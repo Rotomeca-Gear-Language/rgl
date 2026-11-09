@@ -1,0 +1,9 @@
+// Déplacements : « :: » à la déclaration, « <-| » à l'affectation, sur une variable, un champ ou un paramètre.
+gear g(mut [int] p): void {
+    var a:: f();
+    mut [int] b:: a;
+    b <-| p;
+    b[0] <-| 3;
+    p <-| b;
+}
+!train |> done;

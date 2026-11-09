@@ -1,0 +1,1028 @@
+forge: extend
+description: 'collections'
+
+namespace std/collections;
+
+use <Collections> only { index };
+
+/// <lang name="fr">
+/// <summary>Les textes d'un tableau mis bout à bout, séparés par le séparateur, en une passe.</summary>
+/// <param name="parts">Les textes.</param>
+/// <param name="separator">Le séparateur.</param>
+/// <returns>Le texte joint.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The texts of an array put end to end, separated by the separator, in one pass.</summary>
+/// <param name="parts">The texts.</param>
+/// <param name="separator">The separator.</param>
+/// <returns>The joined text.</returns>
+/// </lang>
+@trusted
+gear pure _joinText([string] parts, string separator): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_parts parts, rgl_arg_separator separator) { return rgl::standard::text::join(parts, separator); }
+}([string] parts: parts, string separator: separator): string;
+
+/// <lang name="fr">
+/// <summary>Opérations sur les tableaux de nombres.</summary>
+/// <typeparam name="T">Type numérique des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on arrays of numbers.</summary>
+/// <typeparam name="T">The numeric type of the elements.</typeparam>
+/// </lang>
+extend<T: number> [T] {
+    /// <lang name="fr">
+    /// <summary>Somme de tous les éléments (0 pour un tableau vide).</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Le tableau à additionner.</param>
+    /// <returns>La somme des éléments.</returns>
+    /// <example><code language="rgl">
+    /// const int total: [1, 2, 3].sum(); // 6
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The sum of all elements (0 for an empty array).</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The array to sum.</param>
+    /// <returns>The sum of the elements.</returns>
+    /// <example><code language="rgl">
+    /// const int total: [1, 2, 3].sum(); // 6
+    /// </code></example>
+    /// </lang>
+    gear pure sum(this [T] array): T {
+        const T ZERO: 0;
+
+        return array |+> ZERO with (acc, x) => acc + x;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le plus petit élément.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="v">Le tableau à parcourir.</param>
+    /// <returns>Le plus petit élément, null si le tableau est vide.</returns>
+    /// <example><code language="rgl">
+    /// const int? petit: [4, 2, 9].min(); // 2
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The smallest element.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="v">The array to search.</param>
+    /// <returns>The smallest element, or null if the array is empty.</returns>
+    /// <example><code language="rgl">
+    /// const int? petit: [4, 2, 9].min(); // 2
+    /// </code></example>
+    /// </lang>
+    gear pure min(this [T] v): T? {
+        if (v.length eq 0) { return null; }
+
+        return [1..<v.length] |+> v[0] with (acc, i) => v[i] < acc ? v[i] : acc;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le plus grand élément.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="v">Le tableau à parcourir.</param>
+    /// <returns>Le plus grand élément, null si le tableau est vide.</returns>
+    /// <example><code language="rgl">
+    /// const int? grand: [4, 2, 9].max(); // 9
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The largest element.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="v">The array to search.</param>
+    /// <returns>The largest element, or null if the array is empty.</returns>
+    /// <example><code language="rgl">
+    /// const int? grand: [4, 2, 9].max(); // 9
+    /// </code></example>
+    /// </lang>
+    gear pure max(this [T] v): T? {
+        if (v.length eq 0) { return null; }
+
+        return [1..<v.length] |+> v[0] with (acc, i) => v[i] > acc ? v[i] : acc;
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les tableaux de n'importe quel type.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on arrays of any type.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> [T] {
+    /// <lang name="fr"><summary>Sépare les éléments qui satisfont le prédicat des autres, sans changer leur ordre.</summary><param name="array">Le tableau à partager.</param><param name="test">Le prédicat pur.</param><returns>Un couple nommé `matches` et `others`.</returns></lang>
+    /// <lang name="en"><summary>Separates matching from nonmatching elements without changing their order.</summary><param name="array">The array to split.</param><param name="test">The pure predicate.</param><returns>A named `matches` and `others` pair.</returns></lang>
+    gear pure partition(this [T] array, pure (T) => bool test): ([T] matches, [T] others) {
+        ([T] matches, [T] others) empty: (matches: [], others: []);
+        return array |+> empty with (parts, value) => test(value)
+            ? (matches: [...parts.matches, value], others: parts.others)
+            : (matches: parts.matches, others: [...parts.others, value]);
+    }
+
+    /// <lang name="fr"><summary>Garde le préfixe dont les éléments satisfont le prédicat.</summary><param name="array">Le tableau à parcourir.</param><param name="test">Le test qui arrête le parcours à son premier résultat faux.</param><returns>Une nouvelle copie du préfixe.</returns></lang>
+    /// <lang name="en"><summary>Keeps the prefix whose elements satisfy the predicate.</summary><param name="array">The array to traverse.</param><param name="test">The test that stops traversal at its first false result.</param><returns>A new copy of the prefix.</returns></lang>
+    gear pure takeWhile(this [T] array, pure (T) => bool test): [T] {
+        const long stop: [0..<array.length] |+> (array.length as long) with (found, i) => {
+            if (not test(array[i])) { done i; }
+            return found;
+        };
+        return array.slice(0, stop);
+    }
+
+    /// <lang name="fr"><summary>Retire le préfixe dont les éléments satisfont le prédicat.</summary><param name="array">Le tableau à parcourir.</param><param name="test">Le test qui arrête le retrait à son premier résultat faux.</param><returns>Une nouvelle copie du suffixe restant.</returns></lang>
+    /// <lang name="en"><summary>Removes the prefix whose elements satisfy the predicate.</summary><param name="array">The array to traverse.</param><param name="test">The test that stops removal at its first false result.</param><returns>A new copy of the remaining suffix.</returns></lang>
+    gear pure dropWhile(this [T] array, pure (T) => bool test): [T] {
+        const long start: [0..<array.length] |+> (array.length as long) with (found, i) => {
+            if (not test(array[i])) { done i; }
+            return found;
+        };
+        return array.slice(start, array.length as long);
+    }
+
+    /// <lang name="fr"><summary>Découpe le tableau en blocs non vides.</summary><param name="array">Le tableau à découper.</param><param name="size">La taille maximale d'un bloc.</param><returns>Les blocs dans l'ordre ; un tableau vide si `size` vaut zéro.</returns></lang>
+    /// <lang name="en"><summary>Splits the array into nonempty chunks.</summary><param name="array">The array to split.</param><param name="size">The maximum chunk size.</param><returns>Chunks in order; an empty array when `size` is zero.</returns></lang>
+    gear pure chunk(this [T] array, uint size): [[T]] {
+        if (size eq 0) { return []; }
+        return [0..<((array.length + size - 1) / size)] ||> (i) => array.slice((i * size) as long, ((i + 1) * size) as long);
+    }
+
+    /// <lang name="fr"><summary>Associe chaque élément à son rang.</summary><param name="array">Le tableau à énumérer.</param><returns>Des couples nommés `position` et `value`.</returns></lang>
+    /// <lang name="en"><summary>Pairs every element with its index.</summary><param name="array">The array to enumerate.</param><returns>Named `position` and `value` pairs.</returns></lang>
+    gear pure enumerate(this [T] array): [(index position, T value)] =>
+        [0..<array.length] ||> (i) => (position: index(i as long), value: array[i]);
+
+    /// <lang name="fr"><summary>Trie une copie avec un tri fusion stable en O(n log n).</summary><param name="array">Le tableau d'origine, laissé intact.</param><param name="compare">Comparateur pur : négatif si le premier précède le second, zéro s'ils sont équivalents, positif sinon.</param><returns>Une nouvelle copie triée.</returns></lang>
+    /// <lang name="en"><summary>Sorts a copy using stable O(n log n) merge sort.</summary><param name="array">The original array, left unchanged.</param><param name="compare">Pure comparator: negative when the first precedes the second, zero when equivalent, positive otherwise.</param><returns>A new sorted copy.</returns></lang>
+    gear pure sortedWith(this [T] array, pure (T, T) => int compare): [T] {
+        if (array.length < 2) { return array; }
+        const long middle: (array.length / 2) as long;
+        const [T] left: array.slice(0, middle).sortedWith(compare);
+        const [T] right: array.slice(middle, array.length as long).sortedWith(compare);
+        (uint leftIndex, uint rightIndex, [T] values) start: (leftIndex: 0, rightIndex: 0, values: []);
+        const (uint leftIndex, uint rightIndex, [T] values) merged:
+            [0..<array.length] |+> start with (state, _) => {
+                const bool takeLeft: state.rightIndex >= right.length or
+                    (state.leftIndex < left.length and compare(left[state.leftIndex], right[state.rightIndex]) <= 0);
+                return takeLeft
+                    ? (leftIndex: state.leftIndex + 1, rightIndex: state.rightIndex, values: [...state.values, left[state.leftIndex]])
+                    : (leftIndex: state.leftIndex, rightIndex: state.rightIndex + 1, values: [...state.values, right[state.rightIndex]]);
+            };
+        return merged.values;
+    }
+
+    /// <lang name="fr"><summary>Trie un tableau mutable sur place.</summary><param name="array">Le tableau modifié.</param><param name="compare">Le même contrat de comparateur que `sortedWith`.</param><remarks>Une copie triée temporaire est allouée puis recopiée dans `array`.</remarks></lang>
+    /// <lang name="en"><summary>Sorts a mutable array in place.</summary><param name="array">The modified array.</param><param name="compare">The same comparator contract as `sortedWith`.</param><remarks>A temporary sorted copy is allocated and copied back into `array`.</remarks></lang>
+    gear sortWith(this mut [T] array, pure (T, T) => int compare): void {
+        const [T] sorted: array.sortedWith(compare);
+        [0..<array.length] ||> (i) => { array[i] <- sorted[i]; };
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le premier élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à lire.</param>
+    /// <returns>Le premier élément, null si le tableau est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The first element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to read.</param>
+    /// <returns>The first element, or null if the array is empty.</returns>
+    /// </lang>
+    gear pure first(this [T] array): T? => array.length > 0 ? array[0] : null;
+
+    /// <lang name="fr">
+    /// <summary>Le dernier élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à lire.</param>
+    /// <returns>Le dernier élément, null si le tableau est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The last element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to read.</param>
+    /// <returns>The last element, or null if the array is empty.</returns>
+    /// </lang>
+    gear pure last(this [T] array): T? => array.length > 0 ? array[-1] : null;
+
+    /// <lang name="fr">
+    /// <summary>
+    /// Dit si le tableau contient l'élément (comparé par eq).
+    /// A optimiser en c++.
+    /// </summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="what">L'élément cherché.</param>
+    /// <returns>Vrai si l'élément est présent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>
+    /// Checks whether the array contains the element (compared using eq).
+    /// To be optimized in C++.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="what">The element to find.</param>
+    /// <returns>True if the element is present.</returns>
+    /// </lang>
+    gear pure contains(this [T] array, T what): bool => array.indexOf(what) not eq null;
+
+    /// <lang name="fr">
+    /// <summary>Le rang de la première occurrence d'un élément. L'accumulation s'arrête dès qu'elle est trouvée.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="what">L'élément cherché.</param>
+    /// <returns>Le rang de la première occurrence, null s'il n'y en a pas.</returns>
+    /// <example><code language="rgl">
+    /// const index? rang: [5, 6, 7].indexOf(6); // 1
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The index of the first occurrence of an element. The accumulation stops as soon as it is found.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="what">The element to find.</param>
+    /// <returns>The index of the first occurrence, or null if none is found.</returns>
+    /// <example><code language="rgl">
+    /// const index? rang: [5, 6, 7].indexOf(6); // 1
+    /// </code></example>
+    /// </lang>
+    gear pure indexOf(this [T] array, T what): index? {
+        index? none: null;
+
+        return array |+> none with (acc, x, i) => {
+            if (x eq what) { done index(i as long); }
+            return acc;
+        };
+    }
+
+    /// <lang name="fr">
+    /// <summary>Vrai dès qu'un élément satisfait le test : le parcours s'arrête au premier.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="test">Le test appliqué à chaque élément.</param>
+    /// <returns>Vrai si au moins un élément satisfait le test, faux sinon (et pour un tableau vide).</returns>
+    /// <example><code language="rgl">
+    /// const bool grand: [1, 9].any((x) => x > 8); // true
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>True as soon as an element satisfies the predicate: iteration stops at the first match.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="test">The predicate applied to each element.</param>
+    /// <returns>True if at least one element satisfies the predicate, or false otherwise (including for an empty array).</returns>
+    /// <example><code language="rgl">
+    /// const bool grand: [1, 9].any((x) => x > 8); // true
+    /// </code></example>
+    /// </lang>
+    gear pure any(this [T] array, pure (T) => bool test): bool =>
+        array |+> false with (acc, x) => {
+            if (test(x)) { done true; }
+            return acc;
+        };
+
+    /// <lang name="fr">
+    /// <summary>Vrai si tous les éléments satisfont le test : le parcours s'arrête au premier qui échoue.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="test">Le test appliqué à chaque élément.</param>
+    /// <returns>Vrai si tous les éléments satisfont le test (et pour un tableau vide).</returns>
+    /// <example><code language="rgl">
+    /// const bool positifs: [1, 2].all((x) => x > 0); // true
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>True if every element satisfies the predicate: iteration stops at the first failure.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="test">The predicate applied to each element.</param>
+    /// <returns>True if every element satisfies the predicate (including for an empty array).</returns>
+    /// <example><code language="rgl">
+    /// const bool positifs: [1, 2].all((x) => x > 0); // true
+    /// </code></example>
+    /// </lang>
+    gear pure all(this [T] array, pure (T) => bool test): bool =>
+        array |+> true with (acc, x) => {
+            if (not test(x)) { done false; }
+            return acc;
+        };
+
+    /// <lang name="fr">
+    /// <summary>Écrit les éléments en texte, séparés par un séparateur.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à écrire.</param>
+    /// <param name="separator">Le texte placé entre deux éléments (vide par défaut).</param>
+    /// <returns>Le texte obtenu, vide pour un tableau vide.</returns>
+    /// <example><code language="rgl">
+    /// const string texte: [1, 2, 3].join(', '); // 1, 2, 3
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the elements as text, separated by a separator.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to write.</param>
+    /// <param name="separator">The text placed between elements (empty by default).</param>
+    /// <returns>The resulting text; empty for an empty array.</returns>
+    /// <example><code language="rgl">
+    /// const string texte: [1, 2, 3].join(', '); // 1, 2, 3
+    /// </code></example>
+    /// </lang>
+    gear pure join(this [T] array, string separator: ''): string {
+        if (array.length eq 0) { return ''; }
+
+        // Des textes : un seul passage du runtime ; sinon chaque élément s'écrit en texte, un à un.
+        if (T is string) { return _joinText(array, separator); }
+
+        string first: `{array[0]}`;
+        return [1..<array.length] |+> first with (acc, i) => `{acc}{separator}{array[i]}`;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les deux tableaux mis bout à bout.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="a">Le tableau de départ.</param>
+    /// <param name="b">Le tableau ajouté à la suite.</param>
+    /// <returns>Un nouveau tableau : les éléments de a puis ceux de b.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The two arrays concatenated.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="a">The initial array.</param>
+    /// <param name="b">The array appended to it.</param>
+    /// <returns>A new array: the elements of a followed by those of b.</returns>
+    /// </lang>
+    gear pure concat(this [T] a, [T] b): [T] => [...a, ...b];
+
+    /// <lang name="fr">
+    /// <summary>Les éléments de start (inclus) à stop (exclu). Un nombre négatif compte depuis la fin, et les bornes sont ramenées dans le tableau.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="v">Le tableau à découper.</param>
+    /// <param name="start">Le rang du premier élément gardé.</param>
+    /// <param name="stop">Le rang du premier élément non gardé.</param>
+    /// <returns>Un nouveau tableau, vide si les bornes se croisent.</returns>
+    /// <example><code language="rgl">
+    /// const [int] milieu: [1, 2, 3, 4].slice(1, -1); // [2, 3]
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements from start (inclusive) to stop (exclusive). Negative indices count from the end, and bounds are clamped to the array.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="v">The array to slice.</param>
+    /// <param name="start">The index of the first element to keep.</param>
+    /// <param name="stop">The index of the first element not to keep.</param>
+    /// <returns>A new array, empty if the bounds cross.</returns>
+    /// <example><code language="rgl">
+    /// const [int] milieu: [1, 2, 3, 4].slice(1, -1); // [2, 3]
+    /// </code></example>
+    /// </lang>
+    gear pure slice(this [T] v, long start, long stop): [T] {
+        const long n: v.length as long;
+        const long from0: start < 0 ? start + n : start;
+        const long to0: stop < 0 ? stop + n : stop;
+        const long from: from0 < 0 ? 0 : (from0 > n ? n : from0);
+        const long to: to0 < from ? from : (to0 > n ? n : to0);
+
+        return [from..<to] ||> (i) => v[i];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Inverse l'ordre des éléments, en place : chaque pas échange deux éléments, par la lambda qui modifie v sur place.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="v">Le tableau à inverser, modifié.</param>
+    /// <example><code language="rgl">
+    /// mut [int] t: [1, 2, 3];
+    /// t.reverse(); // [3, 2, 1]
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reverses the elements in place: each step swaps two elements using a lambda that modifies v in place.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="v">The array to reverse, modified in place.</param>
+    /// <example><code language="rgl">
+    /// mut [int] t: [1, 2, 3];
+    /// t.reverse(); // [3, 2, 1]
+    /// </code></example>
+    /// </lang>
+    gear reverse(this mut [T] v): void {
+        [0..<(v.length as int / 2)] ||> (i) => {
+            T moved: v[i];
+            v[i] <- v[-1 - i];
+            v[-1 - i] <- moved;
+        };
+    }
+}
+
+
+/// <lang name="fr">
+/// <summary>Autres opérations sur les tableaux de n'importe quel type.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Additional operations on arrays of any type.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> [T] {
+    /// <lang name="fr">
+    /// <summary>Dit si le tableau n'a aucun élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à tester.</param>
+    /// <returns>Vrai si le tableau est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the array has no elements.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to test.</param>
+    /// <returns>True if the array is empty.</returns>
+    /// </lang>
+    gear pure isEmpty(this [T] array): bool => array.length eq 0;
+
+    /// <lang name="fr">
+    /// <summary>Les éléments qui satisfont le test, dans l'ordre.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à filtrer.</param>
+    /// <param name="test">Le test appliqué à chaque élément.</param>
+    /// <returns>Un nouveau tableau des éléments retenus.</returns>
+    /// <example><code language="rgl">
+    /// const [int] pairs: [1, 2, 3, 4].filter((x) => x % 2 eq 0); // [2, 4]
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements that satisfy the predicate, in order.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to filter.</param>
+    /// <param name="test">The predicate applied to each element.</param>
+    /// <returns>A new array containing the matching elements.</returns>
+    /// <example><code language="rgl">
+    /// const [int] pairs: [1, 2, 3, 4].filter((x) => x % 2 eq 0); // [2, 4]
+    /// </code></example>
+    /// </lang>
+    gear pure filter(this [T] array, pure (T) => bool test): [T] {
+        [T] none: [];
+        return array |+> none with (acc, x) => test(x) ? [...acc, x] : acc;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le premier élément qui satisfait le test : le parcours s'arrête à lui.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="test">Le test appliqué à chaque élément.</param>
+    /// <returns>Le premier élément retenu, null s'il n'y en a pas.</returns>
+    /// <example><code language="rgl">
+    /// const int? premier: [1, 5, 9].find((x) => x > 3); // 5
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The first element that satisfies the predicate: iteration stops at that element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="test">The predicate applied to each element.</param>
+    /// <returns>The first matching element, or null if none is found.</returns>
+    /// <example><code language="rgl">
+    /// const int? premier: [1, 5, 9].find((x) => x > 3); // 5
+    /// </code></example>
+    /// </lang>
+    gear pure find(this [T] array, pure (T) => bool test): T? {
+        T? none: null;
+        return array |+> none with (acc, x) => {
+            if (test(x)) { done x; }
+            return acc;
+        };
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le premier élément qui satisfait le test : un autre nom de <c>find</c>, pour qui lit « premier où ».</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="test">Le test appliqué à chaque élément.</param>
+    /// <returns>Le premier élément retenu, null s'il n'y en a pas.</returns>
+    /// <example><code language="rgl">
+    /// const int? premier: [1, 5, 9].firstWhere((x) => x > 3); // 5
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The first element that satisfies the predicate: another name for <c>find</c>, read as “first where”.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="test">The predicate applied to each element.</param>
+    /// <returns>The first matching element, or null if none is found.</returns>
+    /// <example><code language="rgl">
+    /// const int? premier: [1, 5, 9].firstWhere((x) => x > 3); // 5
+    /// </code></example>
+    /// </lang>
+    gear pure firstWhere(this [T] array, pure (T) => bool test): T? => array.find(test);
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments qui satisfont le test.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="test">Le test appliqué à chaque élément.</param>
+    /// <returns>Le nombre d'éléments retenus.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of elements that satisfy the predicate.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="test">The predicate applied to each element.</param>
+    /// <returns>The number of matching elements.</returns>
+    /// </lang>
+    gear pure count(this [T] array, pure (T) => bool test): uint {
+        uint none: 0;
+        return array |+> none with (acc, x) => test(x) ? acc + 1 : acc;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les n premiers éléments (moins s'il y en a moins).</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à découper.</param>
+    /// <param name="n">Le nombre d'éléments à garder.</param>
+    /// <returns>Un nouveau tableau des n premiers éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The first n elements (fewer if the array is shorter).</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to slice.</param>
+    /// <param name="n">The number of elements to keep.</param>
+    /// <returns>A new array containing the first n elements.</returns>
+    /// </lang>
+    gear pure take(this [T] array, uint n): [T] => array.slice(0, n as long);
+
+    /// <lang name="fr">
+    /// <summary>Tous les éléments sauf les n premiers.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à découper.</param>
+    /// <param name="n">Le nombre d'éléments à écarter.</param>
+    /// <returns>Un nouveau tableau, vide s'il y a n éléments ou moins.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>All elements except the first n.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to slice.</param>
+    /// <param name="n">The number of elements to skip.</param>
+    /// <returns>A new array, empty if it has n elements or fewer.</returns>
+    /// </lang>
+    gear pure drop(this [T] array, uint n): [T] => array.slice(n as long, array.length as long);
+
+    /// <lang name="fr">
+    /// <summary>Le tableau à l'envers, sans toucher à l'original.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à inverser.</param>
+    /// <returns>Un nouveau tableau dans l'ordre inverse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The array in reverse order, without modifying the original.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to reverse.</param>
+    /// <returns>A new array in reverse order.</returns>
+    /// </lang>
+    gear pure reversed(this [T] array): [T] {
+        [T] none: [];
+        return array |+> none with (acc, x) => [x, ...acc];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Chaque élément une fois, dans l'ordre de première apparition.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à dédoublonner.</param>
+    /// <returns>Un nouveau tableau sans doublon.</returns>
+    /// <example><code language="rgl">
+    /// const [int] uniques: [1, 2, 1, 3].distinct(); // [1, 2, 3]
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Each element once, in order of first appearance.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to deduplicate.</param>
+    /// <returns>A new array without duplicates.</returns>
+    /// <example><code language="rgl">
+    /// const [int] uniques: [1, 2, 1, 3].distinct(); // [1, 2, 3]
+    /// </code></example>
+    /// </lang>
+    gear pure distinct(this [T] array): [T] {
+        [T] none: [];
+        return array |+> none with (acc, x) => acc.contains(x) ? acc : [...acc, x];
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les tableaux de tableaux.</summary>
+/// <typeparam name="T">Type des éléments des tableaux intérieurs.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on arrays of arrays.</summary>
+/// <typeparam name="T">The element type of the inner arrays.</typeparam>
+/// </lang>
+extend<T> [[T]] {
+    /// <lang name="fr">
+    /// <summary>Les tableaux mis bout à bout.</summary>
+    /// <typeparam name="T">Type des éléments des tableaux intérieurs.</typeparam>
+    /// <param name="arrays">Le tableau de tableaux à aplatir.</param>
+    /// <returns>Un tableau unique, dans l'ordre.</returns>
+    /// <example><code language="rgl">
+    /// const [int] plat: [[1, 2], [3]].flatten(); // [1, 2, 3]
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The arrays concatenated.</summary>
+    /// <typeparam name="T">The element type of the inner arrays.</typeparam>
+    /// <param name="arrays">The array of arrays to flatten.</param>
+    /// <returns>A single array, in order.</returns>
+    /// <example><code language="rgl">
+    /// const [int] plat: [[1, 2], [3]].flatten(); // [1, 2, 3]
+    /// </code></example>
+    /// </lang>
+    gear pure flatten(this [[T]] arrays): [T] {
+        [T] none: [];
+        return arrays |+> none with (acc, inner) => [...acc, ...inner];
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Autres opérations sur les tableaux de nombres.</summary>
+/// <typeparam name="T">Type numérique des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Additional operations on arrays of numbers.</summary>
+/// <typeparam name="T">The numeric type of the elements.</typeparam>
+/// </lang>
+extend<T: number> [T] {
+    /// <lang name="fr">
+    /// <summary>Produit de tous les éléments (1 pour un tableau vide).</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Le tableau à multiplier.</param>
+    /// <returns>Le produit des éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The product of all elements (1 for an empty array).</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The array to multiply.</param>
+    /// <returns>The product of the elements.</returns>
+    /// </lang>
+    gear pure product(this [T] array): T {
+        const T ONE: 1;
+        return array |+> ONE with (acc, x) => acc * x;
+    }
+
+    /// <lang name="fr">
+    /// <summary>La moyenne des éléments.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Le tableau à moyenner.</param>
+    /// <returns>La moyenne en double, null pour un tableau vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The average of the elements.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The array to average.</param>
+    /// <returns>The average as a double, or null for an empty array.</returns>
+    /// </lang>
+    gear pure average(this [T] array): double? =>
+        array.length eq 0 ? null : (array.sum() as double) / (array.length as double);
+
+    /// <lang name="fr">
+    /// <summary>Le tableau trié du plus petit au plus grand (tri par insertion), sans toucher à l'original.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Le tableau à trier.</param>
+    /// <returns>Un nouveau tableau trié, les éléments égaux gardant leur ordre.</returns>
+    /// <example><code language="rgl">
+    /// const [int] trie: [3, 1, 2].sorted(); // [1, 2, 3]
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The array sorted in ascending order (insertion sort), without modifying the original.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The array to sort.</param>
+    /// <returns>A new sorted array; equal elements retain their order.</returns>
+    /// <example><code language="rgl">
+    /// const [int] trie: [3, 1, 2].sorted(); // [1, 2, 3]
+    /// </code></example>
+    /// </lang>
+    gear pure sorted(this [T] array): [T] {
+        [T] none: [];
+        return array |+> none with (acc, x) => {
+            // Le rang où x s'insère : celui du premier élément plus grand.
+            long end: acc.length as long;
+            const long place: [0..<end] |+> end with (found, p) => {
+                if (acc[p] > x) { done p; }
+                return found;
+            };
+            return [...acc.slice(0, place), x, ...acc.slice(place, end)];
+        };
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les dictionnaires.</summary>
+/// <typeparam name="K">Type des clés.</typeparam>
+/// <typeparam name="V">Type des valeurs.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on dictionaries.</summary>
+/// <typeparam name="K">The key type.</typeparam>
+/// <typeparam name="V">The value type.</typeparam>
+/// </lang>
+extend<K, V> [K:V] {
+    /// <lang name="fr">
+    /// <summary>Dit si le dictionnaire n'a aucune entrée.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire à tester.</param>
+    /// <returns>Vrai si le dictionnaire est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the dictionary has no entries.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary to test.</param>
+    /// <returns>True if the dictionary is empty.</returns>
+    /// </lang>
+    gear pure isEmpty(this [K:V] dictionary): bool => dictionary.length eq 0;
+
+    /// <lang name="fr">
+    /// <summary>La valeur de la clé, ou fallback si elle est absente.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire à lire.</param>
+    /// <param name="key">La clé cherchée.</param>
+    /// <param name="fallback">La valeur rendue quand la clé est absente.</param>
+    /// <returns>La valeur associée à la clé, sinon fallback.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The value for the key, or fallback if it is absent.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary to read.</param>
+    /// <param name="key">The key to find.</param>
+    /// <param name="fallback">The value returned when the key is absent.</param>
+    /// <returns>The value associated with the key, or fallback otherwise.</returns>
+    /// </lang>
+    gear pure getOr(this [K:V] dictionary, K key, V fallback): V => dictionary.has(key) ? dictionary[key] : fallback;
+
+    /// <lang name="fr">
+    /// <summary>La plus petite clé : un dictionnaire est rangé dans l'ordre de ses clés.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire.</param>
+    /// <returns>La première clé, `null` si le dictionnaire est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The smallest key: a dictionary is kept in key order.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary.</param>
+    /// <returns>The first key, `null` when the dictionary is empty.</returns>
+    /// </lang>
+    gear pure firstKey(this [K:V] dictionary): K? => dictionary.keys().first();
+
+    /// <lang name="fr">
+    /// <summary>La plus grande clé : un dictionnaire est rangé dans l'ordre de ses clés.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire.</param>
+    /// <returns>La dernière clé, `null` si le dictionnaire est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The largest key: a dictionary is kept in key order.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary.</param>
+    /// <returns>The last key, `null` when the dictionary is empty.</returns>
+    /// </lang>
+    gear pure lastKey(this [K:V] dictionary): K? => dictionary.keys().last();
+}
+
+/// <lang name="fr">
+/// <summary>Modifications en place des tableaux.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>In-place modifications of arrays.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> [T] {
+    /// <lang name="fr">
+    /// <summary>Retire le dernier élément et le rend.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` pour un tableau vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the last element and returns it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` for an empty array.</returns>
+    /// </lang>
+    gear pop(this mut [T] array): T? {
+        if (array.length eq 0) { return null; }
+        const T last: array[-1];
+        array <- array.slice(0, -1);
+        return last;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire l'élément au rang donné (un rang négatif compte depuis la fin).</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à modifier (variable `mut`).</param>
+    /// <param name="position">Le rang de l'élément retiré.</param>
+    /// <returns>L'élément retiré, `null` si le rang est hors du tableau.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the element at a position (a negative position counts from the end).</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to modify (a `mut` variable).</param>
+    /// <param name="position">The position of the removed element.</param>
+    /// <returns>The removed element, `null` when the position is outside the array.</returns>
+    /// </lang>
+    gear removeAt(this mut [T] array, long position): T? {
+        const long n: array.length as long;
+        const long rank: position < 0 ? position + n : position;
+        if (rank < 0 or rank >= n) { return null; }
+        const T removed: array[rank];
+        array <- [...array.slice(0, rank), ...array.slice(rank + 1, n)];
+        return removed;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Insère un élément au rang donné ; les suivants sont décalés (un rang hors du tableau est ramené à ses bords).</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à modifier (variable `mut`).</param>
+    /// <param name="position">Le rang du nouvel élément.</param>
+    /// <param name="value">L'élément inséré.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Inserts an element at a position; the following ones shift (a position outside the array is clamped to its edges).</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to modify (a `mut` variable).</param>
+    /// <param name="position">The position of the new element.</param>
+    /// <param name="value">The inserted element.</param>
+    /// </lang>
+    gear insert(this mut [T] array, long position, T value): void {
+        const long n: array.length as long;
+        const long rank: position < 0 ? position + n : position;
+        const long clamped: rank < 0 ? 0 : (rank > n ? n : rank);
+        array <- [...array.slice(0, clamped), value, ...array.slice(clamped, n)];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire tous les éléments.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à vider (variable `mut`).</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes every element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to empty (a `mut` variable).</param>
+    /// </lang>
+    gear clear(this mut [T] array): void {
+        [T] none: [];
+        array <- none;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les fenêtres glissantes de `size` éléments consécutifs.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="array">Le tableau à parcourir.</param>
+    /// <param name="size">La taille de chaque fenêtre.</param>
+    /// <returns>Un tableau de fenêtres ; vide si `size` est nul ou dépasse le tableau.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The sliding windows of `size` consecutive elements.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="array">The array to traverse.</param>
+    /// <param name="size">The size of each window.</param>
+    /// <returns>An array of windows; empty when `size` is zero or exceeds the array.</returns>
+    /// </lang>
+    gear pure windowed(this [T] array, uint size): [[T]] {
+        if (size eq 0 or array.length < size) { return []; }
+        return [0..(array.length - size)] ||> (i) => array.slice(i as long, (i + size) as long);
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les tableaux de paires.</summary>
+/// <typeparam name="T">Type du premier élément de chaque paire.</typeparam>
+/// <typeparam name="U">Type du second élément de chaque paire.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on arrays of pairs.</summary>
+/// <typeparam name="T">The type of the first element of each pair.</typeparam>
+/// <typeparam name="U">The type of the second element of each pair.</typeparam>
+/// </lang>
+extend<T, U> [(T, U)] {
+    /// <lang name="fr">
+    /// <summary>Sépare un tableau de paires en deux tableaux.</summary>
+    /// <typeparam name="T">Type du premier élément.</typeparam>
+    /// <typeparam name="U">Type du second élément.</typeparam>
+    /// <param name="pairs">Le tableau de paires.</param>
+    /// <returns>Les premiers éléments (`left`) et les seconds (`right`).</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Splits an array of pairs into two arrays.</summary>
+    /// <typeparam name="T">The first element type.</typeparam>
+    /// <typeparam name="U">The second element type.</typeparam>
+    /// <param name="pairs">The array of pairs.</param>
+    /// <returns>The first elements (`left`) and the second ones (`right`).</returns>
+    /// </lang>
+    gear pure unzip(this [(T, U)] pairs): ([T] left, [U] right) {
+        const [T] left: pairs ||> (p) => p.Item1;
+        const [U] right: pairs ||> (p) => p.Item2;
+        return (left: left, right: right);
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les dictionnaires.</summary>
+/// <typeparam name="K">Type des clés.</typeparam>
+/// <typeparam name="V">Type des valeurs.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on dictionaries.</summary>
+/// <typeparam name="K">The key type.</typeparam>
+/// <typeparam name="V">The value type.</typeparam>
+/// </lang>
+extend<K, V> [K:V] {
+    /// <lang name="fr">
+    /// <summary>Retire une clé et sa valeur.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire à modifier (variable `mut`).</param>
+    /// <param name="key">La clé retirée.</param>
+    /// <returns>`true` si la clé existait.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes a key and its value.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary to modify (a `mut` variable).</param>
+    /// <param name="key">The removed key.</param>
+    /// <returns>`true` when the key existed.</returns>
+    /// </lang>
+    gear remove(this mut [K:V] dictionary, K key): bool {
+        const bool found: dictionary.has(key);
+        dictionary <- dictionary.without(key);
+        return found;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les paires clé/valeur, dans l'ordre des clés.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire à lire.</param>
+    /// <returns>Un tableau de paires `(key, value)`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The key/value pairs, in key order.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary to read.</param>
+    /// <returns>An array of `(key, value)` pairs.</returns>
+    /// </lang>
+    gear pure entries(this [K:V] dictionary): [(K key, V value)] {
+        const [K] keys: dictionary.keys();
+        const [V] values: dictionary.values();
+        return [0..<keys.length] ||> (i) => (key: keys[i], value: values[i]);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Réunit deux dictionnaires ; pour une clé commune, la valeur de `other` l'emporte.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire de départ.</param>
+    /// <param name="other">Le dictionnaire dont les entrées s'ajoutent ou remplacent.</param>
+    /// <returns>Un nouveau dictionnaire.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Merges two dictionaries; for a shared key, the value of `other` wins.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The starting dictionary.</param>
+    /// <param name="other">The dictionary whose entries are added or replace.</param>
+    /// <returns>A new dictionary.</returns>
+    /// </lang>
+    gear pure merge(this [K:V] dictionary, [K:V] other): [K:V] =>
+        other.keys() |+> dictionary with (acc, key) => acc.put(key, other[key]);
+
+    /// <lang name="fr">
+    /// <summary>Garde les entrées pour lesquelles le test est vrai.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="dictionary">Le dictionnaire à filtrer.</param>
+    /// <param name="test">Le test pur appliqué à la clé et à la valeur.</param>
+    /// <returns>Un nouveau dictionnaire.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Keeps the entries for which the test is true.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary to filter.</param>
+    /// <param name="test">The pure test applied to the key and the value.</param>
+    /// <returns>A new dictionary.</returns>
+    /// </lang>
+    gear pure filter(this [K:V] dictionary, pure (K, V) => bool test): [K:V] {
+        [K:V] none: [:];
+        return dictionary.keys() |+> none with (acc, key) => test(key, dictionary[key]) ? acc.put(key, dictionary[key]) : acc;
+    }
+}

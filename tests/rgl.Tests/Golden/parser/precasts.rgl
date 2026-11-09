@@ -1,0 +1,12 @@
+forge: precast
+description: "Precasts"
+
+precast Vec2 Zero  { x: 0.0, y: 0.0 }
+precast {string name, bool debug} Config {
+    name: "MonApp";
+    debug: false;
+}
+precast Autre {
+    string name: "x";
+    int n: 2;
+}

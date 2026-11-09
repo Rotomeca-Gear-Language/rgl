@@ -1,0 +1,3 @@
+27-operateurs-mal-formes.rgl:3:13: erreur[E030]: « : » attendu entre les deux valeurs du ternaire
+27-operateurs-mal-formes.rgl:4:11: erreur[E030]: nombre entier attendu entre les chevrons
+27-operateurs-mal-formes.rgl:5:12: erreur[E030]: « > » attendu pour fermer le pas

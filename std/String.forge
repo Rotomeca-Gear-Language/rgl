@@ -1,0 +1,36 @@
+forge: gears
+description: "Constantes et aides de base sur les chaînes"
+
+/// <lang name="fr">
+/// <summary>Une espace.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A space.</summary>
+/// </lang>
+const string SPACE: ' ';
+/// <lang name="fr">
+/// <summary>Une fin de ligne.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A newline.</summary>
+/// </lang>
+const string END_OF_LINE: "\n";
+/// <lang name="fr">
+/// <summary>Une tabulation.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A tab.</summary>
+/// </lang>
+const string TAB: "\t";
+
+/// <lang name="fr">
+/// <summary>Indique si un texte est vide.</summary>
+/// <param name="s">Le texte à tester.</param>
+/// <returns>`true` si `s` n'a aucun caractère.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether text is empty.</summary>
+/// <param name="s">The text to test.</param>
+/// <returns>`true` if `s` has no characters.</returns>
+/// </lang>
+gear pure isEmpty(string s): bool => s eq '';

@@ -1,0 +1,8 @@
+forge: index
+description: "Index"
+
+import Vectors;
+import Autre only {a, b};
+export {...Vectors, a, b};
+export Vectors;
+export var x: 3;

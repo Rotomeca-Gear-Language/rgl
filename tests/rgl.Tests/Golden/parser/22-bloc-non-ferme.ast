@@ -1,0 +1,6 @@
+CompilationUnit 1:1
+  BlockStatement 2:1
+    VarDeclaration 3:5 keyword=var name=a
+      LiteralExpression 3:12 kind=IntegerLiteral text=1
+    AssignmentStatement 5:5 target=a
+      LiteralExpression 5:10 kind=IntegerLiteral text=2

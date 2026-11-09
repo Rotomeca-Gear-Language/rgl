@@ -1,0 +1,73 @@
+// Simulation de particules : 200 000 particules, des frames jusqu'à ce qu'il n'en reste plus.
+// Un guard fait avancer chaque particule (en fin de vie, il échoue et le parcours l'écarte).
+ingot Position: int;
+ingot Life: uint;
+
+mold Vector3 {
+    Position x: 0;
+    Position y: 0;
+    Position z: 0;
+}
+
+mold Particle {
+    Vector3 position;
+    Position velocity;
+    Life lifetime;
+}
+
+const Vector3 ZERO: {};
+const Vector3 UN: {x: 0, y: 5, z: 75};
+const Vector3 DEUX: {x: 5, y: -10, z: 0};
+
+const Particle PART1: {position: ZERO, velocity: 5, lifetime: 25};
+const Particle PART2: {position: UN, velocity: 15, lifetime: 70};
+const Particle PART3: {position: DEUX, velocity: 8, lifetime: 50};
+
+const uint PARTICLES_MAX: 200000;
+
+gear pure naissance(uint i): Particle {
+    switch (i) {
+        case eval $ % 2 eq 0:
+            return PART1;
+
+        case eval $ % 3 eq 0:
+            return PART2;
+
+        default:
+            return PART3;
+    }
+}
+
+gear writeLine(string what): void {
+    `{what}\n` -> console;
+}
+
+guard updateParticle(mut Particle particule): Particle {
+    if (particule.lifetime eq 0) {
+        fail;
+    }
+
+    const Position velocity: particule.velocity;
+    particule.position.x +<- velocity;
+    particule.position.y +<- velocity;
+    particule.position.z +<- velocity;
+    particule.lifetime -<- 1;
+
+    return particule;
+}
+
+guard frame(mut [Particle] particules): [Particle] {
+    if (particules.length eq 0) {
+        done;
+    }
+
+    var vivantes:: (particules ||> updateParticle);
+    writeLine(`{vivantes.length} particules`);
+    return vivantes;
+}
+
+emit report([Particle] particules): void {
+    writeLine(`Fin : {particules.length} particules encore en vie`);
+}
+
+train [0..<PARTICLES_MAX] ||> naissance |> frame*<100> |> report;

@@ -1,0 +1,2 @@
+// Un rail après une fin de chemin.
+train |> lire |> done !> [rapport];

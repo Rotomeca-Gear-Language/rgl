@@ -1,0 +1,302 @@
+forge: gears
+description: "Erreurs standard : celles que le compilateur envoie lui-même (Exception, CastError, LoopError) et quelques autres"
+
+/// <lang name="fr">
+/// <summary>Le code d'une erreur : 0 quand elle n'en précise pas.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An error code: 0 when none is specified.</summary>
+/// </lang>
+ingot errorCode: uint;
+
+/// <lang name="fr">
+/// <summary>Le nom d'un type, tel qu'il s'écrit dans un cast.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A type name as written in a cast.</summary>
+/// </lang>
+ingot typeName: string;
+
+/// <lang name="fr">
+/// <summary>Les codes d'erreur usuels.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Common error codes.</summary>
+/// </lang>
+extend errorCode {
+    /// <lang name="fr">
+    /// <summary>Aucun code précisé.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>No code specified.</summary>
+    /// </lang>
+    const errorCode NONE: 0;
+
+    /// <lang name="fr">
+    /// <summary>Ce qui est cherché n'existe pas.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The requested item does not exist.</summary>
+    /// </lang>
+    const errorCode NOT_FOUND: 404;
+
+    /// <lang name="fr">
+    /// <summary>Une valeur donnée est invalide.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A supplied value is invalid.</summary>
+    /// </lang>
+    const errorCode INVALID: 400;
+
+    /// <lang name="fr">
+    /// <summary>Une entrée ou une sortie a échoué.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>An input or output operation failed.</summary>
+    /// </lang>
+    const errorCode IO: 5;
+}
+
+/// <lang name="fr">
+/// <summary>Base des erreurs usuelles : un code en plus du `message` et du `where` que toute erreur reçoit.</summary>
+/// <remarks>
+/// `message` vaut « échec » par défaut et `where` reçoit l'endroit du `fail`.
+/// </remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>The base for common errors: a code in addition to the `message` and `where` fields that every error receives.</summary>
+/// <remarks>
+/// `message` defaults to “échec”, and `where` receives the location of the `fail`.
+/// </remarks>
+/// </lang>
+error StandardError {
+    /// <lang name="fr">
+    /// <summary>Le code de l'erreur ; 0 quand elle n'en précise pas.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The error code; 0 when none is specified.</summary>
+    /// </lang>
+    errorCode code: 0;
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'envoie `fail "texte";`, une division entière par zéro, un index hors limites, un ajout dans un tableau plein…</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sent by `fail "texte";`, integer division by zero, an out-of-bounds index, an insertion into a full array, etc.</summary>
+/// </lang>
+error Exception {
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'envoie un cast contrôlé (`as!`, borne, conversion de tableau) qui échoue.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sent when a checked cast (`as!`, a bound, or an array conversion) fails.</summary>
+/// </lang>
+error CastError {
+    /// <lang name="fr">
+    /// <summary>Le texte ou la valeur refusés.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The rejected text or value.</summary>
+    /// </lang>
+    string item;
+
+    /// <lang name="fr">
+    /// <summary>Le type visé par le cast.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The target type of the cast.</summary>
+    /// </lang>
+    typeName target;
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'envoie une boucle de guard `*&lt;!N&gt;` ou une reprise `^N&lt;!M&gt;` qui atteint sa limite.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sent when a guard loop `*&lt;!N&gt;` or a retry `^N&lt;!M&gt;` reaches its limit.</summary>
+/// </lang>
+error LoopError {
+}
+
+/// <lang name="fr">
+/// <summary>Ce qui est cherché n'existe pas.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The requested item does not exist.</summary>
+/// </lang>
+error NotFound {
+    ...StandardError;
+
+    /// <lang name="fr">
+    /// <summary>Ce qui a été cherché.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The item that was requested.</summary>
+    /// </lang>
+    string item;
+}
+
+/// <lang name="fr">
+/// <summary>Un texte n'a pas pu être lu.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Text could not be parsed.</summary>
+/// </lang>
+error ParseError {
+    ...StandardError;
+
+    /// <lang name="fr">
+    /// <summary>Le texte refusé.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The rejected text.</summary>
+    /// </lang>
+    string input;
+}
+
+/// <lang name="fr">
+/// <summary>Une entrée ou une sortie a échoué.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An input or output operation failed.</summary>
+/// </lang>
+error IoError {
+    ...StandardError;
+
+    /// <lang name="fr">
+    /// <summary>Le fichier ou la ressource concernés.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The file or resource involved.</summary>
+    /// </lang>
+    string path;
+}
+
+/// <lang name="fr">
+/// <summary>
+/// Un appel à du code C++ a lancé une exception. `message` est son `what()`, ou « exception C++ inconnue » quand elle n'en a pas (`throw 42`) ;
+/// `where` est la position RGL de l'appel, pas celle du `throw`.
+/// </summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>
+/// A call into C++ code threw an exception. `message` is its `what()`, or "exception C++ inconnue" when it has none (`throw 42`);
+/// `where` is the RGL position of the call, not that of the `throw`.
+/// </summary>
+/// </lang>
+error NativeError {
+    /// <lang name="fr">
+    /// <summary>La fonction ou la méthode C++ appelée, telle qu'écrite dans la liaison.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The C++ function or method that was called, as written in the binding.</summary>
+    /// </lang>
+    string callee;
+}
+
+/// <lang name="fr">
+/// <summary>Où en est une tâche asynchrone (`promesse.state`). L'ordre des variantes est celui du runtime : ne pas le changer.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The state of an asynchronous task (`promesse.state`). Variant order matches the runtime: do not change it.</summary>
+/// </lang>
+enum TaskState {
+    /// <lang name="fr">
+    /// <summary>La tâche est créée, pas encore démarrée.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task has been created but has not started.</summary>
+    /// </lang>
+    Ready,
+
+    /// <lang name="fr">
+    /// <summary>La tâche exécute du code.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task is executing code.</summary>
+    /// </lang>
+    Running,
+
+    /// <lang name="fr">
+    /// <summary>La tâche attend (une durée, une autre promesse).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task is waiting (for a duration or another promise).</summary>
+    /// </lang>
+    Suspended,
+
+    /// <lang name="fr">
+    /// <summary>La tâche est terminée, avec ou sans erreur.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task has finished, with or without an error.</summary>
+    /// </lang>
+    Completed,
+
+    /// <lang name="fr">
+    /// <summary>La tâche a été annulée par `cancel`.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task was cancelled by `cancel`.</summary>
+    /// </lang>
+    Cancelled,
+}
+
+/// <lang name="fr">
+/// <summary>Ce qui est arrivé à une tâche asynchrone qui n'a pas abouti. `Cancelled` est la première variante : le runtime la construit sans connaître le type généré.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>What happened to an asynchronous task that did not complete successfully. `Cancelled` is the first variant: the runtime constructs it without knowing the generated type.</summary>
+/// </lang>
+enum AsyncKind {
+    /// <lang name="fr">
+    /// <summary>La tâche a été annulée (`cancel`).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task was cancelled (`cancel`).</summary>
+    /// </lang>
+    Cancelled,
+
+    /// <lang name="fr">
+    /// <summary>Un délai est dépassé.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A timeout expired.</summary>
+    /// </lang>
+    Timeout,
+
+    /// <lang name="fr">
+    /// <summary>La tâche a été interrompue avant la fin.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The task was interrupted before completion.</summary>
+    /// </lang>
+    Aborted,
+
+    /// <lang name="fr">
+    /// <summary>Une entrée ou une sortie asynchrone a échoué.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>An asynchronous input or output operation failed.</summary>
+    /// </lang>
+    IoError,
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'une promesse (`Promise&lt;T>`) rend quand elle n'a pas abouti : annulée, délai dépassé, interrompue.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>What a promise (`Promise&lt;T>`) returns when it does not complete successfully: cancelled, timed out, or interrupted.</summary>
+/// </lang>
+error AsyncException {
+    /// <lang name="fr">
+    /// <summary>Ce qui est arrivé à la tâche.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>What happened to the task.</summary>
+    /// </lang>
+    AsyncKind kind;
+}

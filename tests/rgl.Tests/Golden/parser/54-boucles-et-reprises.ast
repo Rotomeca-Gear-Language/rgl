@@ -1,0 +1,27 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    NameExpression 2:7 name=path
+    Pipeline 2:12
+      CallStep 2:15 gear=charger
+        Checkpoint 2:15 number=1
+        Rail 2:26
+          CallStep 2:30 gear=reparer
+          ResumeStep 2:41 number=1
+            RepeatLimit 2:43 count=3 fails=false
+          CallStep 2:50 gear=secours
+          DoneStep 2:61
+      CallStep 2:70 gear=converge
+        Repeat 2:78
+          RepeatLimit 2:79 count=10 fails=false
+      CallStep 2:87 gear=lisser
+        Repeat 2:93
+      CallStep 2:98 gear=verifier
+        LiteralExpression 2:107 kind=IntegerLiteral text=2
+        Repeat 2:109
+          RepeatLimit 2:110 count=5 fails=true
+        Rail 2:115
+          ResumeStep 2:119 number=1
+            RepeatLimit 2:121 count=2 fails=true
+      CallStep 2:130 gear=fin
+        Checkpoint 2:130 number=2
+      ResumeStep 2:140 number=1

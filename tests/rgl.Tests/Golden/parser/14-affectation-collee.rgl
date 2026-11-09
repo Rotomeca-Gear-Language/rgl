@@ -1,0 +1,2 @@
+// « <- » collé dans une expression : lu comme « a < -5 », avec W008.
+train |> keep(a<-5) |> done;

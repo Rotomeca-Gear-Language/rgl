@@ -1,0 +1,8 @@
+// Nullables mal formés et symboles réservés : T??, ?:, ++, --.
+gear f(int?? a): int {
+    var b: a ?: 0;
+    b++;
+    var c: ++b;
+    return --c;
+}
+!train |> done;

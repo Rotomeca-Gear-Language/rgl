@@ -1,0 +1,35 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=salut pure=false parameters=3
+    Parameter 1:12 name=nom
+      PrimitiveType 1:12 type=string
+    Parameter 1:24 name=suffixe
+      PrimitiveType 1:24 type=string
+      LiteralExpression 1:40 kind=StringLiteral text="!"
+    Parameter 1:45 name=fin
+      PrimitiveType 1:45 type=string
+      TemplateExpression 1:57
+        TemplateInterpolation 1:58
+          NameExpression 1:59 name=nom
+        TemplateText 1:63 text=?
+    PrimitiveType 1:68 type=string
+    TemplateExpression 1:78
+      TemplateInterpolation 1:79
+        NameExpression 1:80 name=nom
+      TemplateInterpolation 1:84
+        NameExpression 1:85 name=suffixe
+      TemplateInterpolation 1:93
+        NameExpression 1:94 name=fin
+  GearDeclaration 2:1 kind=gear name=log pure=false parameters=3
+    Parameter 2:10 name=message
+      PrimitiveType 2:10 type=string
+    Parameter 2:26 name=caller
+      PrimitiveType 2:26 type=string
+      NameExpression 2:41 name=__CALLER__
+    Parameter 2:53 name=line
+      PrimitiveType 2:53 type=uint
+      NameExpression 2:64 name=__LINE__
+    PrimitiveType 2:75 type=void
+    BlockStatement 2:80
+  TrainDeclaration 4:1 unguarded=true parameters=none
+    Pipeline 4:8
+      DoneStep 4:11

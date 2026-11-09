@@ -1,0 +1,406 @@
+forge: gears
+description: "Lecture et écriture de fichiers"
+
+/// <lang name="fr">
+/// <summary>Lit tout un fichier comme un texte UTF-8 strict.</summary>
+/// <param name="path">Le chemin du fichier.</param>
+/// <returns>Son contenu ; un éventuel BOM UTF-8 est retiré.</returns>
+/// <remarks>Le guard échoue avec un `IoError` si le fichier est inaccessible ou contient un UTF-8 invalide.</remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads an entire file as strict UTF-8 text.</summary>
+/// <param name="path">The file path.</param>
+/// <returns>Its contents; an optional UTF-8 BOM is removed.</returns>
+/// <remarks>The guard fails with an `IoError` when the file is inaccessible or contains invalid UTF-8.</remarks>
+/// </lang>
+guard readText(string path): string {
+    string content <- raw path;
+    return content;
+}
+
+/// <lang name="fr">
+/// <summary>Lit tous les octets d'un fichier sans les interpréter.</summary>
+/// <param name="path">Le chemin du fichier.</param>
+/// <returns>Les octets exacts du fichier, BOM compris.</returns>
+/// <remarks>Le guard échoue avec un `IoError` si le fichier est inaccessible.</remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads every byte from a file without interpreting it.</summary>
+/// <param name="path">The file path.</param>
+/// <returns>The exact file bytes, including any BOM.</returns>
+/// <remarks>The guard fails with an `IoError` when the file is inaccessible.</remarks>
+/// </lang>
+guard readBytes(string path): bytes {
+    bytes content <- raw path;
+    return content;
+}
+
+/// <lang name="fr">
+/// <summary>Crée ou remplace un fichier par un texte UTF-8.</summary>
+/// <param name="path">Le chemin du fichier.</param>
+/// <param name="content">Le texte à écrire, sans BOM ajouté.</param>
+/// <remarks>Le guard échoue avec un `IoError` si l'écriture est impossible.</remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates or replaces a file with UTF-8 text.</summary>
+/// <param name="path">The file path.</param>
+/// <param name="content">The text to write; no BOM is added.</param>
+/// <remarks>The guard fails with an `IoError` when writing is impossible.</remarks>
+/// </lang>
+guard writeText(string path, string content): void {
+    content -> raw path;
+}
+
+/// <lang name="fr">
+/// <summary>Crée ou remplace un fichier par les octets donnés.</summary>
+/// <param name="path">Le chemin du fichier.</param>
+/// <param name="content">Les octets à écrire exactement.</param>
+/// <remarks>Le guard échoue avec un `IoError` si l'écriture est impossible.</remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates or replaces a file with the supplied bytes.</summary>
+/// <param name="path">The file path.</param>
+/// <param name="content">The exact bytes to write.</param>
+/// <remarks>The guard fails with an `IoError` when writing is impossible.</remarks>
+/// </lang>
+guard writeBytes(string path, bytes content): void {
+    content -> raw path;
+}
+
+/// <lang name="fr">
+/// <summary>Ajoute du texte UTF-8 à la fin d'un fichier.</summary>
+/// <param name="path">Le chemin du fichier, créé s'il n'existe pas.</param>
+/// <param name="content">Le texte à ajouter.</param>
+/// <remarks>Le flux se ferme automatiquement. Le guard échoue avec un `IoError` si l'ouverture ou l'écriture échoue.</remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>Appends UTF-8 text to the end of a file.</summary>
+/// <param name="path">The file path, created when absent.</param>
+/// <param name="content">The text to append.</param>
+/// <remarks>The stream closes automatically. The guard fails with an `IoError` when opening or writing fails.</remarks>
+/// </lang>
+guard appendText(string path, string content): void {
+    var stream <- file<append> path;
+    stream.write(content);
+}
+
+/// <lang name="fr">
+/// <summary>Indique si un fichier ou dossier existe.</summary>
+/// <param name="path">Le chemin à tester.</param>
+/// <returns>`true` si une entrée existe ; `false` si elle est absente ou si le système refuse le test.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether a file or directory exists.</summary>
+/// <param name="path">The path to test.</param>
+/// <returns>`true` when an entry exists; `false` when absent or when the operating system rejects the query.</returns>
+/// </lang>
+@trusted
+gear pure exists(string path): bool => cpp {
+    #include <filesystem>
+    bool rgl(rgl_arg_path path) {
+        std::error_code error;
+        return std::filesystem::exists(std::filesystem::u8path(path.data(), path.data() + path.size()), error);
+    }
+}(string path: path): bool;
+
+/// <lang name="fr">
+/// <summary>Supprime un fichier ou un dossier.</summary>
+/// <param name="path">Le chemin à supprimer.</param>
+/// <param name="recursive">Vrai pour supprimer aussi le contenu d'un dossier non vide.</param>
+/// <returns>`true` si une entrée a été supprimée ; `false` si elle n'existait pas, si le dossier n'est pas vide sans `recursive` ou si le système refuse.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Deletes a file or a directory.</summary>
+/// <param name="path">The path to delete.</param>
+/// <param name="recursive">True to also delete the contents of a non-empty directory.</param>
+/// <returns>`true` when an entry was deleted; `false` when it did not exist, the directory is not empty without `recursive`, or the system refuses.</returns>
+/// </lang>
+@trusted
+gear removePath(string path, bool recursive: false): bool => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path, rgl_arg_recursive recursive) {
+        std::error_code error;
+        if (recursive) {
+            const auto count = std::filesystem::remove_all(as_path(path), error);
+            return !error && count > 0;
+        }
+        const bool removed = std::filesystem::remove(as_path(path), error);
+        return !error && removed;
+    }
+}(string path: path, bool recursive: recursive): bool;
+
+/// <lang name="fr">
+/// <summary>Crée un dossier, avec ses dossiers parents s'ils manquent.</summary>
+/// <param name="path">Le dossier à créer.</param>
+/// <returns>`true` si le dossier existe à la fin (créé ou déjà là).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates a directory, along with its missing parent directories.</summary>
+/// <param name="path">The directory to create.</param>
+/// <returns>`true` when the directory exists at the end (created or already there).</returns>
+/// </lang>
+@trusted
+gear createDirectory(string path): bool => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path) {
+        std::error_code error;
+        std::filesystem::create_directories(as_path(path), error);
+        return !error && std::filesystem::is_directory(as_path(path), error);
+    }
+}(string path: path): bool;
+
+/// <lang name="fr">
+/// <summary>Liste les noms d'un dossier, sans `.` ni `..`, triés.</summary>
+/// <param name="path">Le dossier à lire.</param>
+/// <returns>Les noms des entrées, `null` si le chemin n'est pas un dossier lisible.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Lists the names in a directory, without `.` or `..`, sorted.</summary>
+/// <param name="path">The directory to read.</param>
+/// <returns>The entry names, `null` when the path is not a readable directory.</returns>
+/// </lang>
+@trusted
+gear listDirectory(string path): [string]? => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    #include <vector>
+    #include <algorithm>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path) {
+        std::error_code error;
+        std::vector<std::string> names;
+        for (std::filesystem::directory_iterator it(as_path(path), error), end; !error && it != end; it.increment(error)) {
+            const auto text = it->path().filename().generic_u8string();
+            names.emplace_back(reinterpret_cast<const char*>(text.c_str()), text.size());
+        }
+        if (error) return rgl_return{};
+        std::sort(names.begin(), names.end());
+        rgl::standard::array<rgl::standard::string> result;
+        for (const auto& name : names) result.push(rgl::standard::string(name.c_str(), name.size()));
+        return rgl_return(std::move(result));
+    }
+}(string path: path): [string]?;
+
+/// <lang name="fr">
+/// <summary>Indique si le chemin désigne un dossier.</summary>
+/// <param name="path">Le chemin à tester.</param>
+/// <returns>`true` pour un dossier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether the path is a directory.</summary>
+/// <param name="path">The path to test.</param>
+/// <returns>`true` for a directory.</returns>
+/// </lang>
+@trusted
+gear pure isDirectory(string path): bool => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path) {
+        std::error_code error;
+        return std::filesystem::is_directory(as_path(path), error);
+    }
+}(string path: path): bool;
+
+/// <lang name="fr">
+/// <summary>Indique si le chemin désigne un fichier ordinaire.</summary>
+/// <param name="path">Le chemin à tester.</param>
+/// <returns>`true` pour un fichier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether the path is a regular file.</summary>
+/// <param name="path">The path to test.</param>
+/// <returns>`true` for a regular file.</returns>
+/// </lang>
+@trusted
+gear pure isFile(string path): bool => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path) {
+        std::error_code error;
+        return std::filesystem::is_regular_file(as_path(path), error);
+    }
+}(string path: path): bool;
+
+/// <lang name="fr">
+/// <summary>La taille d'un fichier en octets.</summary>
+/// <param name="path">Le fichier.</param>
+/// <returns>La taille, `null` si le chemin n'est pas un fichier lisible.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The size of a file in bytes.</summary>
+/// <param name="path">The file.</param>
+/// <returns>The size, `null` when the path is not a readable file.</returns>
+/// </lang>
+@trusted
+gear fileSize(string path): long? => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    #include <cstdint>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path) {
+        std::error_code error;
+        const auto size = std::filesystem::file_size(as_path(path), error);
+        if (error) return rgl_return{};
+        return rgl_return(static_cast<std::int64_t>(size));
+    }
+}(string path: path): long?;
+
+/// <lang name="fr">
+/// <summary>La date de dernière modification d'un fichier ou d'un dossier, en UTC.</summary>
+/// <param name="path">Le chemin.</param>
+/// <returns>La date, `null` si le chemin n'existe pas.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The last modification time of a file or directory, in UTC.</summary>
+/// <param name="path">The path.</param>
+/// <returns>The time, `null` when the path does not exist.</returns>
+/// </lang>
+@trusted
+gear _modifiedMilliseconds(string path): long? => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    #include <chrono>
+    #include <cstdint>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_path path) {
+        std::error_code error;
+        const auto stamp = std::filesystem::last_write_time(as_path(path), error);
+        if (error) return rgl_return{};
+        const auto system_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::file_clock::to_sys(stamp));
+        return rgl_return(static_cast<std::int64_t>(system_time.time_since_epoch().count()));
+    }
+}(string path: path): long?;
+
+/// <lang name="fr">
+/// <summary>La date de dernière modification d'un fichier ou d'un dossier, en UTC.</summary>
+/// <param name="path">Le chemin.</param>
+/// <returns>La date, `null` si le chemin n'existe pas.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The last modification time of a file or directory, in UTC.</summary>
+/// <param name="path">The path.</param>
+/// <returns>The time, `null` when the path does not exist.</returns>
+/// </lang>
+gear modifiedTime(string path): datetime? {
+    const long? milliseconds: _modifiedMilliseconds(path);
+    return milliseconds eq null ? null : (milliseconds ?? 0) as datetime;
+}
+
+/// <lang name="fr">
+/// <summary>Copie un fichier.</summary>
+/// <param name="from">Le fichier source.</param>
+/// <param name="to">La destination.</param>
+/// <param name="overwrite">Vrai pour remplacer un fichier déjà présent.</param>
+/// <returns>`true` si la copie a eu lieu.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Copies a file.</summary>
+/// <param name="from">The source file.</param>
+/// <param name="to">The destination.</param>
+/// <param name="overwrite">True to replace an existing file.</param>
+/// <returns>`true` when the copy happened.</returns>
+/// </lang>
+@trusted
+gear copyFile(string from, string to, bool overwrite: false): bool => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_from from, rgl_arg_to to, rgl_arg_overwrite overwrite) {
+        std::error_code error;
+        const auto options = overwrite ? std::filesystem::copy_options::overwrite_existing : std::filesystem::copy_options::none;
+        return std::filesystem::copy_file(as_path(from), as_path(to), options, error) && !error;
+    }
+}(string from: from, string to: to, bool overwrite: overwrite): bool;
+
+/// <lang name="fr">
+/// <summary>Déplace ou renomme un fichier ou un dossier.</summary>
+/// <param name="from">Le chemin source.</param>
+/// <param name="to">Le chemin de destination.</param>
+/// <returns>`true` si le déplacement a eu lieu.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Moves or renames a file or directory.</summary>
+/// <param name="from">The source path.</param>
+/// <param name="to">The destination path.</param>
+/// <returns>`true` when the move happened.</returns>
+/// </lang>
+@trusted
+gear moveFile(string from, string to): bool => cpp {
+    #include <filesystem>
+    #include <system_error>
+    #include <string>
+    static std::filesystem::path as_path(const rgl::standard::string& text) {
+        return std::filesystem::u8path(text.data(), text.data() + text.size());
+    }
+    static rgl::standard::string from_path(const std::filesystem::path& value) {
+        const auto text = value.generic_u8string();
+        return rgl::standard::string(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+    rgl_return rgl(rgl_arg_from from, rgl_arg_to to) {
+        std::error_code error;
+        std::filesystem::rename(as_path(from), as_path(to), error);
+        return !error;
+    }
+}(string from: from, string to: to): bool;

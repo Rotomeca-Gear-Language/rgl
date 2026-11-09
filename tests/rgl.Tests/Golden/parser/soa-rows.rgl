@@ -1,0 +1,12 @@
+soa mold Particles {
+    [float] vx;
+    [float] vy;
+}
+
+gear damp(float vx, float vy): float => vx * 0.5 + vy;
+
+var p: new Particles {vx: [1.0], vy: [2.0]};
+p |S|> damp;
+p ||S|> damp;
+
+train |> done;

@@ -1,0 +1,27 @@
+CompilationUnit 1:1
+  MoldDeclaration 2:1 name=Introuvable error=true
+    MoldField 2:21 name=chemin
+      PrimitiveType 2:21 type=string
+  GearDeclaration 4:1 kind=guard name=charger pure=false parameters=1
+    Parameter 4:15 name=chemin
+      PrimitiveType 4:15 type=string
+    PrimitiveType 4:31 type=string
+    BlockStatement 4:38
+      FailStatement 5:5
+        MoldExpression 5:10
+          NamedType 5:14 name=Introuvable
+          MoldFieldValue 5:27 name=chemin shorthand=true
+  TrainDeclaration 8:1 unguarded=false parameters=none
+    LiteralExpression 8:7 kind=StringLiteral text="a.txt"
+    Pipeline 9:5
+      CallStep 9:8 gear=charger
+        Rail 9:16
+          CallStep 9:20 gear=reparer
+            Rail 9:28
+              CallStep 9:32 gear=rapport
+              ExitCodeStep 9:43
+                LiteralExpression 9:45 kind=IntegerLiteral text=3
+          ExitCodeStep 9:51
+            LiteralExpression 9:53 kind=IntegerLiteral text=2
+      CallStep 10:8 gear=sauver
+      DoneStep 11:8

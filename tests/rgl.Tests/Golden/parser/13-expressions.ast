@@ -1,0 +1,24 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    Pipeline 2:7
+      CallStep 2:10 gear=check
+        BinaryExpression 2:16 op=and
+          BinaryExpression 2:16 op=>
+            NameExpression 2:16 name=a
+            LiteralExpression 2:20 kind=IntegerLiteral text=0
+          UnaryExpression 2:26 op=not
+            BinaryExpression 2:26 op=eq
+              NameExpression 2:26 name=b
+              LiteralExpression 2:35 kind=IntegerLiteral text=3
+        BinaryExpression 2:38 op=*
+          UnaryExpression 2:38 op=-
+            NameExpression 2:39 name=x
+          LiteralExpression 2:43 kind=IntegerLiteral text=2
+      ExitCodeStep 2:49
+        BinaryExpression 2:51 op=??
+          BinaryExpression 2:51 op=eq
+            BinaryExpression 2:51 op=bitand
+              NameExpression 2:51 name=flags
+              LiteralExpression 2:64 kind=IntegerLiteral text=4
+            LiteralExpression 2:69 kind=IntegerLiteral text=0
+          LiteralExpression 2:74 kind=IntegerLiteral text=1

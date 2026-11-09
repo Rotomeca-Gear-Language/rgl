@@ -1,0 +1,52 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=n
+    LiteralExpression 2:8 kind=IntegerLiteral text=5
+  IfStatement 3:1
+    BinaryExpression 3:5 op=<
+      NameExpression 3:5 name=n
+      LiteralExpression 3:9 kind=IntegerLiteral text=0
+    BlockStatement 3:12
+      AssignmentStatement 4:5 target=n
+        LiteralExpression 4:10 kind=IntegerLiteral text=0
+    IfStatement 5:8
+      BinaryExpression 5:12 op=eq
+        NameExpression 5:12 name=n
+        LiteralExpression 5:17 kind=IntegerLiteral text=0
+      BlockStatement 5:20
+        AssignmentStatement 6:5 target=n
+          LiteralExpression 6:10 kind=IntegerLiteral text=1
+      BlockStatement 7:8
+        AssignmentStatement 8:5 target=n
+          BinaryExpression 8:10 op=*
+            NameExpression 8:10 name=n
+            LiteralExpression 8:14 kind=IntegerLiteral text=2
+  SwitchStatement 10:1
+    NameExpression 10:9 name=n
+    SwitchSection 11:5 kind=Values
+      LiteralExpression 11:10 kind=IntegerLiteral text=1
+      BreakStatement 12:9
+    SwitchSection 13:5 kind=Values
+      LiteralExpression 13:10 kind=IntegerLiteral text=2
+      GotoStatement 14:9
+        LiteralExpression 14:14 kind=IntegerLiteral text=1
+    SwitchSection 15:5 kind=Values
+      LiteralExpression 15:10 kind=IntegerLiteral text=3
+      LiteralExpression 15:13 kind=IntegerLiteral text=4
+    SwitchSection 16:5 kind=Values
+      LiteralExpression 16:10 kind=IntegerLiteral text=5
+      SwitchStatement 17:9
+        BinaryExpression 17:17 op=+
+          NameExpression 17:17 name=n
+          LiteralExpression 17:21 kind=IntegerLiteral text=1
+        SwitchSection 18:13 kind=Eval
+          BinaryExpression 18:23 op=>
+            DollarExpression 18:23
+            LiteralExpression 18:27 kind=IntegerLiteral text=10
+          BreakStatement 19:17 depth=1
+        SwitchSection 20:13 kind=Default
+          BreakStatement 21:17 depth=all
+    SwitchSection 23:5 kind=Default
+      BreakStatement 24:9
+  TrainDeclaration 26:1 unguarded=false parameters=none
+    Pipeline 26:7
+      DoneStep 26:10

@@ -1,0 +1,5 @@
+// Enums mal formés : nom manquant, virgule manquante, valeur sans expression.
+enum { A }
+enum B { X Y }
+enum C: int { Z: }
+!train |> done;

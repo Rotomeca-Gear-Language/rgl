@@ -1,0 +1,9 @@
+// Déclarations typées : le type puis le nom, sans mot-clé.
+gear g(): void {
+    (A | B)? valeur: null;
+    int<0..10> n: 3;
+    A a: x;
+    [int] t: liste;
+    int? peutEtre: null;
+}
+!train |> done;

@@ -1,0 +1,5 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    Pipeline 2:7
+      CallStep 2:10 gear=lire
+      DoneStep 2:18

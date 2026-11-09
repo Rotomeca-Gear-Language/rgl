@@ -1,0 +1,14 @@
+// Nullables : T?, null, ??, ?°, ?. et as?.
+mold Profil { string nom; int? age: null; }
+
+gear decrire(Profil? p, string? titre): string {
+    int? n: "42" as? int;
+    var nom: p?.nom ?? "inconnu";
+    var t: titre ?° "sans titre";
+    if (n not eq null and n > 0) {
+        return `{nom} {t} {p?.age}`;
+    }
+    return nom;
+}
+
+!train |> done;

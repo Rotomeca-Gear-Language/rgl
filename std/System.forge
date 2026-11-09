@@ -1,0 +1,60 @@
+forge: gears
+description: "Valeur de sortie d'un programme : un entier entre 0 et 255"
+
+use <Math> only {min};
+use <Errors> only {errorCode};
+
+/// <lang name="fr">
+/// <summary>Valeur de retour d'un programme : un code de sortie de 0 à 255.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A program's return value: an exit code from 0 to 255.</summary>
+/// </lang>
+ingot programValue: uint<0..255>; 
+
+/// <lang name="fr">
+/// <summary>Les valeurs de retour usuelles et leurs conversions.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Common return values and their conversions.</summary>
+/// </lang>
+extend programValue {
+    /// <lang name="fr">
+    /// <summary>Le programme a réussi.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The program succeeded.</summary>
+    /// </lang>
+    const programValue SUCCESS: 0;
+
+    /// <lang name="fr">
+    /// <summary>Le programme a échoué.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The program failed.</summary>
+    /// </lang>
+    const programValue FAILURE: 1;
+
+    /// <lang name="fr">
+    /// <summary>Fait une valeur de retour d'un entier de 0 à 255.</summary>
+    /// <param name="n">Le code de sortie.</param>
+    /// <returns>La valeur de retour.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Creates a return value from an integer between 0 and 255.</summary>
+    /// <param name="n">The exit code.</param>
+    /// <returns>The return value.</returns>
+    /// </lang>
+    gear pure from(uint<0..255> n): programValue => programValue(n);
+    /// <lang name="fr">
+    /// <summary>Fait une valeur de retour d'un code d'erreur ; un code supérieur à 255 est ramené à 255.</summary>
+    /// <param name="code">Le code de l'erreur.</param>
+    /// <returns>La valeur de retour.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Creates a return value from an error code; a code above 255 is clamped to 255.</summary>
+    /// <param name="code">The error code.</param>
+    /// <returns>The return value.</returns>
+    /// </lang>
+    gear pure fromCode(errorCode code): programValue => programValue(min(code°, 255));
+}

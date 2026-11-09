@@ -1,0 +1,144 @@
+forge: gears
+description: "Le terminal : saisie sans écho, lecture d'une touche, taille de la fenêtre, barre de progression et menu à choisir aux flèches"
+
+use <Console> only {write, readLine, writeLine};
+
+/// <lang name="fr"><summary>Dit si l'entrée standard est un terminal (et non un fichier ou un tube).</summary><returns>Vrai pour un terminal.</returns></lang>
+/// <lang name="en"><summary>Tells whether standard input is a terminal (not a file or a pipe).</summary><returns>True for a terminal.</returns></lang>
+@trusted
+gear isTerminal(): bool => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() { return rgl::standard::system::is_terminal_input(); }
+}(): bool;
+
+/// <lang name="fr"><summary>Dit si la sortie standard est un terminal : les séquences ANSI (couleurs, déplacements) n'ont de sens que là.</summary><returns>Vrai pour un terminal.</returns></lang>
+/// <lang name="en"><summary>Tells whether standard output is a terminal: ANSI sequences (colours, cursor moves) only make sense there.</summary><returns>True for a terminal.</returns></lang>
+@trusted
+gear isTerminalOutput(): bool => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() { return rgl::standard::system::is_terminal_output(); }
+}(): bool;
+
+/// <lang name="fr"><summary>Le nombre de colonnes de la fenêtre du terminal.</summary><returns>Les colonnes (80 si elles sont inconnues).</returns></lang>
+/// <lang name="en"><summary>The number of columns of the terminal window.</summary><returns>The columns (80 when unknown).</returns></lang>
+@trusted
+gear terminalColumns(): int => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() {
+        std::int32_t columns = 80, rows = 24;
+        rgl::standard::system::terminal_size(columns, rows);
+        return columns;
+    }
+}(): int;
+
+/// <lang name="fr"><summary>Le nombre de lignes de la fenêtre du terminal.</summary><returns>Les lignes (24 si elles sont inconnues).</returns></lang>
+/// <lang name="en"><summary>The number of rows of the terminal window.</summary><returns>The rows (24 when unknown).</returns></lang>
+@trusted
+gear terminalRows(): int => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() {
+        std::int32_t columns = 80, rows = 24;
+        rgl::standard::system::terminal_size(columns, rows);
+        return rows;
+    }
+}(): int;
+
+/// <lang name="fr"><summary>Autorise les séquences ANSI sur la sortie. Sous Windows, il faut l'appeler avant d'en écrire (couleurs, effacement de ligne) ; ailleurs, c'est toujours permis sur un terminal.</summary><returns>Vrai si la sortie les accepte.</returns></lang>
+/// <lang name="en"><summary>Allows ANSI sequences on the output. On Windows it must be called before writing any (colours, line erase); elsewhere they are always allowed on a terminal.</summary><returns>True when the output accepts them.</returns></lang>
+@trusted
+gear enableAnsi(): bool => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() { return rgl::standard::system::enable_ansi(); }
+}(): bool;
+
+/// <lang name="fr"><summary>Lit un texte secret sans l'écrire à l'écran (un mot de passe). Sans terminal (entrée redirigée), lit une ligne ordinaire.</summary><returns>Le texte saisi, sans son retour à la ligne.</returns></lang>
+/// <lang name="en"><summary>Reads a secret text without showing it on screen (a password). Without a terminal (redirected input), reads an ordinary line.</summary><returns>The text typed, without its line break.</returns></lang>
+@trusted
+gear _readSecret(): string => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() { return rgl::standard::system::read_password(); }
+}(): string;
+
+/// <lang name="fr"><summary>Écrit une invite puis lit un mot de passe sans écho.</summary><param name="prompt">L'invite écrite avant la saisie (vide : rien).</param><returns>Le mot de passe saisi.</returns></lang>
+/// <lang name="en"><summary>Writes a prompt then reads a password without echo.</summary><param name="prompt">The prompt written before typing (empty: nothing).</param><returns>The password typed.</returns></lang>
+gear readPassword(string prompt: ''): string {
+    if (prompt not eq '') { write(prompt); }
+    return _readSecret();
+}
+
+/// <lang name="fr"><summary>Lit une touche (usage interne) : `null` sans terminal, le texte vide au délai, sinon le nom de la touche.</summary><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>La touche.</returns></lang>
+/// <lang name="en"><summary>Reads a key (internal use): `null` without a terminal, empty text on timeout, otherwise the key's name.</summary><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The key.</returns></lang>
+@trusted
+gear _readKey(uint timeoutMs): string? => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl(rgl_arg_timeoutMs timeoutMs) {
+        bool available = true;
+        auto key = rgl::standard::system::read_key(timeoutMs, available);
+        if (!available) return rgl_return{};
+        return rgl_return(std::move(key));
+    }
+}(uint timeoutMs: timeoutMs): string?;
+
+/// <lang name="fr"><summary>Attend une touche et rend son nom : `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `delete`, `enter`, `tab`, `escape`, `backspace`, ou le caractère tapé. Rien n'est écrit à l'écran.</summary><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>La touche ; `null` si l'entrée n'est pas un terminal ou si le délai est passé.</returns></lang>
+/// <lang name="en"><summary>Waits for a key and returns its name: `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `delete`, `enter`, `tab`, `escape`, `backspace`, or the character typed. Nothing is written to the screen.</summary><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The key; `null` when the input is not a terminal or the delay has passed.</returns></lang>
+gear readKey(uint timeoutMs: 0): string? {
+    const string? key: _readKey(timeoutMs);
+    return key eq '' ? null : key;
+}
+
+/// <lang name="fr"><summary>Une barre de progression écrite : `[#####-----] 50%`.</summary><param name="done">Le travail fait.</param><param name="total">Le travail total (0 ou moins : une barre vide).</param><param name="width">La largeur de la barre, en caractères.</param><returns>Le texte de la barre.</returns></lang>
+/// <lang name="en"><summary>A progress bar written out: `[#####-----] 50%`.</summary><param name="done">The work done.</param><param name="total">The total work (0 or less: an empty bar).</param><param name="width">The width of the bar, in characters.</param><returns>The text of the bar.</returns></lang>
+gear pure progressBar(long done, long total, uint width: 30): string {
+    const long shown: total <= 0 ? 0 : (done < 0 ? 0 : (done > total ? total : done));
+    const long filled: total <= 0 ? 0 : shown * (width as long) / total;
+    const long percent: total <= 0 ? 0 : shown * 100 / total;
+    return `[{'#'.repeat(filled as uint)}{'-'.repeat(((width as long) - filled) as uint)}] {percent}%`;
+}
+
+/// <lang name="fr"><summary>Affiche la progression sur la ligne courante en la réécrivant (retour chariot) ; un saut de ligne final quand le travail est fini.</summary><param name="done">Le travail fait.</param><param name="total">Le travail total.</param><param name="label">Un texte avant la barre.</param><param name="width">La largeur de la barre.</param></lang>
+/// <lang name="en"><summary>Shows progress on the current line by rewriting it (carriage return); a final line break when the work is done.</summary><param name="done">The work done.</param><param name="total">The total work.</param><param name="label">A text before the bar.</param><param name="width">The width of the bar.</param></lang>
+gear showProgress(long done, long total, string label: '', uint width: 30): void {
+    write(`\r{label eq '' ? '' : label + ' '}{progressBar(done, total, width)}`);
+    if (total > 0 and done >= total) { write("\n"); }
+}
+
+/// <lang name="fr"><summary>Le menu interactif (usage interne) : le rang choisi, -1 si l'utilisateur abandonne ou sans terminal.</summary><param name="title">Le titre.</param><param name="options">Les options.</param><param name="selected">Le rang choisi au départ.</param><returns>Le rang.</returns></lang>
+/// <lang name="en"><summary>The interactive menu (internal use): the chosen index, -1 when the user gives up or without a terminal.</summary><param name="title">The title.</param><param name="options">The options.</param><param name="selected">The index chosen at the start.</param><returns>The index.</returns></lang>
+@trusted
+gear _menu(string title, [string] options, int selected): int => cpp {
+    #include <rgl/standard/system.hpp>
+    #include <vector>
+    rgl_return rgl(rgl_arg_title title, rgl_arg_options options, int selected) {
+        std::vector<rgl::standard::string> list;
+        for (std::size_t i = 0; i < options.size(); ++i) list.push_back(options[i]);
+        return rgl::standard::system::menu(title, list, selected);
+    }
+}(string title: title, [string] options: options, int selected: selected): int;
+
+/// <lang name="fr">
+/// <summary>Propose un choix : sur un terminal, un menu où l'on se déplace aux flèches (`enter` valide, `escape` abandonne, un chiffre de 1 à 9 saute à l'option) ; sans terminal, une liste numérotée dont on tape le numéro sur une ligne.</summary>
+/// <param name="title">Le titre, écrit au-dessus des options.</param>
+/// <param name="options">Les options.</param>
+/// <param name="selected">Le rang de l'option choisie au départ.</param>
+/// <returns>Le rang de l'option choisie, à partir de 0 ; `null` si l'utilisateur abandonne, si la saisie n'est pas un numéro valide ou s'il n'y a pas d'option.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Offers a choice: on a terminal, a menu moved with the arrow keys (`enter` confirms, `escape` gives up, a digit from 1 to 9 jumps to the option); without a terminal, a numbered list whose number is typed on a line.</summary>
+/// <param name="title">The title, written above the options.</param>
+/// <param name="options">The options.</param>
+/// <param name="selected">The index of the option chosen at the start.</param>
+/// <returns>The index of the chosen option, from 0; `null` when the user gives up, the input is not a valid number or there are no options.</returns>
+/// </lang>
+gear chooseMenu(string title, [string] options, int selected: 0): long? {
+    if (options.length eq 0) { return null; }
+    if (isTerminal() and isTerminalOutput()) {
+        const int rank: _menu(title, options, selected);
+        return rank < 0 ? null : (rank as long);
+    }
+    if (title not eq '') { writeLine(title); }
+    options ||> (option, i) => { writeLine(`{i + 1}) {option}`); };
+    const int? typed: readLine().trim() as? int;
+    if (typed eq null) { return null; }
+    const long rank: (typed ?? 0) as long;
+    return rank >= 1 and rank <= (options.length as long) ? rank - 1 : null;
+}

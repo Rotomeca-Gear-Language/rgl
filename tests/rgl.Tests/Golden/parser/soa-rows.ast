@@ -1,0 +1,39 @@
+CompilationUnit 1:1
+  MoldDeclaration 1:1 name=Particles soa=true
+    MoldField 2:5 name=vx
+      ArrayType 2:5
+        PrimitiveType 2:6 type=float
+    MoldField 3:5 name=vy
+      ArrayType 3:5
+        PrimitiveType 3:6 type=float
+  GearDeclaration 6:1 kind=gear name=damp pure=false parameters=2
+    Parameter 6:11 name=vx
+      PrimitiveType 6:11 type=float
+    Parameter 6:21 name=vy
+      PrimitiveType 6:21 type=float
+    PrimitiveType 6:32 type=float
+    BinaryExpression 6:41 op=+
+      BinaryExpression 6:41 op=*
+        NameExpression 6:41 name=vx
+        LiteralExpression 6:46 kind=FloatLiteral text=0.5
+      NameExpression 6:52 name=vy
+  VarDeclaration 8:1 keyword=var name=p
+    MoldExpression 8:8
+      NamedType 8:12 name=Particles
+      MoldFieldValue 8:23 name=vx
+        ArrayExpression 8:27
+          LiteralExpression 8:28 kind=FloatLiteral text=1.0
+      MoldFieldValue 8:34 name=vy
+        ArrayExpression 8:38
+          LiteralExpression 8:39 kind=FloatLiteral text=2.0
+  ExpressionStatement 9:1
+    SoaEachExpression 9:1 shortest=false
+      NameExpression 9:1 name=p
+      EachTarget 9:8 name=damp
+  ExpressionStatement 10:1
+    SoaEachExpression 10:1 shortest=true
+      NameExpression 10:1 name=p
+      EachTarget 10:9 name=damp
+  TrainDeclaration 12:1 unguarded=false parameters=none
+    Pipeline 12:7
+      DoneStep 12:10

@@ -1,0 +1,277 @@
+forge: gears
+description: "Une valeur de données dynamique (null, booléen, entier, flottant, texte, octets, liste, table) : ce que lisent et écrivent les formats binaires"
+
+use <Text> only {hexEncode};
+use <Time> only {parseDateTime};
+
+/// <lang name="fr"><summary>La sorte d'une valeur de données.</summary></lang>
+/// <lang name="en"><summary>The kind of a data value.</summary></lang>
+enum DataKind {
+    /// <lang name="fr"><summary>Rien (`null`).</summary></lang>
+    /// <lang name="en"><summary>Nothing (`null`).</summary></lang>
+    Null,
+    /// <lang name="fr"><summary>Un booléen.</summary></lang>
+    /// <lang name="en"><summary>A boolean.</summary></lang>
+    Bool,
+    /// <lang name="fr"><summary>Un entier 64 bits signé.</summary></lang>
+    /// <lang name="en"><summary>A signed 64-bit integer.</summary></lang>
+    Int,
+    /// <lang name="fr"><summary>Un flottant 64 bits.</summary></lang>
+    /// <lang name="en"><summary>A 64-bit float.</summary></lang>
+    Double,
+    /// <lang name="fr"><summary>Un texte.</summary></lang>
+    /// <lang name="en"><summary>A text.</summary></lang>
+    Text,
+    /// <lang name="fr"><summary>Des octets.</summary></lang>
+    /// <lang name="en"><summary>Bytes.</summary></lang>
+    Bytes,
+    /// <lang name="fr"><summary>Une liste de valeurs.</summary></lang>
+    /// <lang name="en"><summary>A list of values.</summary></lang>
+    List,
+    /// <lang name="fr"><summary>Une table de valeurs à clés textuelles, qui garde l'ordre d'écriture.</summary></lang>
+    /// <lang name="en"><summary>A table of values with text keys, which keeps the writing order.</summary></lang>
+    Map,
+    /// <lang name="fr"><summary>Une date et une heure (UTC), en millisecondes depuis 1970 dans `number`.</summary></lang>
+    /// <lang name="en"><summary>A date and time (UTC), in milliseconds since 1970 in `number`.</summary></lang>
+    Date,
+}
+
+/// <lang name="fr">
+/// <summary>Une valeur de données dynamique, dont la forme n'est connue qu'à l'exécution. Un seul champ est significatif selon `kind` : `flag` pour un booléen, `number` pour un entier, `real` pour un flottant, `text`, `data`, `items` (une liste, ou les valeurs d'une table) et `keys` (les clés d'une table, une par valeur). On les construit par `dataInt`, `dataText`, `dataList`, `dataMap`…</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A dynamic data value whose shape is only known at run time. A single field is meaningful depending on `kind`: `flag` for a boolean, `number` for an integer, `real` for a float, `text`, `data`, `items` (a list, or the values of a table) and `keys` (the keys of a table, one per value). They are built with `dataInt`, `dataText`, `dataList`, `dataMap`…</summary>
+/// </lang>
+mold DataValue {
+    /// <lang name="fr"><summary>La sorte de la valeur.</summary></lang>
+    /// <lang name="en"><summary>The kind of the value.</summary></lang>
+    DataKind kind;
+    /// <lang name="fr"><summary>La valeur d'un booléen.</summary></lang>
+    /// <lang name="en"><summary>The value of a boolean.</summary></lang>
+    bool flag;
+    /// <lang name="fr"><summary>La valeur d'un entier.</summary></lang>
+    /// <lang name="en"><summary>The value of an integer.</summary></lang>
+    long number;
+    /// <lang name="fr"><summary>La valeur d'un flottant.</summary></lang>
+    /// <lang name="en"><summary>The value of a float.</summary></lang>
+    double real;
+    /// <lang name="fr"><summary>La valeur d'un texte.</summary></lang>
+    /// <lang name="en"><summary>The value of a text.</summary></lang>
+    string text;
+    /// <lang name="fr"><summary>La valeur d'octets.</summary></lang>
+    /// <lang name="en"><summary>The value of bytes.</summary></lang>
+    bytes data;
+    /// <lang name="fr"><summary>Les éléments d'une liste, ou les valeurs d'une table.</summary></lang>
+    /// <lang name="en"><summary>The elements of a list, or the values of a table.</summary></lang>
+    [DataValue] items;
+    /// <lang name="fr"><summary>Les clés d'une table, dans l'ordre, une par valeur.</summary></lang>
+    /// <lang name="en"><summary>The keys of a table, in order, one per value.</summary></lang>
+    [string] keys;
+}
+
+/// <lang name="fr"><summary>Construit une valeur de données avec tous ses champs (usage interne).</summary><param name="kind">La sorte.</param><param name="flag">Le booléen.</param><param name="number">L'entier.</param><param name="real">Le flottant.</param><param name="text">Le texte.</param><param name="data">Les octets.</param><param name="items">Les éléments.</param><param name="keys">Les clés.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>Builds a data value with all its fields (internal use).</summary><param name="kind">The kind.</param><param name="flag">The boolean.</param><param name="number">The integer.</param><param name="real">The float.</param><param name="text">The text.</param><param name="data">The bytes.</param><param name="items">The elements.</param><param name="keys">The keys.</param><returns>The value.</returns></lang>
+gear pure _dataMake(DataKind kind, bool flag, long number, double real, string text, bytes data, [DataValue] items, [string] keys): DataValue =>
+    {kind, flag, number, real, text, data, items, keys};
+
+/// <lang name="fr"><summary>La valeur `null`.</summary><returns>Une valeur de sorte `Null`.</returns></lang>
+/// <lang name="en"><summary>The `null` value.</summary><returns>A value of kind `Null`.</returns></lang>
+gear pure dataNull(): DataValue => _dataMake(DataKind.Null, false, 0, 0.0, '', '' as bytes, [], []);
+
+/// <lang name="fr"><summary>Une valeur booléenne.</summary><param name="value">Le booléen.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>A boolean value.</summary><param name="value">The boolean.</param><returns>The value.</returns></lang>
+gear pure dataBool(bool value): DataValue => _dataMake(DataKind.Bool, value, 0, 0.0, '', '' as bytes, [], []);
+
+/// <lang name="fr"><summary>Une valeur entière.</summary><param name="value">L'entier.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>An integer value.</summary><param name="value">The integer.</param><returns>The value.</returns></lang>
+gear pure dataInt(long value): DataValue => _dataMake(DataKind.Int, false, value, 0.0, '', '' as bytes, [], []);
+
+/// <lang name="fr"><summary>Une valeur flottante.</summary><param name="value">Le flottant.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>A float value.</summary><param name="value">The float.</param><returns>The value.</returns></lang>
+gear pure dataDouble(double value): DataValue => _dataMake(DataKind.Double, false, 0, value, '', '' as bytes, [], []);
+
+/// <lang name="fr"><summary>Une valeur textuelle.</summary><param name="value">Le texte.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>A text value.</summary><param name="value">The text.</param><returns>The value.</returns></lang>
+gear pure dataText(string value): DataValue => _dataMake(DataKind.Text, false, 0, 0.0, value, '' as bytes, [], []);
+
+/// <lang name="fr"><summary>Une valeur d'octets.</summary><param name="value">Les octets.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>A bytes value.</summary><param name="value">The bytes.</param><returns>The value.</returns></lang>
+gear pure dataBytes(bytes value): DataValue => _dataMake(DataKind.Bytes, false, 0, 0.0, '', value, [], []);
+
+/// <lang name="fr"><summary>Une liste de valeurs.</summary><param name="items">Les éléments.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>A list of values.</summary><param name="items">The elements.</param><returns>The value.</returns></lang>
+gear pure dataList([DataValue] items): DataValue => _dataMake(DataKind.List, false, 0, 0.0, '', '' as bytes, items, []);
+
+/// <lang name="fr"><summary>Une table de valeurs à clés textuelles.</summary><param name="keys">Les clés, dans l'ordre.</param><param name="items">Les valeurs, une par clé.</param><returns>La valeur.</returns></lang>
+/// <lang name="en"><summary>A table of values with text keys.</summary><param name="keys">The keys, in order.</param><param name="items">The values, one per key.</param><returns>The value.</returns></lang>
+gear pure dataMap([string] keys, [DataValue] items): DataValue => _dataMake(DataKind.Map, false, 0, 0.0, '', '' as bytes, items, keys);
+
+/// <lang name="fr"><summary>La valeur d'une clé d'une table.</summary><param name="table">La table.</param><param name="key">La clé.</param><returns>La valeur, `null` si `table` n'est pas une table ou n'a pas cette clé.</returns></lang>
+/// <lang name="en"><summary>The value of a key of a table.</summary><param name="table">The table.</param><param name="key">The key.</param><returns>The value, or `null` when `table` is not a table or lacks this key.</returns></lang>
+gear pure dataGet(DataValue table, string key): DataValue? {
+    if (table.kind not eq DataKind.Map) { return null; }
+    const long none: -1;
+    const long found: table.keys |+> none with (acc, other, i) => acc < 0 and other eq key ? (i as long) : acc;
+    return found < 0 ? null : table.items[found];
+}
+
+/// <lang name="fr"><summary>Un élément d'une liste.</summary><param name="list">La liste.</param><param name="index">Le rang, à partir de 0.</param><returns>L'élément, `null` si `list` n'est pas une liste ou si le rang est hors limites.</returns></lang>
+/// <lang name="en"><summary>An element of a list.</summary><param name="list">The list.</param><param name="index">The index, from 0.</param><returns>The element, or `null` when `list` is not a list or the index is out of range.</returns></lang>
+gear pure dataAt(DataValue list, long index): DataValue? => list.kind eq DataKind.List and index >= 0 and index < (list.items.length as long) ? list.items[index] : null;
+
+/// <lang name="fr"><summary>Écrit une valeur de façon lisible, proche du JSON (pour les messages et les tests : les octets s'écrivent en hexadécimal entre `h'…'`, les textes ne sont pas échappés).</summary><param name="value">La valeur.</param><returns>Le texte.</returns></lang>
+/// <lang name="en"><summary>Writes a value readably, close to JSON (for messages and tests: bytes are written in hexadecimal between `h'…'`, texts are not escaped).</summary><param name="value">The value.</param><returns>The text.</returns></lang>
+gear pure dataToText(DataValue value): string {
+    if (value.kind eq DataKind.Null) { return 'null'; }
+    if (value.kind eq DataKind.Bool) { return value.flag ? 'true' : 'false'; }
+    if (value.kind eq DataKind.Int) { return `{value.number}`; }
+    if (value.kind eq DataKind.Double) { return `{value.real}`; }
+    if (value.kind eq DataKind.Text) { return `"{value.text}"`; }
+    if (value.kind eq DataKind.Bytes) { return `h'{hexEncode(value.data)}'`; }
+    if (value.kind eq DataKind.Date) { return `"{_dateText(value)}"`; }
+    if (value.kind eq DataKind.List) { return `[{(value.items ||> (item) => dataToText(item)).join(',')}]`; }
+    const [string] pairs: value.items ||> (item, i) => `"{value.keys[i]}":{dataToText(item)}`;
+    return `\{{pairs.join(',')}\}`;
+}
+
+/// <lang name="fr"><summary>Une date (sorte `Date`) : ses millisecondes depuis 1970 sont dans `number`. Un format sans type date (JSON, MessagePack) l'écrit en texte ISO 8601 ; CBOR l'écrit avec l'étiquette 0.</summary><param name="value">La date.</param><returns>Une valeur de sorte `Date`.</returns></lang>
+/// <lang name="en"><summary>A date (kind `Date`): its milliseconds since 1970 are in `number`. A format with no date type (JSON, MessagePack) writes it as ISO 8601 text; CBOR writes it with tag 0.</summary><param name="value">The date.</param><returns>A value of kind `Date`.</returns></lang>
+gear pure dataDate(datetime value): DataValue => _dataMake(DataKind.Date, false, value as long, 0.0, '', '' as bytes, [], []);
+
+/// <lang name="fr"><summary>La date d'une valeur de sorte `Date`, ou d'un texte ISO 8601 (ce que JSON et MessagePack rendent d'une date).</summary><param name="value">La valeur.</param><returns>La date ; `null` pour une autre sorte ou un texte qui n'est pas une date.</returns></lang>
+/// <lang name="en"><summary>The date of a value of kind `Date`, or of an ISO 8601 text (what JSON and MessagePack give back for a date).</summary><param name="value">The value.</param><returns>The date; `null` for another kind or a text that is not a date.</returns></lang>
+gear pure dataToDate(DataValue value): datetime? {
+    if (value.kind eq DataKind.Date) { return value.number as datetime; }
+    return value.kind eq DataKind.Text ? parseDateTime(value.text) : null;
+}
+
+/// <lang name="fr"><summary>Le texte ISO 8601 d'une valeur de sorte `Date` (usage interne).</summary><param name="value">La valeur.</param><returns>Le texte, par exemple `2026-10-24T10:30:00Z`.</returns></lang>
+/// <lang name="en"><summary>The ISO 8601 text of a value of kind `Date` (internal use).</summary><param name="value">The value.</param><returns>The text, for example `2026-10-24T10:30:00Z`.</returns></lang>
+gear pure _dateText(DataValue value): string => `{value.number as datetime}`;
+
+/// <lang name="fr"><summary>Une valeur et la position qui suit dans les octets lus, ou un échec (usage interne des formats binaires).</summary></lang>
+/// <lang name="en"><summary>A value and the position that follows in the bytes read, or a failure (internal use of the binary formats).</summary></lang>
+mold _Read {
+    /// <lang name="fr"><summary>Faux si la lecture a échoué.</summary></lang>
+    /// <lang name="en"><summary>False when reading failed.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>La valeur lue.</summary></lang>
+    /// <lang name="en"><summary>The value read.</summary></lang>
+    DataValue value;
+    /// <lang name="fr"><summary>La position qui suit la valeur.</summary></lang>
+    /// <lang name="en"><summary>The position that follows the value.</summary></lang>
+    long at;
+}
+
+/// <lang name="fr"><summary>Une lecture réussie (usage interne).</summary><param name="value">La valeur.</param><param name="at">La position qui suit.</param><returns>Le résultat.</returns></lang>
+/// <lang name="en"><summary>A successful read (internal use).</summary><param name="value">The value.</param><param name="at">The position that follows.</param><returns>The result.</returns></lang>
+gear pure _readOk(DataValue value, long at): _Read => {ok: true, value, at};
+
+/// <lang name="fr"><summary>Une lecture échouée (usage interne).</summary><returns>Le résultat.</returns></lang>
+/// <lang name="en"><summary>A failed read (internal use).</summary><returns>The result.</returns></lang>
+gear pure _readFail(): _Read => {ok: false, value: dataNull(), at: 0};
+
+/// <lang name="fr"><summary>Les éléments lus d'une liste ou d'une table, avec l'endroit où l'on en est (usage interne).</summary></lang>
+/// <lang name="en"><summary>The elements read from a list or a table, with the current position (internal use).</summary></lang>
+mold _Items {
+    /// <lang name="fr"><summary>Faux si la lecture a échoué.</summary></lang>
+    /// <lang name="en"><summary>False when reading failed.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>La position qui suit le dernier élément lu.</summary></lang>
+    /// <lang name="en"><summary>The position that follows the last element read.</summary></lang>
+    long at;
+    /// <lang name="fr"><summary>Les valeurs lues.</summary></lang>
+    /// <lang name="en"><summary>The values read.</summary></lang>
+    [DataValue] items;
+    /// <lang name="fr"><summary>Les clés lues (une table).</summary></lang>
+    /// <lang name="en"><summary>The keys read (a table).</summary></lang>
+    [string] keys;
+}
+
+/// <lang name="fr"><summary>Lit `count` éléments à la suite (des valeurs, ou des paires clé-valeur) avec le lecteur du format (usage interne).</summary><param name="data">Les octets.</param><param name="at">Où commencer.</param><param name="count">Le nombre d'éléments (de paires pour une table).</param><param name="map">Vrai pour une table : chaque élément est une clé textuelle puis une valeur.</param><param name="reader">Le lecteur d'une valeur du format.</param><returns>Une liste ou une table, ou un échec.</returns></lang>
+/// <lang name="en"><summary>Reads `count` elements in a row (values, or key-value pairs) with the format's reader (internal use).</summary><param name="data">The bytes.</param><param name="at">Where to start.</param><param name="count">The number of elements (pairs for a table).</param><param name="map">True for a table: each element is a text key then a value.</param><param name="reader">The reader of one value of the format.</param><returns>A list or a table, or a failure.</returns></lang>
+gear pure _readSequence(bytes data, long at, long count, bool map, pure (bytes, long) => _Read reader): _Read {
+    const _Items start: {ok: true, at, items: [], keys: []};
+    const _Items end: [0..<count] |+> start with (acc, i) => {
+        if (not acc.ok) { done acc; }
+        if (not map) {
+            const _Read one: reader(data, acc.at);
+            if (not one.ok) { return {...acc, ok: false}; }
+            return {ok: true, at: one.at, items: [...acc.items, one.value], keys: acc.keys};
+        }
+        const _Read key: reader(data, acc.at);
+        if (not key.ok or key.value.kind not eq DataKind.Text) { return {...acc, ok: false}; }
+        const _Read value: reader(data, key.at);
+        if (not value.ok) { return {...acc, ok: false}; }
+        return {ok: true, at: value.at, items: [...acc.items, value.value], keys: [...acc.keys, key.value.text]};
+    };
+    if (not end.ok) { return _readFail(); }
+    return _readOk(map ? dataMap(end.keys, end.items) : dataList(end.items), end.at);
+}
+
+/// <lang name="fr"><summary>Les 64 bits d'un flottant (usage interne).</summary><param name="value">Le flottant.</param><returns>Son motif binaire IEEE 754.</returns></lang>
+/// <lang name="en"><summary>The 64 bits of a float (internal use).</summary><param name="value">The float.</param><returns>Its IEEE 754 bit pattern.</returns></lang>
+@trusted
+gear pure _doubleBits(double value): ulong => cpp {
+    #include <cstdint>
+    #include <cstring>
+    rgl_return rgl(rgl_arg_value value) {
+        std::uint64_t bits;
+        std::memcpy(&bits, &value, sizeof bits);
+        return bits;
+    }
+}(double value: value): ulong;
+
+/// <lang name="fr"><summary>Le flottant dont on donne les 64 bits (usage interne).</summary><param name="bits">Le motif binaire IEEE 754.</param><returns>Le flottant.</returns></lang>
+/// <lang name="en"><summary>The float whose 64 bits are given (internal use).</summary><param name="bits">The IEEE 754 bit pattern.</param><returns>The float.</returns></lang>
+@trusted
+gear pure _bitsDouble(ulong bits): double => cpp {
+    #include <cstdint>
+    #include <cstring>
+    rgl_return rgl(rgl_arg_bits bits) {
+        double value;
+        std::memcpy(&value, &bits, sizeof value);
+        return value;
+    }
+}(ulong bits: bits): double;
+
+/// <lang name="fr"><summary>Le flottant 32 bits dont on donne le motif, rendu en 64 bits (usage interne).</summary><param name="bits">Le motif binaire IEEE 754 sur 32 bits.</param><returns>Le flottant.</returns></lang>
+/// <lang name="en"><summary>The 32-bit float whose pattern is given, returned as 64 bits (internal use).</summary><param name="bits">The 32-bit IEEE 754 bit pattern.</param><returns>The float.</returns></lang>
+@trusted
+gear pure _bitsFloat(ulong bits): double => cpp {
+    #include <cstdint>
+    #include <cstring>
+    rgl_return rgl(rgl_arg_bits bits) {
+        const std::uint32_t narrow = static_cast<std::uint32_t>(bits);
+        float value;
+        std::memcpy(&value, &narrow, sizeof value);
+        return static_cast<double>(value);
+    }
+}(ulong bits: bits): double;
+
+/// <lang name="fr"><summary>Un entier signé vu comme non signé, sur 64 bits (complément à deux, usage interne).</summary><param name="value">L'entier.</param><returns>Les mêmes 64 bits.</returns></lang>
+/// <lang name="en"><summary>A signed integer seen as unsigned, on 64 bits (two's complement, internal use).</summary><param name="value">The integer.</param><returns>The same 64 bits.</returns></lang>
+@trusted
+gear pure _asUnsigned(long value): ulong => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_value value) { return static_cast<std::uint64_t>(value); }
+}(long value: value): ulong;
+
+/// <lang name="fr"><summary>Un entier non signé vu comme signé, sur 64 bits (complément à deux, usage interne).</summary><param name="value">L'entier.</param><returns>Les mêmes 64 bits.</returns></lang>
+/// <lang name="en"><summary>An unsigned integer seen as signed, on 64 bits (two's complement, internal use).</summary><param name="value">The integer.</param><returns>The same 64 bits.</returns></lang>
+@trusted
+gear pure _asSigned(ulong value): long => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_value value) { return static_cast<std::int64_t>(value); }
+}(ulong value: value): long;
+
+/// <lang name="fr"><summary>Les `size` octets d'un entier, du plus fort au plus faible (usage interne).</summary><param name="value">L'entier.</param><param name="size">Le nombre d'octets.</param><returns>Les octets.</returns></lang>
+/// <lang name="en"><summary>The `size` bytes of an integer, most significant first (internal use).</summary><param name="value">The integer.</param><param name="size">The number of bytes.</param><returns>The bytes.</returns></lang>
+gear pure _beBytes(ulong value, long size): bytes => [0..<size] ||> (i) => ((value shr (((size - 1 - i) * 8) as int)) bitand (255 as ulong)) as ubyte;
+
+/// <lang name="fr"><summary>Lit `size` octets comme un entier, du plus fort au plus faible (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang du premier.</param><param name="size">Le nombre d'octets.</param><returns>L'entier.</returns></lang>
+/// <lang name="en"><summary>Reads `size` bytes as an integer, most significant first (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the first.</param><param name="size">The number of bytes.</param><returns>The integer.</returns></lang>
+gear pure _readBe(bytes data, long at, long size): ulong {
+    const ulong start: 0;
+    return [0..<size] |+> start with (acc, i) => (acc shl 8) bitor (data[at + i] as ulong);
+}

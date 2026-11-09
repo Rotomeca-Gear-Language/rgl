@@ -1,0 +1,14 @@
+// Reprise après erreur : rail hors du train, mots réservés, « ; » manquant avant « } », « } » en trop.
+gear lire(): int {
+    return lireNombre()
+        !> redemander();
+}
+gear boucle(): void {
+    bool continue: false;
+    continue;
+    var a: 1
+}
+}
+gear suivant(): void {
+    var b: 2;
+!train |> done;

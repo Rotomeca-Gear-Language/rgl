@@ -1,0 +1,76 @@
+forge: gears
+description: "Rendu HTML sûr des fichiers Paper"
+
+/// <lang name="fr"><summary>Fragment HTML déjà sûr, inséré sans échappement par Paper.</summary></lang>
+/// <lang name="en"><summary>Already-safe HTML fragment inserted by Paper without escaping.</summary></lang>
+export ingot html: string;
+
+/// <lang name="fr"><summary>Événement DOM transmis par le runtime navigateur à un handler Paper.</summary></lang>
+/// <lang name="en"><summary>DOM event sent by the browser runtime to a Paper handler.</summary></lang>
+export mold DomEvent {
+    /// <lang name="fr"><summary>Nom de l'événement du navigateur.</summary></lang>
+    /// <lang name="en"><summary>Browser event name.</summary></lang>
+    string type;
+    /// <lang name="fr"><summary>Identifiant HTML de la cible, ou texte vide.</summary></lang>
+    /// <lang name="en"><summary>Target HTML id, or empty text.</summary></lang>
+    string targetId: '';
+    /// <lang name="fr"><summary>Valeur courante d'un contrôle, ou texte vide.</summary></lang>
+    /// <lang name="en"><summary>Current control value, or empty text.</summary></lang>
+    string value: '';
+    /// <lang name="fr"><summary>Touche du clavier, ou texte vide.</summary></lang>
+    /// <lang name="en"><summary>Keyboard key, or empty text.</summary></lang>
+    string key: '';
+}
+
+@trusted
+/// <lang name="fr"><summary>Échappe un texte pour l'insérer dans le contenu d'un élément HTML.</summary><param name="value">Texte non fiable.</param><returns>Texte où les caractères HTML significatifs sont remplacés par des entités.</returns></lang>
+/// <lang name="en"><summary>Escapes text for insertion into HTML element content.</summary><param name="value">Untrusted text.</param><returns>Text whose HTML-significant characters are replaced with entities.</returns></lang>
+export gear pure escapeHtml(string value): string => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_value value) {
+        std::string escaped;
+        escaped.reserve(value.size());
+        for (const char character : value.view()) {
+            switch (character) {
+                case '&': escaped += "&amp;"; break;
+                case '<': escaped += "&lt;"; break;
+                case '>': escaped += "&gt;"; break;
+                case '"': escaped += "&quot;"; break;
+                case '\'': escaped += "&#39;"; break;
+                default: escaped += character; break;
+            }
+        }
+        return rgl_return::from_std_string(escaped);
+    }
+}(string value: value): string;
+
+@trusted
+/// <lang name="fr"><summary>Échappe un texte pour l'insérer dans une chaîne JSON.</summary><param name="value">Texte arbitraire.</param><returns>Contenu JSON sans les guillemets extérieurs.</returns></lang>
+/// <lang name="en"><summary>Escapes text for insertion into a JSON string.</summary><param name="value">Arbitrary text.</param><returns>JSON string content without surrounding quotes.</returns></lang>
+export gear pure escapeJson(string value): string => cpp {
+    #include <cstdio>
+    #include <string>
+    rgl_return rgl(rgl_arg_value value) {
+        std::string escaped;
+        escaped.reserve(value.size());
+        char unicode[7]{};
+        for (const unsigned char character : value.view()) {
+            switch (character) {
+                case '"': escaped += "\\\""; break;
+                case '\\': escaped += "\\\\"; break;
+                case '\b': escaped += "\\b"; break;
+                case '\f': escaped += "\\f"; break;
+                case '\n': escaped += "\\n"; break;
+                case '\r': escaped += "\\r"; break;
+                case '\t': escaped += "\\t"; break;
+                default:
+                    if (character < 0x20) {
+                        std::snprintf(unicode, sizeof(unicode), "\\u%04x", character);
+                        escaped += unicode;
+                    } else escaped += static_cast<char>(character);
+                    break;
+            }
+        }
+        return rgl_return::from_std_string(escaped);
+    }
+}(string value: value): string;

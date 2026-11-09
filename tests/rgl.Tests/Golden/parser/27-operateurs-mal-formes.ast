@@ -1,0 +1,14 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=a
+    LiteralExpression 2:8 kind=IntegerLiteral text=1
+  VarDeclaration 3:1 keyword=var name=b
+    ConditionalExpression 3:8
+      NameExpression 3:8 name=a
+      LiteralExpression 3:12 kind=IntegerLiteral text=1
+      LiteralExpression 3:14 kind=IntegerLiteral text=2
+  ExpressionStatement 4:1
+    IncrementExpression 4:1 op=increment
+      NameExpression 4:13 name=a
+  ExpressionStatement 5:1
+    IncrementExpression 5:1 op=increment step=2
+      NameExpression 5:13 name=a

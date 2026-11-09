@@ -1,0 +1,4 @@
+// Parenthèses, type de retour ou corps manquants.
+gear sansParametres: int => 1;
+gear sansType() => 1;
+gear sansCorps(): int;

@@ -1,0 +1,800 @@
+forge: gears
+description: "Mathématiques supplémentaires : flottants spéciaux, trigonométrie hyperbolique, divisions entières, nombres premiers, grands entiers"
+
+/// <lang name="fr">
+/// <summary>Indique si le flottant n'est pas un nombre (NaN).</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>`true` pour NaN.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether the float is not a number (NaN).</summary>
+/// <param name="x">The number.</param>
+/// <returns>`true` for NaN.</returns>
+/// </lang>
+@trusted
+gear pure isNaN(double x): bool => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::isnan(x);
+    }
+}(double x: x): bool;
+
+/// <lang name="fr">
+/// <summary>Indique si le flottant est infini (positif ou négatif).</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>`true` pour l'infini.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether the float is infinite (positive or negative).</summary>
+/// <param name="x">The number.</param>
+/// <returns>`true` for infinity.</returns>
+/// </lang>
+@trusted
+gear pure isInfinity(double x): bool => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::isinf(x);
+    }
+}(double x: x): bool;
+
+/// <lang name="fr">
+/// <summary>Indique si le flottant est un nombre fini (ni infini ni NaN).</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>`true` pour un nombre fini.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether the float is a finite number (neither infinite nor NaN).</summary>
+/// <param name="x">The number.</param>
+/// <returns>`true` for a finite number.</returns>
+/// </lang>
+@trusted
+gear pure isFinite(double x): bool => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::isfinite(x);
+    }
+}(double x: x): bool;
+
+/// <lang name="fr">
+/// <summary>Le sinus hyperbolique.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>sinh(x).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The hyperbolic sine.</summary>
+/// <param name="x">The number.</param>
+/// <returns>sinh(x).</returns>
+/// </lang>
+@trusted
+gear pure sinh(double x): double => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::sinh(x);
+    }
+}(double x: x): double;
+
+/// <lang name="fr">
+/// <summary>Le cosinus hyperbolique.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>cosh(x).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The hyperbolic cosine.</summary>
+/// <param name="x">The number.</param>
+/// <returns>cosh(x).</returns>
+/// </lang>
+@trusted
+gear pure cosh(double x): double => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::cosh(x);
+    }
+}(double x: x): double;
+
+/// <lang name="fr">
+/// <summary>La tangente hyperbolique.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>tanh(x).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The hyperbolic tangent.</summary>
+/// <param name="x">The number.</param>
+/// <returns>tanh(x).</returns>
+/// </lang>
+@trusted
+gear pure tanh(double x): double => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::tanh(x);
+    }
+}(double x: x): double;
+
+/// <lang name="fr">
+/// <summary>L'argument sinus hyperbolique.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>asinh(x).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The inverse hyperbolic sine.</summary>
+/// <param name="x">The number.</param>
+/// <returns>asinh(x).</returns>
+/// </lang>
+@trusted
+gear pure asinh(double x): double => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::asinh(x);
+    }
+}(double x: x): double;
+
+/// <lang name="fr">
+/// <summary>Deux puissance x.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>2^x.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Two raised to the power x.</summary>
+/// <param name="x">The number.</param>
+/// <returns>2^x.</returns>
+/// </lang>
+@trusted
+gear pure exp2(double x): double => cpp {
+    #include <cmath>
+    rgl_return rgl(rgl_arg_x x) {
+        return std::exp2(x);
+    }
+}(double x: x): double;
+
+/// <lang name="fr">
+/// <summary>Le reste de la division par b, toujours de même signe que b (le modulo mathématique, contrairement à `%` qui suit le dividende).</summary>
+/// <param name="a">Le dividende.</param>
+/// <param name="b">Le diviseur, non nul.</param>
+/// <returns>Le modulo ; 0 si b est nul.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The remainder of the division by b, always with the sign of b (the mathematical modulo, unlike `%` which follows the dividend).</summary>
+/// <param name="a">The dividend.</param>
+/// <param name="b">The divisor, non-zero.</param>
+/// <returns>The modulo; 0 when b is zero.</returns>
+/// </lang>
+@trusted
+gear pure modulo(long a, long b): long => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        if (b == 0) return 0;
+        if (b == -1) return 0;
+        const std::int64_t r = a % b;
+        return (r != 0 && ((r < 0) != (b < 0))) ? r + b : r;
+    }
+}(long a: a, long b: b): long;
+
+/// <lang name="fr">
+/// <summary>La division entière arrondie vers moins l'infini (`-7 / 2` donne -4, pas -3).</summary>
+/// <param name="a">Le dividende.</param>
+/// <param name="b">Le diviseur, non nul.</param>
+/// <returns>Le quotient ; 0 si b est nul.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The integer division rounded toward minus infinity (`-7 / 2` gives -4, not -3).</summary>
+/// <param name="a">The dividend.</param>
+/// <param name="b">The divisor, non-zero.</param>
+/// <returns>The quotient; 0 when b is zero.</returns>
+/// </lang>
+@trusted
+gear pure floorDiv(long a, long b): long => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        if (b == 0) return 0;
+        if (b == -1) return a == INT64_MIN ? INT64_MIN : -a;
+        std::int64_t q = a / b;
+        if ((a % b != 0) && ((a < 0) != (b < 0))) --q;
+        return q;
+    }
+}(long a: a, long b: b): long;
+
+/// <lang name="fr">
+/// <summary>La division entière arrondie vers plus l'infini (`7 / 2` donne 4).</summary>
+/// <param name="a">Le dividende.</param>
+/// <param name="b">Le diviseur, non nul.</param>
+/// <returns>Le quotient ; 0 si b est nul.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The integer division rounded toward plus infinity (`7 / 2` gives 4).</summary>
+/// <param name="a">The dividend.</param>
+/// <param name="b">The divisor, non-zero.</param>
+/// <returns>The quotient; 0 when b is zero.</returns>
+/// </lang>
+@trusted
+gear pure ceilDiv(long a, long b): long => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        if (b == 0) return 0;
+        if (b == -1) return a == INT64_MIN ? INT64_MIN : -a;
+        std::int64_t q = a / b;
+        if ((a % b != 0) && ((a < 0) == (b < 0))) ++q;
+        return q;
+    }
+}(long a: a, long b: b): long;
+
+/// <lang name="fr">
+/// <summary>Le nombre de bits à 1.</summary>
+/// <param name="n">Le nombre.</param>
+/// <returns>Le nombre de bits à 1, de 0 à 64.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The number of bits set to 1.</summary>
+/// <param name="n">The number.</param>
+/// <returns>The number of bits set, from 0 to 64.</returns>
+/// </lang>
+@trusted
+gear pure bitCount(ulong n): uint => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_n n) {
+        return static_cast<std::uint32_t>(__builtin_popcountll(n));
+    }
+}(ulong n: n): uint;
+
+/// <lang name="fr">
+/// <summary>Indique si un nombre est premier (division d'essai, rapide jusqu'à environ 10^12).</summary>
+/// <param name="n">Le nombre à tester.</param>
+/// <returns>`true` si n est premier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether a number is prime (trial division, fast up to about 10^12).</summary>
+/// <param name="n">The number to test.</param>
+/// <returns>`true` when n is prime.</returns>
+/// </lang>
+@trusted
+gear pure isPrime(ulong n): bool => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_n n) {
+        if (n < 2) return false;
+        if (n < 4) return true;
+        if (n % 2 == 0 || n % 3 == 0) return false;
+        for (std::uint64_t i = 5; i <= n / i; i += 6) if (n % i == 0 || n % (i + 2) == 0) return false;
+        return true;
+    }
+}(ulong n: n): bool;
+
+/// <lang name="fr">
+/// <summary>Additionne deux entiers de taille quelconque écrits en décimal.</summary>
+/// <param name="a">Le premier entier (chiffres, signe facultatif).</param>
+/// <param name="b">Le second entier.</param>
+/// <returns>La somme en décimal, `null` si un texte n'est pas un entier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Adds two arbitrary-size integers written in decimal.</summary>
+/// <param name="a">The first integer (digits, optional sign).</param>
+/// <param name="b">The second integer.</param>
+/// <returns>The sum in decimal, `null` when a text is not an integer.</returns>
+/// </lang>
+@trusted
+gear pure bigAdd(string a, string b): string? => cpp {
+    #include <string>
+    #include <vector>
+    #include <algorithm>
+    struct Big { bool negative = false; std::string digits; };
+    static bool parse_big(const rgl::standard::string& text, Big& out) {
+        std::size_t i = 0;
+        out.negative = false;
+        if (i < text.size() && (text.data()[i] == '-' || text.data()[i] == '+')) { out.negative = text.data()[i] == '-'; ++i; }
+        if (i >= text.size()) return false;
+        std::size_t start = i;
+        for (; i < text.size(); ++i) if (text.data()[i] < '0' || text.data()[i] > '9') return false;
+        while (start + 1 < text.size() && text.data()[start] == '0') ++start;
+        out.digits.assign(text.data() + start, text.size() - start);
+        if (out.digits == "0") out.negative = false;
+        return true;
+    }
+    static int compare_magnitude(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) return a.size() < b.size() ? -1 : 1;
+        const int c = a.compare(b);
+        return c < 0 ? -1 : (c > 0 ? 1 : 0);
+    }
+    static std::string add_magnitude(const std::string& a, const std::string& b) {
+        std::string result;
+        int carry = 0;
+        for (std::size_t i = 0; i < a.size() || i < b.size() || carry; ++i) {
+            int sum = carry;
+            if (i < a.size()) sum += a[a.size() - 1 - i] - '0';
+            if (i < b.size()) sum += b[b.size() - 1 - i] - '0';
+            result += static_cast<char>('0' + sum % 10);
+            carry = sum / 10;
+        }
+        std::reverse(result.begin(), result.end());
+        return result.empty() ? "0" : result;
+    }
+    static std::string sub_magnitude(const std::string& a, const std::string& b) {
+        // a >= b
+        std::string result;
+        int borrow = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            int diff = (a[a.size() - 1 - i] - '0') - borrow - (i < b.size() ? b[b.size() - 1 - i] - '0' : 0);
+            borrow = diff < 0 ? 1 : 0;
+            if (diff < 0) diff += 10;
+            result += static_cast<char>('0' + diff);
+        }
+        while (result.size() > 1 && result.back() == '0') result.pop_back();
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+    static std::string mul_magnitude(const std::string& a, const std::string& b) {
+        if (a == "0" || b == "0") return "0";
+        std::vector<int> cells(a.size() + b.size(), 0);
+        for (std::size_t i = 0; i < a.size(); ++i)
+            for (std::size_t j = 0; j < b.size(); ++j)
+                cells[i + j + 1] += (a[i] - '0') * (b[j] - '0');
+        for (std::size_t k = cells.size(); k-- > 1;) { cells[k - 1] += cells[k] / 10; cells[k] %= 10; }
+        std::string result;
+        std::size_t start = 0;
+        while (start + 1 < cells.size() && cells[start] == 0) ++start;
+        for (std::size_t k = start; k < cells.size(); ++k) result += static_cast<char>('0' + cells[k]);
+        return result;
+    }
+    static void divmod_magnitude(const std::string& a, const std::string& b, std::string& quotient, std::string& remainder) {
+        quotient.clear();
+        remainder = "0";
+        for (const char digit : a) {
+            remainder = remainder == "0" ? std::string(1, digit) : remainder + digit;
+            int count = 0;
+            while (compare_magnitude(remainder, b) >= 0) { remainder = sub_magnitude(remainder, b); ++count; }
+            quotient += static_cast<char>('0' + count);
+        }
+        std::size_t start = 0;
+        while (start + 1 < quotient.size() && quotient[start] == '0') ++start;
+        quotient = quotient.empty() ? "0" : quotient.substr(start);
+    }
+    static std::string render(bool negative, const std::string& digits) {
+        return (negative && digits != "0" ? "-" : "") + digits;
+    }
+    static rgl::standard::string to_rgl(const std::string& text) { return rgl::standard::string(text.c_str(), text.size()); }
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        Big x, y;
+        if (!parse_big(a, x) || !parse_big(b, y)) return rgl_return{};
+        if (x.negative == y.negative) return rgl_return(to_rgl(render(x.negative, add_magnitude(x.digits, y.digits))));
+        const int order = compare_magnitude(x.digits, y.digits);
+        if (order == 0) return rgl_return(to_rgl("0"));
+        return order > 0 ? rgl_return(to_rgl(render(x.negative, sub_magnitude(x.digits, y.digits)))) : rgl_return(to_rgl(render(y.negative, sub_magnitude(y.digits, x.digits))));
+    }
+}(string a: a, string b: b): string?;
+
+/// <lang name="fr">
+/// <summary>Soustrait deux entiers de taille quelconque écrits en décimal.</summary>
+/// <param name="a">Le premier entier.</param>
+/// <param name="b">L'entier retranché.</param>
+/// <returns>La différence en décimal, `null` si un texte n'est pas un entier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Subtracts two arbitrary-size integers written in decimal.</summary>
+/// <param name="a">The first integer.</param>
+/// <param name="b">The subtracted integer.</param>
+/// <returns>The difference in decimal, `null` when a text is not an integer.</returns>
+/// </lang>
+@trusted
+gear pure bigSub(string a, string b): string? => cpp {
+    #include <string>
+    #include <vector>
+    #include <algorithm>
+    struct Big { bool negative = false; std::string digits; };
+    static bool parse_big(const rgl::standard::string& text, Big& out) {
+        std::size_t i = 0;
+        out.negative = false;
+        if (i < text.size() && (text.data()[i] == '-' || text.data()[i] == '+')) { out.negative = text.data()[i] == '-'; ++i; }
+        if (i >= text.size()) return false;
+        std::size_t start = i;
+        for (; i < text.size(); ++i) if (text.data()[i] < '0' || text.data()[i] > '9') return false;
+        while (start + 1 < text.size() && text.data()[start] == '0') ++start;
+        out.digits.assign(text.data() + start, text.size() - start);
+        if (out.digits == "0") out.negative = false;
+        return true;
+    }
+    static int compare_magnitude(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) return a.size() < b.size() ? -1 : 1;
+        const int c = a.compare(b);
+        return c < 0 ? -1 : (c > 0 ? 1 : 0);
+    }
+    static std::string add_magnitude(const std::string& a, const std::string& b) {
+        std::string result;
+        int carry = 0;
+        for (std::size_t i = 0; i < a.size() || i < b.size() || carry; ++i) {
+            int sum = carry;
+            if (i < a.size()) sum += a[a.size() - 1 - i] - '0';
+            if (i < b.size()) sum += b[b.size() - 1 - i] - '0';
+            result += static_cast<char>('0' + sum % 10);
+            carry = sum / 10;
+        }
+        std::reverse(result.begin(), result.end());
+        return result.empty() ? "0" : result;
+    }
+    static std::string sub_magnitude(const std::string& a, const std::string& b) {
+        // a >= b
+        std::string result;
+        int borrow = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            int diff = (a[a.size() - 1 - i] - '0') - borrow - (i < b.size() ? b[b.size() - 1 - i] - '0' : 0);
+            borrow = diff < 0 ? 1 : 0;
+            if (diff < 0) diff += 10;
+            result += static_cast<char>('0' + diff);
+        }
+        while (result.size() > 1 && result.back() == '0') result.pop_back();
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+    static std::string mul_magnitude(const std::string& a, const std::string& b) {
+        if (a == "0" || b == "0") return "0";
+        std::vector<int> cells(a.size() + b.size(), 0);
+        for (std::size_t i = 0; i < a.size(); ++i)
+            for (std::size_t j = 0; j < b.size(); ++j)
+                cells[i + j + 1] += (a[i] - '0') * (b[j] - '0');
+        for (std::size_t k = cells.size(); k-- > 1;) { cells[k - 1] += cells[k] / 10; cells[k] %= 10; }
+        std::string result;
+        std::size_t start = 0;
+        while (start + 1 < cells.size() && cells[start] == 0) ++start;
+        for (std::size_t k = start; k < cells.size(); ++k) result += static_cast<char>('0' + cells[k]);
+        return result;
+    }
+    static void divmod_magnitude(const std::string& a, const std::string& b, std::string& quotient, std::string& remainder) {
+        quotient.clear();
+        remainder = "0";
+        for (const char digit : a) {
+            remainder = remainder == "0" ? std::string(1, digit) : remainder + digit;
+            int count = 0;
+            while (compare_magnitude(remainder, b) >= 0) { remainder = sub_magnitude(remainder, b); ++count; }
+            quotient += static_cast<char>('0' + count);
+        }
+        std::size_t start = 0;
+        while (start + 1 < quotient.size() && quotient[start] == '0') ++start;
+        quotient = quotient.empty() ? "0" : quotient.substr(start);
+    }
+    static std::string render(bool negative, const std::string& digits) {
+        return (negative && digits != "0" ? "-" : "") + digits;
+    }
+    static rgl::standard::string to_rgl(const std::string& text) { return rgl::standard::string(text.c_str(), text.size()); }
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        Big x, y;
+        if (!parse_big(a, x) || !parse_big(b, y)) return rgl_return{};
+        y.negative = !y.negative && y.digits != "0";
+        if (x.negative == y.negative) return rgl_return(to_rgl(render(x.negative, add_magnitude(x.digits, y.digits))));
+        const int order = compare_magnitude(x.digits, y.digits);
+        if (order == 0) return rgl_return(to_rgl("0"));
+        return order > 0 ? rgl_return(to_rgl(render(x.negative, sub_magnitude(x.digits, y.digits)))) : rgl_return(to_rgl(render(y.negative, sub_magnitude(y.digits, x.digits))));
+    }
+}(string a: a, string b: b): string?;
+
+/// <lang name="fr">
+/// <summary>Multiplie deux entiers de taille quelconque écrits en décimal.</summary>
+/// <param name="a">Le premier facteur.</param>
+/// <param name="b">Le second facteur.</param>
+/// <returns>Le produit en décimal, `null` si un texte n'est pas un entier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Multiplies two arbitrary-size integers written in decimal.</summary>
+/// <param name="a">The first factor.</param>
+/// <param name="b">The second factor.</param>
+/// <returns>The product in decimal, `null` when a text is not an integer.</returns>
+/// </lang>
+@trusted
+gear pure bigMul(string a, string b): string? => cpp {
+    #include <string>
+    #include <vector>
+    #include <algorithm>
+    struct Big { bool negative = false; std::string digits; };
+    static bool parse_big(const rgl::standard::string& text, Big& out) {
+        std::size_t i = 0;
+        out.negative = false;
+        if (i < text.size() && (text.data()[i] == '-' || text.data()[i] == '+')) { out.negative = text.data()[i] == '-'; ++i; }
+        if (i >= text.size()) return false;
+        std::size_t start = i;
+        for (; i < text.size(); ++i) if (text.data()[i] < '0' || text.data()[i] > '9') return false;
+        while (start + 1 < text.size() && text.data()[start] == '0') ++start;
+        out.digits.assign(text.data() + start, text.size() - start);
+        if (out.digits == "0") out.negative = false;
+        return true;
+    }
+    static int compare_magnitude(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) return a.size() < b.size() ? -1 : 1;
+        const int c = a.compare(b);
+        return c < 0 ? -1 : (c > 0 ? 1 : 0);
+    }
+    static std::string add_magnitude(const std::string& a, const std::string& b) {
+        std::string result;
+        int carry = 0;
+        for (std::size_t i = 0; i < a.size() || i < b.size() || carry; ++i) {
+            int sum = carry;
+            if (i < a.size()) sum += a[a.size() - 1 - i] - '0';
+            if (i < b.size()) sum += b[b.size() - 1 - i] - '0';
+            result += static_cast<char>('0' + sum % 10);
+            carry = sum / 10;
+        }
+        std::reverse(result.begin(), result.end());
+        return result.empty() ? "0" : result;
+    }
+    static std::string sub_magnitude(const std::string& a, const std::string& b) {
+        // a >= b
+        std::string result;
+        int borrow = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            int diff = (a[a.size() - 1 - i] - '0') - borrow - (i < b.size() ? b[b.size() - 1 - i] - '0' : 0);
+            borrow = diff < 0 ? 1 : 0;
+            if (diff < 0) diff += 10;
+            result += static_cast<char>('0' + diff);
+        }
+        while (result.size() > 1 && result.back() == '0') result.pop_back();
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+    static std::string mul_magnitude(const std::string& a, const std::string& b) {
+        if (a == "0" || b == "0") return "0";
+        std::vector<int> cells(a.size() + b.size(), 0);
+        for (std::size_t i = 0; i < a.size(); ++i)
+            for (std::size_t j = 0; j < b.size(); ++j)
+                cells[i + j + 1] += (a[i] - '0') * (b[j] - '0');
+        for (std::size_t k = cells.size(); k-- > 1;) { cells[k - 1] += cells[k] / 10; cells[k] %= 10; }
+        std::string result;
+        std::size_t start = 0;
+        while (start + 1 < cells.size() && cells[start] == 0) ++start;
+        for (std::size_t k = start; k < cells.size(); ++k) result += static_cast<char>('0' + cells[k]);
+        return result;
+    }
+    static void divmod_magnitude(const std::string& a, const std::string& b, std::string& quotient, std::string& remainder) {
+        quotient.clear();
+        remainder = "0";
+        for (const char digit : a) {
+            remainder = remainder == "0" ? std::string(1, digit) : remainder + digit;
+            int count = 0;
+            while (compare_magnitude(remainder, b) >= 0) { remainder = sub_magnitude(remainder, b); ++count; }
+            quotient += static_cast<char>('0' + count);
+        }
+        std::size_t start = 0;
+        while (start + 1 < quotient.size() && quotient[start] == '0') ++start;
+        quotient = quotient.empty() ? "0" : quotient.substr(start);
+    }
+    static std::string render(bool negative, const std::string& digits) {
+        return (negative && digits != "0" ? "-" : "") + digits;
+    }
+    static rgl::standard::string to_rgl(const std::string& text) { return rgl::standard::string(text.c_str(), text.size()); }
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        Big x, y;
+        if (!parse_big(a, x) || !parse_big(b, y)) return rgl_return{};
+        return rgl_return(to_rgl(render(x.negative != y.negative, mul_magnitude(x.digits, y.digits))));
+    }
+}(string a: a, string b: b): string?;
+
+/// <lang name="fr">
+/// <summary>Divise deux entiers de taille quelconque (quotient tronqué vers zéro, le reste a le signe du dividende).</summary>
+/// <param name="a">Le dividende.</param>
+/// <param name="b">Le diviseur.</param>
+/// <returns>Un tableau `[quotient, reste]`, `null` si un texte n'est pas un entier ou si le diviseur est nul.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Divides two arbitrary-size integers (quotient truncated toward zero, the remainder has the sign of the dividend).</summary>
+/// <param name="a">The dividend.</param>
+/// <param name="b">The divisor.</param>
+/// <returns>An array `[quotient, remainder]`, `null` when a text is not an integer or the divisor is zero.</returns>
+/// </lang>
+@trusted
+gear pure bigDivMod(string a, string b): [string]? => cpp {
+    #include <string>
+    #include <vector>
+    #include <algorithm>
+    struct Big { bool negative = false; std::string digits; };
+    static bool parse_big(const rgl::standard::string& text, Big& out) {
+        std::size_t i = 0;
+        out.negative = false;
+        if (i < text.size() && (text.data()[i] == '-' || text.data()[i] == '+')) { out.negative = text.data()[i] == '-'; ++i; }
+        if (i >= text.size()) return false;
+        std::size_t start = i;
+        for (; i < text.size(); ++i) if (text.data()[i] < '0' || text.data()[i] > '9') return false;
+        while (start + 1 < text.size() && text.data()[start] == '0') ++start;
+        out.digits.assign(text.data() + start, text.size() - start);
+        if (out.digits == "0") out.negative = false;
+        return true;
+    }
+    static int compare_magnitude(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) return a.size() < b.size() ? -1 : 1;
+        const int c = a.compare(b);
+        return c < 0 ? -1 : (c > 0 ? 1 : 0);
+    }
+    static std::string add_magnitude(const std::string& a, const std::string& b) {
+        std::string result;
+        int carry = 0;
+        for (std::size_t i = 0; i < a.size() || i < b.size() || carry; ++i) {
+            int sum = carry;
+            if (i < a.size()) sum += a[a.size() - 1 - i] - '0';
+            if (i < b.size()) sum += b[b.size() - 1 - i] - '0';
+            result += static_cast<char>('0' + sum % 10);
+            carry = sum / 10;
+        }
+        std::reverse(result.begin(), result.end());
+        return result.empty() ? "0" : result;
+    }
+    static std::string sub_magnitude(const std::string& a, const std::string& b) {
+        // a >= b
+        std::string result;
+        int borrow = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            int diff = (a[a.size() - 1 - i] - '0') - borrow - (i < b.size() ? b[b.size() - 1 - i] - '0' : 0);
+            borrow = diff < 0 ? 1 : 0;
+            if (diff < 0) diff += 10;
+            result += static_cast<char>('0' + diff);
+        }
+        while (result.size() > 1 && result.back() == '0') result.pop_back();
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+    static std::string mul_magnitude(const std::string& a, const std::string& b) {
+        if (a == "0" || b == "0") return "0";
+        std::vector<int> cells(a.size() + b.size(), 0);
+        for (std::size_t i = 0; i < a.size(); ++i)
+            for (std::size_t j = 0; j < b.size(); ++j)
+                cells[i + j + 1] += (a[i] - '0') * (b[j] - '0');
+        for (std::size_t k = cells.size(); k-- > 1;) { cells[k - 1] += cells[k] / 10; cells[k] %= 10; }
+        std::string result;
+        std::size_t start = 0;
+        while (start + 1 < cells.size() && cells[start] == 0) ++start;
+        for (std::size_t k = start; k < cells.size(); ++k) result += static_cast<char>('0' + cells[k]);
+        return result;
+    }
+    static void divmod_magnitude(const std::string& a, const std::string& b, std::string& quotient, std::string& remainder) {
+        quotient.clear();
+        remainder = "0";
+        for (const char digit : a) {
+            remainder = remainder == "0" ? std::string(1, digit) : remainder + digit;
+            int count = 0;
+            while (compare_magnitude(remainder, b) >= 0) { remainder = sub_magnitude(remainder, b); ++count; }
+            quotient += static_cast<char>('0' + count);
+        }
+        std::size_t start = 0;
+        while (start + 1 < quotient.size() && quotient[start] == '0') ++start;
+        quotient = quotient.empty() ? "0" : quotient.substr(start);
+    }
+    static std::string render(bool negative, const std::string& digits) {
+        return (negative && digits != "0" ? "-" : "") + digits;
+    }
+    static rgl::standard::string to_rgl(const std::string& text) { return rgl::standard::string(text.c_str(), text.size()); }
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        Big x, y;
+        if (!parse_big(a, x) || !parse_big(b, y) || y.digits == "0") return rgl_return{};
+        std::string quotient, remainder;
+        divmod_magnitude(x.digits, y.digits, quotient, remainder);
+        rgl::standard::array<rgl::standard::string> result;
+        result.push(to_rgl(render(x.negative != y.negative, quotient)));
+        result.push(to_rgl(render(x.negative, remainder)));
+        return rgl_return(std::move(result));
+    }
+}(string a: a, string b: b): [string]?;
+
+/// <lang name="fr">
+/// <summary>Compare deux entiers de taille quelconque écrits en décimal.</summary>
+/// <param name="a">Le premier entier.</param>
+/// <param name="b">Le second entier.</param>
+/// <returns>-1, 0 ou 1 ; `null` si un texte n'est pas un entier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Compares two arbitrary-size integers written in decimal.</summary>
+/// <param name="a">The first integer.</param>
+/// <param name="b">The second integer.</param>
+/// <returns>-1, 0 or 1; `null` when a text is not an integer.</returns>
+/// </lang>
+@trusted
+gear pure bigCompare(string a, string b): int? => cpp {
+    #include <string>
+    #include <vector>
+    #include <algorithm>
+    struct Big { bool negative = false; std::string digits; };
+    static bool parse_big(const rgl::standard::string& text, Big& out) {
+        std::size_t i = 0;
+        out.negative = false;
+        if (i < text.size() && (text.data()[i] == '-' || text.data()[i] == '+')) { out.negative = text.data()[i] == '-'; ++i; }
+        if (i >= text.size()) return false;
+        std::size_t start = i;
+        for (; i < text.size(); ++i) if (text.data()[i] < '0' || text.data()[i] > '9') return false;
+        while (start + 1 < text.size() && text.data()[start] == '0') ++start;
+        out.digits.assign(text.data() + start, text.size() - start);
+        if (out.digits == "0") out.negative = false;
+        return true;
+    }
+    static int compare_magnitude(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) return a.size() < b.size() ? -1 : 1;
+        const int c = a.compare(b);
+        return c < 0 ? -1 : (c > 0 ? 1 : 0);
+    }
+    static std::string add_magnitude(const std::string& a, const std::string& b) {
+        std::string result;
+        int carry = 0;
+        for (std::size_t i = 0; i < a.size() || i < b.size() || carry; ++i) {
+            int sum = carry;
+            if (i < a.size()) sum += a[a.size() - 1 - i] - '0';
+            if (i < b.size()) sum += b[b.size() - 1 - i] - '0';
+            result += static_cast<char>('0' + sum % 10);
+            carry = sum / 10;
+        }
+        std::reverse(result.begin(), result.end());
+        return result.empty() ? "0" : result;
+    }
+    static std::string sub_magnitude(const std::string& a, const std::string& b) {
+        // a >= b
+        std::string result;
+        int borrow = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            int diff = (a[a.size() - 1 - i] - '0') - borrow - (i < b.size() ? b[b.size() - 1 - i] - '0' : 0);
+            borrow = diff < 0 ? 1 : 0;
+            if (diff < 0) diff += 10;
+            result += static_cast<char>('0' + diff);
+        }
+        while (result.size() > 1 && result.back() == '0') result.pop_back();
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+    static std::string mul_magnitude(const std::string& a, const std::string& b) {
+        if (a == "0" || b == "0") return "0";
+        std::vector<int> cells(a.size() + b.size(), 0);
+        for (std::size_t i = 0; i < a.size(); ++i)
+            for (std::size_t j = 0; j < b.size(); ++j)
+                cells[i + j + 1] += (a[i] - '0') * (b[j] - '0');
+        for (std::size_t k = cells.size(); k-- > 1;) { cells[k - 1] += cells[k] / 10; cells[k] %= 10; }
+        std::string result;
+        std::size_t start = 0;
+        while (start + 1 < cells.size() && cells[start] == 0) ++start;
+        for (std::size_t k = start; k < cells.size(); ++k) result += static_cast<char>('0' + cells[k]);
+        return result;
+    }
+    static void divmod_magnitude(const std::string& a, const std::string& b, std::string& quotient, std::string& remainder) {
+        quotient.clear();
+        remainder = "0";
+        for (const char digit : a) {
+            remainder = remainder == "0" ? std::string(1, digit) : remainder + digit;
+            int count = 0;
+            while (compare_magnitude(remainder, b) >= 0) { remainder = sub_magnitude(remainder, b); ++count; }
+            quotient += static_cast<char>('0' + count);
+        }
+        std::size_t start = 0;
+        while (start + 1 < quotient.size() && quotient[start] == '0') ++start;
+        quotient = quotient.empty() ? "0" : quotient.substr(start);
+    }
+    static std::string render(bool negative, const std::string& digits) {
+        return (negative && digits != "0" ? "-" : "") + digits;
+    }
+    static rgl::standard::string to_rgl(const std::string& text) { return rgl::standard::string(text.c_str(), text.size()); }
+    rgl_return rgl(rgl_arg_a a, rgl_arg_b b) {
+        Big x, y;
+        if (!parse_big(a, x) || !parse_big(b, y)) return rgl_return{};
+        if (x.negative != y.negative) return rgl_return(x.negative ? -1 : 1);
+        const int order = compare_magnitude(x.digits, y.digits);
+        return rgl_return(x.negative ? -order : order);
+    }
+}(string a: a, string b: b): int?;
+
+/// <lang name="fr">
+/// <summary>La puissance d'un entier de taille quelconque.</summary>
+/// <param name="base">L'entier, en décimal.</param>
+/// <param name="exponent">L'exposant.</param>
+/// <returns>`base` puissance `exponent` en décimal, `null` si `base` n'est pas un entier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The power of an arbitrary-size integer.</summary>
+/// <param name="base">The integer, in decimal.</param>
+/// <param name="exponent">The exponent.</param>
+/// <returns>`base` raised to `exponent` in decimal, `null` when `base` is not an integer.</returns>
+/// </lang>
+gear pure bigPow(string base, uint exponent): string? {
+    if (exponent eq 0) { return '1'; }
+    const string? half: bigPow(base, exponent / 2);
+    const string? square: half eq null ? null : bigMul(half ?? '', half ?? '');
+    return exponent % 2 eq 0 ? square : (square eq null ? null : bigMul(square ?? '', base));
+}
+
+/// <lang name="fr">
+/// <summary>La factorielle d'un entier, en décimal et sans débordement.</summary>
+/// <param name="n">L'entier (au plus quelques milliers).</param>
+/// <returns>n! en décimal.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The factorial of an integer, in decimal and without overflow.</summary>
+/// <param name="n">The integer (at most a few thousand).</param>
+/// <returns>n! in decimal.</returns>
+/// </lang>
+gear pure bigFactorial(uint n): string {
+    if (n < 2) { return '1'; }
+    return [2..n] |+> '1' with (acc, k) => bigMul(acc, `{k}`) ?? acc;
+}

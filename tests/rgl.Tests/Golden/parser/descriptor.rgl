@@ -1,0 +1,8 @@
+// Un descriptor : le type C++ à gauche de la flèche, le nom RGL à droite ; les membres portent le C++ qui les réalise.
+descriptor ns::Counter -> Compteur {
+    constructor(int start) => ns::Counter(start);
+    add(int n): int => add;
+    const field total: int => $self.total();
+    field label: string => _label;
+    static Zero(): Compteur => ns::Counter::zero(1, {2, 3});
+}

@@ -1,0 +1,18 @@
+// Casts, types bornés et ingots.
+ingot UserId: int;
+ingot Angle: float<0.0..360.0>;
+ingot Ecart: int<-5..5>;
+
+gear demo(): uint {
+    UserId uid: 42;
+    var brut: uid°;
+    uid °<- 43;
+    int<0..100> pct: 50;
+    var octet: brut as byte;
+    var peutEtre: brut as? byte;
+    var compare: brut as int < 5;
+    var nom: UserId(7)°.x;
+    return 0;
+}
+
+!train |> $ demo();

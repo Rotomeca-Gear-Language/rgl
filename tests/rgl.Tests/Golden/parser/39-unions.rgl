@@ -1,0 +1,15 @@
+// Unions, résultats et match : types, ok/err, bras valeur, bloc, sortie et default.
+gear decrire(int | string v, (int | string)? w, int ! string r): string {
+    var a: match (v) {
+        int i |> `entier {i}`;
+        string |> "texte";
+    };
+    match (r) {
+        ok n |> { return a; }
+        err e |> return e;
+    }
+    var b: match (w) { default |> ok(1); };
+    return err("x");
+}
+
+!train |> done;

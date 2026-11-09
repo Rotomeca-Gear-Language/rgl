@@ -1,0 +1,14 @@
+forge: gears
+description: "Extensions"
+
+ingot ProgramValue: uint;
+
+extend ProgramValue {
+    const ProgramValue Valid: 0;
+    gear pure plus(this ProgramValue p, uint n): ProgramValue => ProgramValue(p° + n);
+    gear make(uint n): ProgramValue => ProgramValue(n);
+}
+
+extend [int] {
+    gear pure premier(this mut [int] xs): int => xs[0];
+}

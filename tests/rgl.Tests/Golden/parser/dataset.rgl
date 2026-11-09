@@ -1,0 +1,17 @@
+mold Move {
+    string name;
+    int power;
+}
+
+dataset Moves of Move {
+    attaquer: {name: 'Attaquer', power: 5},
+    soin: {name: 'Soin', power: -20},
+}
+
+dataset Classes as Class {
+    guerrier: {atk: 50},
+}
+
+dataset Heros from "heros.json" of Hero;
+
+!train |> done;

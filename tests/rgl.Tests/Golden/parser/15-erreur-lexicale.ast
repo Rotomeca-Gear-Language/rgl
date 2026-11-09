@@ -1,0 +1,5 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    Pipeline 2:7
+      ExitCodeStep 2:10
+        LiteralExpression 2:12 kind=StringLiteral text="abc

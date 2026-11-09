@@ -1,0 +1,2 @@
+// Un rail dont le crochet ne se ferme pas.
+train |> lire !> [reparer |> done;

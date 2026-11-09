@@ -1,0 +1,4 @@
+// Une déclaration sans valeur : E006.
+int autre;
+var vide;
+train |> done;

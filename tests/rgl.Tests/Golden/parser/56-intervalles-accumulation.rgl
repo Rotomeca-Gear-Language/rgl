@@ -1,0 +1,10 @@
+// Intervalles et accumulations.
+gear test([int] notes, int n): void {
+    var a: [0..10];
+    var b: [0..<n by 2];
+    var c: [10..0];
+    var d: [n..<-5 by -1];
+    var total: notes |+> 0 with (acc, x) => acc + x;
+    var pairs: notes ||> doubler |+> 0 with ajouter(1);
+}
+train [1, 2] ||> verifier |+> 0 with compter !> [rapport] |> fin;

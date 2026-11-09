@@ -1,0 +1,2 @@
+// Boucles de guard, points de reprise et reprises.
+train path |> ^1 charger !> [reparer |> ^1<3> |> secours |> done] |> converge*<10> |> lisser* |> verifier(2)*<!5> !> [^1<!2>] |> ^2 fin |> ^1;

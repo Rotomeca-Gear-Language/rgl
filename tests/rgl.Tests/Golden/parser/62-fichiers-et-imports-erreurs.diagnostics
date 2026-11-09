@@ -1,0 +1,7 @@
+62-fichiers-et-imports-erreurs.rgl:2:1: erreur[E030]: « forge » est déjà écrit dans l'en-tête
+62-fichiers-et-imports-erreurs.rgl:3:13: erreur[E030]: texte attendu après « description: »
+62-fichiers-et-imports-erreurs.rgl:3:15: erreur[E030]: « -> » attendu après la valeur
+62-fichiers-et-imports-erreurs.rgl:5:22: erreur[E030]: « { » attendu après « only »
+62-fichiers-et-imports-erreurs.rgl:6:34: erreur[E030]: nouveau nom attendu
+62-fichiers-et-imports-erreurs.rgl:7:13: erreur[E030]: nom de fichier chaîne attendu après « import file »
+62-fichiers-et-imports-erreurs.rgl:10:5: erreur[E034]: un bloc ne contient qu'un train

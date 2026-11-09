@@ -1,0 +1,8 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    Pipeline 2:7
+      DoneStep 2:10
+  VarDeclaration 3:1 keyword=var name=a
+    LiteralExpression 3:8 kind=IntegerLiteral text=1
+  VarDeclaration 5:1 keyword=var name=b
+    LiteralExpression 5:8 kind=IntegerLiteral text=2

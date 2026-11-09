@@ -1,0 +1,290 @@
+forge: gears
+description: "Manipulation portable des chemins de fichiers"
+
+/// <lang name="fr">
+/// <summary>Joint deux composants de chemin selon les règles de la plateforme cible.</summary>
+/// <param name="left">Le chemin de départ.</param>
+/// <param name="right">Le composant à ajouter ; s'il est absolu, la bibliothèque C++ applique ses règles de remplacement.</param>
+/// <returns>Le chemin joint, écrit avec des séparateurs `/`.</returns>
+/// <example><code language="rgl">const string path: join('logs', 'today.txt');</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Joins two path components using the target platform's rules.</summary>
+/// <param name="left">The initial path.</param>
+/// <param name="right">The component to append; when absolute, C++ filesystem replacement rules apply.</param>
+/// <returns>The joined path, written with `/` separators.</returns>
+/// <example><code language="rgl">const string path: join('logs', 'today.txt');</code></example>
+/// </lang>
+@trusted
+gear pure join(string left, string right): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_left left, rgl_arg_right right) {
+        auto a = std::filesystem::u8path(left.data(), left.data() + left.size());
+        auto b = std::filesystem::u8path(right.data(), right.data() + right.size());
+        auto value = (a / b).generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()));
+    }
+}(string left: left, string right: right): string;
+
+/// <lang name="fr">
+/// <summary>Normalise lexicalement les composants `.` et `..` sans accéder au disque.</summary>
+/// <param name="path">Le chemin à normaliser.</param>
+/// <returns>Le chemin normalisé avec des séparateurs `/`.</returns>
+/// <remarks>Les liens symboliques et l'existence du chemin ne sont pas examinés.</remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>Lexically normalizes `.` and `..` components without accessing the filesystem.</summary>
+/// <param name="path">The path to normalize.</param>
+/// <returns>The normalized path with `/` separators.</returns>
+/// <remarks>Symbolic links and path existence are not examined.</remarks>
+/// </lang>
+@trusted
+gear pure normalize(string path): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path) {
+        auto p = std::filesystem::u8path(path.data(), path.data() + path.size()).lexically_normal();
+        auto value = p.generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()));
+    }
+}(string path: path): string;
+
+/// <lang name="fr">
+/// <summary>Indique si un chemin est absolu pour la plateforme cible.</summary>
+/// <param name="path">Le chemin à tester.</param>
+/// <returns>`true` lorsque le chemin possède une racine complète.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether a path is absolute for the target platform.</summary>
+/// <param name="path">The path to test.</param>
+/// <returns>`true` when the path has a complete root.</returns>
+/// </lang>
+@trusted
+gear pure isAbsolute(string path): bool => cpp {
+    #include <filesystem>
+    bool rgl(rgl_arg_path path) {
+        return std::filesystem::u8path(path.data(), path.data() + path.size()).is_absolute();
+    }
+}(string path: path): bool;
+
+/// <lang name="fr">
+/// <summary>Extrait le dernier composant d'un chemin.</summary>
+/// <param name="path">Le chemin à découper.</param>
+/// <returns>Le nom final, extension comprise, ou un texte vide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Extracts the final component of a path.</summary>
+/// <param name="path">The path to split.</param>
+/// <returns>The final name including its extension, or empty text.</returns>
+/// </lang>
+@trusted
+gear pure filename(string path): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path) {
+        auto value = std::filesystem::u8path(path.data(), path.data() + path.size()).filename().generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()));
+    }
+}(string path: path): string;
+
+/// <lang name="fr">
+/// <summary>Extrait le dernier composant sans sa dernière extension.</summary>
+/// <param name="path">Le chemin à découper.</param>
+/// <returns>La base du nom ; `archive.tar.gz` donne `archive.tar`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Extracts the final component without its last extension.</summary>
+/// <param name="path">The path to split.</param>
+/// <returns>The name stem; `archive.tar.gz` yields `archive.tar`.</returns>
+/// </lang>
+@trusted
+gear pure basename(string path): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path) {
+        auto value = std::filesystem::u8path(path.data(), path.data() + path.size()).stem().generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()));
+    }
+}(string path: path): string;
+
+/// <lang name="fr">
+/// <summary>Extrait la dernière extension du dernier composant.</summary>
+/// <param name="path">Le chemin à découper.</param>
+/// <returns>L'extension, point compris, ou un texte vide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Extracts the final extension of the final component.</summary>
+/// <param name="path">The path to split.</param>
+/// <returns>The extension including its dot, or empty text.</returns>
+/// </lang>
+@trusted
+gear pure extension(string path): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path) {
+        auto value = std::filesystem::u8path(path.data(), path.data() + path.size()).extension().generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()));
+    }
+}(string path: path): string;
+
+/// <lang name="fr">
+/// <summary>Extrait le chemin du dossier parent.</summary>
+/// <param name="path">Le chemin à découper.</param>
+/// <returns>Le parent avec des séparateurs `/`, ou un texte vide s'il n'existe pas lexicalement.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Extracts the parent directory path.</summary>
+/// <param name="path">The path to split.</param>
+/// <returns>The parent with `/` separators, or empty text when no lexical parent exists.</returns>
+/// </lang>
+@trusted
+gear pure dirname(string path): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path) {
+        auto value = std::filesystem::u8path(path.data(), path.data() + path.size()).parent_path().generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()));
+    }
+}(string path: path): string;
+
+/// <lang name="fr"><summary>Renvoie le dossier courant du processus avec des séparateurs `/`.</summary><returns>Le dossier depuis lequel le programme a été lancé.</returns></lang>
+/// <lang name="en"><summary>Returns the process working directory using `/` separators.</summary><returns>The directory from which the program was started.</returns></lang>
+@trusted
+gear currentDirectory(): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl() {
+        std::error_code error;
+        const auto path = std::filesystem::current_path(error);
+        if (error) return {};
+        const auto value = path.generic_u8string();
+        return rgl_return::from_std_string(std::string(reinterpret_cast<const char*>(value.data()), value.size()));
+    }
+}(): string;
+
+/// <lang name="fr"><summary>Renvoie le chemin absolu de l'exécutable en cours.</summary><returns>Le chemin du binaire, avec des séparateurs `/`.</returns></lang>
+/// <lang name="en"><summary>Returns the absolute path of the running executable.</summary><returns>The binary path using `/` separators.</returns></lang>
+@trusted
+gear executablePath(): string => cpp {
+    #include <filesystem>
+    #include <string>
+    #if defined(_WIN32)
+    #include <windows.h>
+    #elif defined(__APPLE__)
+    #include <mach-o/dyld.h>
+    #include <vector>
+    #else
+    #include <unistd.h>
+    #include <vector>
+    #endif
+
+    rgl_return rgl() {
+        std::filesystem::path path;
+        #if defined(_WIN32)
+        std::wstring buffer(32768, L'\0');
+        const auto size = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (size == 0 || size == buffer.size()) return {};
+        buffer.resize(size);
+        path = buffer;
+        #elif defined(__APPLE__)
+        std::uint32_t size = 0;
+        _NSGetExecutablePath(nullptr, &size);
+        std::vector<char> buffer(size);
+        if (_NSGetExecutablePath(buffer.data(), &size) != 0) return {};
+        path = std::filesystem::weakly_canonical(std::filesystem::u8path(buffer.data()));
+        #else
+        std::vector<char> buffer(4096);
+        for (;;) {
+            const auto size = readlink("/proc/self/exe", buffer.data(), buffer.size());
+            if (size < 0) return {};
+            if (static_cast<std::size_t>(size) < buffer.size()) {
+                path = std::filesystem::u8path(buffer.data(), buffer.data() + size);
+                break;
+            }
+            buffer.resize(buffer.size() * 2);
+        }
+        #endif
+        const auto value = path.generic_u8string();
+        return rgl_return::from_std_string(std::string(reinterpret_cast<const char*>(value.data()), value.size()));
+    }
+}(): string;
+
+/// <lang name="fr"><summary>Renvoie le dossier qui contient l'exécutable.</summary><returns>Le dossier absolu du binaire.</returns></lang>
+/// <lang name="en"><summary>Returns the directory containing the executable.</summary><returns>The absolute binary directory.</returns></lang>
+gear executableDirectory(): string => dirname(executablePath());
+
+/// <lang name="fr"><summary>Cherche récursivement le premier fichier portant ce nom dans un dossier.</summary><param name="name">Nom exact, extension comprise.</param><param name="folder">Dossier de départ.</param><returns>Son chemin absolu, ou `null` s'il est absent ou inaccessible.</returns><remarks>Le premier chemin dans l'ordre lexical est choisi.</remarks></lang>
+/// <lang name="en"><summary>Recursively finds the first file with this name below a directory.</summary><param name="name">Exact filename including its extension.</param><param name="folder">Directory to search.</param><returns>Its absolute path, or `null` when absent or inaccessible.</returns><remarks>The first path in lexical order is selected.</remarks></lang>
+@trusted
+gear findFile(string name, string folder: '.'): string? => cpp {
+    #include <algorithm>
+    #include <filesystem>
+    #include <string>
+    #include <vector>
+    rgl_return rgl(rgl_arg_name name, rgl_arg_folder folder) {
+        std::error_code error;
+        const auto root = std::filesystem::absolute(std::filesystem::u8path(folder.data(), folder.data() + folder.size()), error);
+        if (error || !std::filesystem::is_directory(root, error)) return {};
+        const std::string wanted(name.data(), name.size());
+        std::vector<std::filesystem::path> matches;
+        std::filesystem::recursive_directory_iterator iterator(root, std::filesystem::directory_options::skip_permission_denied, error), end;
+        while (!error && iterator != end) {
+            const auto candidate = iterator->path().filename().generic_u8string();
+            const std::string candidateText(reinterpret_cast<const char*>(candidate.data()), candidate.size());
+            if (iterator->is_regular_file(error) && !error && candidateText == wanted) matches.push_back(iterator->path());
+            iterator.increment(error);
+        }
+        if (matches.empty()) return {};
+        std::sort(matches.begin(), matches.end());
+        const auto value = std::filesystem::absolute(matches.front(), error).generic_u8string();
+        if (error) return {};
+        return rgl_return(rgl::standard::string::from_std_string(std::string(reinterpret_cast<const char*>(value.data()), value.size())));
+    }
+}(string name: name, string folder: folder): string?;
+
+/// <lang name="fr">
+/// <summary>Le chemin relatif de `path` à partir de `base`, sans accéder au disque.</summary>
+/// <param name="path">Le chemin à exprimer.</param>
+/// <param name="base">Le dossier de départ.</param>
+/// <returns>Le chemin relatif, avec des `/`, ou une chaîne vide s'il n'existe pas (racines différentes).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The path of `path` relative to `base`, without accessing the disk.</summary>
+/// <param name="path">The path to express.</param>
+/// <param name="base">The starting directory.</param>
+/// <returns>The relative path, with `/` separators, or an empty string when there is none (different roots).</returns>
+/// </lang>
+@trusted
+gear pure relative(string path, string base): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path, rgl_arg_base base) {
+        const auto value = std::filesystem::u8path(path.data(), path.data() + path.size()).lexically_relative(std::filesystem::u8path(base.data(), base.data() + base.size())).generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(value.c_str()), value.size());
+    }
+}(string path: path, string base: base): string;
+
+/// <lang name="fr">
+/// <summary>Remplace l'extension d'un chemin.</summary>
+/// <param name="path">Le chemin.</param>
+/// <param name="extension">La nouvelle extension, avec ou sans point ; vide pour la retirer.</param>
+/// <returns>Le chemin avec la nouvelle extension.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Replaces the extension of a path.</summary>
+/// <param name="path">The path.</param>
+/// <param name="extension">The new extension, with or without a dot; empty to remove it.</param>
+/// <returns>The path with the new extension.</returns>
+/// </lang>
+@trusted
+gear pure changeExtension(string path, string extension): string => cpp {
+    #include <filesystem>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path, rgl_arg_extension extension) {
+        auto value = std::filesystem::u8path(path.data(), path.data() + path.size());
+        value.replace_extension(std::filesystem::u8path(extension.data(), extension.data() + extension.size()));
+        const auto text = value.generic_u8string();
+        return rgl_return(reinterpret_cast<const char*>(text.c_str()), text.size());
+    }
+}(string path: path, string extension: extension): string;

@@ -1,0 +1,26 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=guard name=positif pure=false parameters=1
+    Parameter 2:20 name=n
+      PrimitiveType 2:20 type=int
+    PrimitiveType 2:28 type=int
+    BlockStatement 2:32
+      DoneStatement 2:34
+  GearDeclaration 3:1 kind=emit name=afficher pure=false parameters=1
+    Parameter 3:20 name=n
+      PrimitiveType 3:20 type=int
+    PrimitiveType 3:28 type=void
+    BlockStatement 3:33
+  GearDeclaration 4:1 kind=gear name=valeur pure=false parameters=1
+    Parameter 4:13 name=n
+      PrimitiveType 4:13 type=int
+    PrimitiveType 4:21 type=void
+    BlockStatement 4:26
+      ExpressionStatement 5:5
+        BinaryExpression 5:5 op=+
+          NameExpression 5:5 name=n
+          LiteralExpression 5:9 kind=IntegerLiteral text=1
+      WriteStatement 6:5 target=<manquant>
+        NameExpression 6:5 name=n
+  TrainDeclaration 9:1 unguarded=true parameters=none
+    Pipeline 9:8
+      DoneStep 9:11

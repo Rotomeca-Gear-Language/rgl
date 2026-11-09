@@ -1,0 +1,18 @@
+// Collections : types, tableaux et dictionnaires écrits, tuples, index, appels sur une valeur.
+mold Equipe { [string] noms; [int;3] scores; [int;1..5] tours; [string+] chefs; [string:int] ages; (int, string) paire; (int x, int y) point; }
+
+gear demo(): uint {
+    var nums: [1, 2, 3];
+    var plus: [...nums, 4, ...nums];
+    [int] vide: [];
+    var ages: ["Alix": 12, "Zoé": 7];
+    [string:int] aucun: [:];
+    var paire: (1, "a");
+    var point: (x: 1, y: 2);
+    nums.push(4);
+    nums[0] <- 9;
+    `{nums[1]} {ages["Alix"]} {paire.Item1} {point.x} {nums.length}` -> console;
+    return 0;
+}
+
+!train |> $ demo();

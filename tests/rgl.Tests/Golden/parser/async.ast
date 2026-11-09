@@ -1,0 +1,73 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=lent pure=false parameters=1
+    DeclarationNotes 1:1
+      OtherAnnotation 1:1 name=async
+    Parameter 2:11 name=a
+      PrimitiveType 2:11 type=int
+    PrimitiveType 2:19 type=int
+    BlockStatement 2:23
+      ExpressionStatement 3:5
+        AwaitExpression 3:5
+          CallExpression 3:11
+            NameExpression 3:11 name=sleep
+            LiteralExpression 3:17 kind=DurationLiteral text=10ms
+      ReturnStatement 4:5
+        BinaryExpression 4:12 op=+
+          NameExpression 4:12 name=a
+          LiteralExpression 4:16 kind=IntegerLiteral text=1
+  GearDeclaration 8:1 kind=gear name=signal pure=false parameters=1
+    DeclarationNotes 7:1
+      OtherAnnotation 7:1 name=fire
+    Parameter 8:13 name=d
+      PrimitiveType 8:13 type=duration
+    PrimitiveType 8:26 type=void
+    BlockStatement 8:31
+      ExpressionStatement 9:5
+        AwaitExpression 9:5
+          CallExpression 9:11
+            NameExpression 9:11 name=sleep
+            NameExpression 9:17 name=d
+  GearDeclaration 13:1 kind=gear name=types pure=false parameters=0
+    DeclarationNotes 12:1
+      OtherAnnotation 12:1 name=async
+    NamedType 13:15 name=Promise
+      ResultType 13:23
+        PrimitiveType 13:23 type=int
+        NamedType 13:29 name=AsyncException
+    BlockStatement 13:45
+      VarDeclaration 14:5 keyword=var name=p
+        CallExpression 14:12
+          NameExpression 14:12 name=lent
+          LiteralExpression 14:17 kind=IntegerLiteral text=1
+      VarDeclaration 15:5 keyword=none name=x
+        PrimitiveType 15:5 type=int
+        BinaryExpression 15:12 op=??
+          AwaitExpression 15:12
+            NameExpression 15:18 name=p
+          LiteralExpression 15:23 kind=IntegerLiteral text=0
+      VarDeclaration 16:5 keyword=var name=y
+        BinaryExpression 16:12 op=+
+          AwaitExpression 16:12
+            CallExpression 16:18
+              NameExpression 16:18 name=lent
+              NameExpression 16:23 name=x
+          AwaitExpression 16:28
+            CallExpression 16:34
+              NameExpression 16:34 name=lent
+              LiteralExpression 16:39 kind=IntegerLiteral text=2
+      ReturnStatement 17:5
+        NameExpression 17:12 name=x
+  GearDeclaration 21:1 kind=emit name=principal pure=false parameters=0
+    DeclarationNotes 20:1
+      OtherAnnotation 20:1 name=async
+    PrimitiveType 21:19 type=uint
+    BlockStatement 21:24
+      ExpressionStatement 22:5
+        AwaitExpression 22:5
+          CallExpression 22:11
+            NameExpression 22:11 name=types
+      ReturnStatement 23:5
+        LiteralExpression 23:12 kind=IntegerLiteral text=0
+  TrainDeclaration 26:1 unguarded=true parameters=none
+    Pipeline 26:8
+      CallStep 26:11 gear=principal

@@ -1,0 +1,6 @@
+// Les trois formes de déclaration, avant comme après le train.
+var compteur: 0;
+string nom: "RGL";
+train |> done;
+const int MAX: 5 + 1;
+[string] noms: args;

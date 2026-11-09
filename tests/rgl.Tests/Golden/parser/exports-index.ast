@@ -1,0 +1,10 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=index description="Index" metadata=false
+  ImportDeclaration 4:1 module=Vectors only=none
+  ImportDeclaration 5:1 module=Autre only=2
+    ImportName 5:20 name=a
+    ImportName 5:23 name=b
+  ExportDeclaration 6:1 names=...Vectors,a,b
+  ExportDeclaration 7:1 names=module Vectors
+  ExpressionStatement 8:1
+    NameExpression 8:1 name=export

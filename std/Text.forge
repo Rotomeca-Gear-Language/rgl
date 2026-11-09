@@ -1,0 +1,515 @@
+forge: gears
+description: "Encodages (base64, hexadécimal, URL), points de code, formats de texte (CSV, INI, TOML, YAML)"
+
+use <Errors> only {ParseError};
+
+/// <lang name="fr">
+/// <summary>Encode des octets en base64 (alphabet standard, avec le remplissage `=`).</summary>
+/// <param name="data">Les octets à encoder.</param>
+/// <returns>Le texte base64.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Encodes bytes as base64 (standard alphabet, with `=` padding).</summary>
+/// <param name="data">The bytes to encode.</param>
+/// <returns>The base64 text.</returns>
+/// </lang>
+@trusted
+gear pure base64Encode(bytes data): string => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_data data) {
+        static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string text;
+        const std::size_t size = data.size();
+        text.reserve((size + 2) / 3 * 4);
+        for (std::size_t i = 0; i < size; i += 3) {
+            const unsigned a = static_cast<unsigned char>(data[i]);
+            const unsigned b = i + 1 < size ? static_cast<unsigned char>(data[i + 1]) : 0u;
+            const unsigned c = i + 2 < size ? static_cast<unsigned char>(data[i + 2]) : 0u;
+            const unsigned all = (a << 16) | (b << 8) | c;
+            text += table[(all >> 18) & 63];
+            text += table[(all >> 12) & 63];
+            text += i + 1 < size ? table[(all >> 6) & 63] : '=';
+            text += i + 2 < size ? table[all & 63] : '=';
+        }
+        return rgl_return(text.c_str(), text.size());
+    }
+}(bytes data: data): string;
+
+/// <lang name="fr">
+/// <summary>Décode un texte base64 (le remplissage `=` est facultatif ; les espaces et retours à la ligne sont ignorés).</summary>
+/// <param name="text">Le texte base64.</param>
+/// <returns>Les octets décodés, `null` si le texte n'est pas du base64 valide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Decodes base64 text (`=` padding is optional; spaces and newlines are ignored).</summary>
+/// <param name="text">The base64 text.</param>
+/// <returns>The decoded bytes, `null` when the text is not valid base64.</returns>
+/// </lang>
+@trusted
+gear pure base64Decode(string text): bytes? => cpp {
+    #include <string>
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_text text) {
+        rgl::standard::array<std::uint8_t> bytes;
+        unsigned buffer = 0;
+        int bits = 0;
+        for (const char character : text.view()) {
+            int value;
+            if (character >= 'A' && character <= 'Z') value = character - 'A';
+            else if (character >= 'a' && character <= 'z') value = character - 'a' + 26;
+            else if (character >= '0' && character <= '9') value = character - '0' + 52;
+            else if (character == '+') value = 62;
+            else if (character == '/') value = 63;
+            else if (character == '=' || character == ' ' || character == '\n' || character == '\r' || character == '\t') continue;
+            else return rgl_return{};
+            buffer = (buffer << 6) | static_cast<unsigned>(value);
+            bits += 6;
+            if (bits >= 8) {
+                bits -= 8;
+                bytes.push(static_cast<std::uint8_t>((buffer >> bits) & 255u));
+            }
+        }
+        return rgl_return(std::move(bytes));
+    }
+}(string text: text): bytes?;
+
+/// <lang name="fr">
+/// <summary>Écrit des octets en hexadécimal minuscule, deux chiffres par octet.</summary>
+/// <param name="data">Les octets à écrire.</param>
+/// <returns>Le texte hexadécimal.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes bytes as lowercase hexadecimal, two digits per byte.</summary>
+/// <param name="data">The bytes to write.</param>
+/// <returns>The hexadecimal text.</returns>
+/// </lang>
+@trusted
+gear pure hexEncode(bytes data): string => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_data data) {
+        static const char digits[] = "0123456789abcdef";
+        std::string text;
+        text.reserve(data.size() * 2);
+        for (std::size_t i = 0; i < data.size(); ++i) {
+            const unsigned char value = static_cast<unsigned char>(data[i]);
+            text += digits[value >> 4];
+            text += digits[value & 15];
+        }
+        return rgl_return(text.c_str(), text.size());
+    }
+}(bytes data: data): string;
+
+/// <lang name="fr">
+/// <summary>Lit un texte hexadécimal (majuscules ou minuscules, nombre pair de chiffres).</summary>
+/// <param name="text">Le texte hexadécimal.</param>
+/// <returns>Les octets lus, `null` si le texte n'est pas de l'hexadécimal valide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads hexadecimal text (upper or lower case, even number of digits).</summary>
+/// <param name="text">The hexadecimal text.</param>
+/// <returns>The bytes read, `null` when the text is not valid hexadecimal.</returns>
+/// </lang>
+@trusted
+gear pure hexDecode(string text): bytes? => cpp {
+    #include <string>
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_text text) {
+        if (text.size() % 2 != 0) return rgl_return{};
+        rgl::standard::array<std::uint8_t> bytes;
+        const auto digit = [](char c) -> int {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        };
+        for (std::size_t i = 0; i < text.size(); i += 2) {
+            const int high = digit(text.data()[i]);
+            const int low = digit(text.data()[i + 1]);
+            if (high < 0 || low < 0) return rgl_return{};
+            bytes.push(static_cast<std::uint8_t>(high * 16 + low));
+        }
+        return rgl_return(std::move(bytes));
+    }
+}(string text: text): bytes?;
+
+/// <lang name="fr">
+/// <summary>Encode un texte pour une URL (pourcentage) : seuls les lettres, chiffres et `-_.~` restent tels quels.</summary>
+/// <param name="text">Le texte à encoder (en UTF-8).</param>
+/// <returns>Le texte encodé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Percent-encodes a text for a URL: only letters, digits and `-_.~` stay as they are.</summary>
+/// <param name="text">The text to encode (as UTF-8).</param>
+/// <returns>The encoded text.</returns>
+/// </lang>
+@trusted
+gear pure urlEncode(string text): string => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_text text) {
+        static const char digits[] = "0123456789ABCDEF";
+        std::string result;
+        for (const unsigned char c : text.view()) {
+            const bool plain = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~';
+            if (plain) result += static_cast<char>(c);
+            else {
+                result += '%';
+                result += digits[c >> 4];
+                result += digits[c & 15];
+            }
+        }
+        return rgl_return(result.c_str(), result.size());
+    }
+}(string text: text): string;
+
+/// <lang name="fr">
+/// <summary>Décode un texte encodé pour une URL : `%XX` donne l'octet, `+` une espace.</summary>
+/// <param name="text">Le texte encodé.</param>
+/// <returns>Le texte décodé, `null` si un `%` n'est pas suivi de deux chiffres hexadécimaux ou si le résultat n'est pas de l'UTF-8.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Decodes URL-encoded text: `%XX` gives the byte, `+` a space.</summary>
+/// <param name="text">The encoded text.</param>
+/// <returns>The decoded text, `null` when a `%` is not followed by two hexadecimal digits or the result is not UTF-8.</returns>
+/// </lang>
+@trusted
+gear pure urlDecode(string text): string? => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_text text) {
+        const auto digit = [](char c) -> int {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        };
+        std::string result;
+        const std::size_t size = text.size();
+        for (std::size_t i = 0; i < size; ++i) {
+            const char c = text.data()[i];
+            if (c == '+') result += ' ';
+            else if (c == '%') {
+                if (i + 2 >= size) return rgl_return{};
+                const int high = digit(text.data()[i + 1]);
+                const int low = digit(text.data()[i + 2]);
+                if (high < 0 || low < 0) return rgl_return{};
+                result += static_cast<char>(high * 16 + low);
+                i += 2;
+            } else result += c;
+        }
+        // Le résultat doit être de l'UTF-8 valide.
+        for (std::size_t i = 0; i < result.size();) {
+            const unsigned char c = static_cast<unsigned char>(result[i]);
+            const std::size_t length = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 0;
+            if (length == 0 || i + length > result.size()) return rgl_return{};
+            for (std::size_t k = 1; k < length; ++k) if ((static_cast<unsigned char>(result[i + k]) & 0xC0) != 0x80) return rgl_return{};
+            i += length;
+        }
+        return rgl_return(rgl::standard::string(result.c_str(), result.size()));
+    }
+}(string text: text): string?;
+
+/// <lang name="fr">
+/// <summary>Les points de code Unicode d'un texte UTF-8.</summary>
+/// <param name="text">Le texte à lire.</param>
+/// <returns>Un nombre par caractère.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The Unicode code points of a UTF-8 text.</summary>
+/// <param name="text">The text to read.</param>
+/// <returns>One number per character.</returns>
+/// </lang>
+@trusted
+gear pure codePoints(string text): [uint] => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_text text) {
+        rgl_return points;
+        const std::size_t size = text.size();
+        for (std::size_t i = 0; i < size;) {
+            const unsigned char c = static_cast<unsigned char>(text.data()[i]);
+            std::size_t length = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : 4;
+            if (i + length > size) length = size - i;
+            std::uint32_t value = length == 1 ? c : length == 2 ? (c & 0x1Fu) : length == 3 ? (c & 0x0Fu) : (c & 0x07u);
+            for (std::size_t k = 1; k < length; ++k) value = (value << 6) | (static_cast<unsigned char>(text.data()[i + k]) & 0x3Fu);
+            points.push(value);
+            i += length;
+        }
+        return points;
+    }
+}(string text: text): [uint];
+
+/// <lang name="fr">
+/// <summary>Le caractère d'un point de code Unicode.</summary>
+/// <param name="point">Le point de code (hors substituts et au plus 0x10FFFF).</param>
+/// <returns>Le caractère, `null` si le point de code est invalide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The character of a Unicode code point.</summary>
+/// <param name="point">The code point (excluding surrogates, at most 0x10FFFF).</param>
+/// <returns>The character, `null` when the code point is invalid.</returns>
+/// </lang>
+@trusted
+gear pure fromCodePoint(uint point): string? => cpp {
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_point point) {
+        if (point > 0x10FFFFu || (point >= 0xD800u && point <= 0xDFFFu)) return rgl_return{};
+        char buffer[4];
+        std::size_t length;
+        if (point < 0x80u) { buffer[0] = static_cast<char>(point); length = 1; }
+        else if (point < 0x800u) { buffer[0] = static_cast<char>(0xC0u | (point >> 6)); buffer[1] = static_cast<char>(0x80u | (point & 0x3Fu)); length = 2; }
+        else if (point < 0x10000u) { buffer[0] = static_cast<char>(0xE0u | (point >> 12)); buffer[1] = static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); buffer[2] = static_cast<char>(0x80u | (point & 0x3Fu)); length = 3; }
+        else { buffer[0] = static_cast<char>(0xF0u | (point >> 18)); buffer[1] = static_cast<char>(0x80u | ((point >> 12) & 0x3Fu)); buffer[2] = static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); buffer[3] = static_cast<char>(0x80u | (point & 0x3Fu)); length = 4; }
+        return rgl_return(rgl::standard::string(buffer, length));
+    }
+}(uint point: point): string?;
+
+/// <lang name="fr">
+/// <summary>Compare deux textes par points de code (l'ordre des octets UTF-8).</summary>
+/// <param name="left">Le premier texte.</param>
+/// <param name="right">Le second texte.</param>
+/// <returns>Un nombre négatif si `left` précède `right`, positif s'il le suit, nul s'ils sont égaux.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Compares two texts by code point (the UTF-8 byte order).</summary>
+/// <param name="left">The first text.</param>
+/// <param name="right">The second text.</param>
+/// <returns>A negative number when `left` comes first, positive when it comes after, zero when equal.</returns>
+/// </lang>
+@trusted
+gear pure compareText(string left, string right): int => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_left left, rgl_arg_right right) {
+        const std::size_t common = left.size() < right.size() ? left.size() : right.size();
+        for (std::size_t i = 0; i < common; ++i) {
+            const unsigned char a = static_cast<unsigned char>(left.data()[i]);
+            const unsigned char b = static_cast<unsigned char>(right.data()[i]);
+            if (a != b) return a < b ? -1 : 1;
+        }
+        return left.size() == right.size() ? 0 : (left.size() < right.size() ? -1 : 1);
+    }
+}(string left: left, string right: right): int;
+
+/// <lang name="fr">
+/// <summary>La distance d'édition entre deux textes : le plus petit nombre d'insertions, suppressions et remplacements de caractères.</summary>
+/// <param name="left">Le premier texte.</param>
+/// <param name="right">Le second texte.</param>
+/// <returns>La distance, nulle pour deux textes égaux.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The edit distance between two texts: the smallest number of character insertions, deletions and substitutions.</summary>
+/// <param name="left">The first text.</param>
+/// <param name="right">The second text.</param>
+/// <returns>The distance, zero for equal texts.</returns>
+/// </lang>
+@trusted
+gear pure levenshtein(string left, string right): uint => cpp {
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_left left, rgl_arg_right right) {
+        const auto decode = [](const rgl::standard::string& text) {
+            std::vector<std::uint32_t> points;
+            for (std::size_t i = 0; i < text.size();) {
+                const unsigned char c = static_cast<unsigned char>(text.data()[i]);
+                std::size_t length = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : 4;
+                if (i + length > text.size()) length = text.size() - i;
+                std::uint32_t value = length == 1 ? c : length == 2 ? (c & 0x1Fu) : length == 3 ? (c & 0x0Fu) : (c & 0x07u);
+                for (std::size_t k = 1; k < length; ++k) value = (value << 6) | (static_cast<unsigned char>(text.data()[i + k]) & 0x3Fu);
+                points.push_back(value);
+                i += length;
+            }
+            return points;
+        };
+        const auto a = decode(left);
+        const auto b = decode(right);
+        std::vector<std::uint32_t> previous(b.size() + 1), current(b.size() + 1);
+        for (std::size_t j = 0; j <= b.size(); ++j) previous[j] = static_cast<std::uint32_t>(j);
+        for (std::size_t i = 1; i <= a.size(); ++i) {
+            current[0] = static_cast<std::uint32_t>(i);
+            for (std::size_t j = 1; j <= b.size(); ++j) {
+                const std::uint32_t cost = a[i - 1] == b[j - 1] ? 0u : 1u;
+                std::uint32_t best = previous[j] + 1;
+                if (current[j - 1] + 1 < best) best = current[j - 1] + 1;
+                if (previous[j - 1] + cost < best) best = previous[j - 1] + cost;
+                current[j] = best;
+            }
+            previous.swap(current);
+        }
+        return previous[b.size()];
+    }
+}(string left: left, string right: right): uint;
+
+/// <lang name="fr">
+/// <summary>Lit un texte CSV : les champs entre guillemets peuvent contenir le séparateur, des retours à la ligne et `""` pour un guillemet.</summary>
+/// <param name="text">Le texte CSV.</param>
+/// <param name="separator">Le séparateur de champs, un seul caractère (par exemple `,` ou `;`).</param>
+/// <returns>Les lignes, chacune un tableau de champs ; une ligne vide finale est ignorée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads CSV text: quoted fields may contain the separator, newlines and `""` for a quote.</summary>
+/// <param name="text">The CSV text.</param>
+/// <param name="separator">The field separator, a single character (for example `,` or `;`).</param>
+/// <returns>The rows, each an array of fields; a trailing empty row is ignored.</returns>
+/// </lang>
+@trusted
+gear pure parseCsv(string text, string separator): [[string]] => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_text text, rgl_arg_separator separator) {
+        const char separatorCharacter = separator.size() > 0 ? separator.data()[0] : ',';
+        rgl_return rows;
+        rgl::standard::array<rgl::standard::string> row;
+        std::string field;
+        bool quoted = false;
+        bool any = false;
+        const std::size_t size = text.size();
+        const auto endField = [&]() {
+            row.push(rgl::standard::string(field.c_str(), field.size()));
+            field.clear();
+        };
+        const auto endRow = [&]() {
+            endField();
+            rows.push(std::move(row));
+            row = rgl::standard::array<rgl::standard::string>();
+            any = false;
+        };
+        for (std::size_t i = 0; i < size; ++i) {
+            const char c = text.data()[i];
+            if (quoted) {
+                if (c == '"') {
+                    if (i + 1 < size && text.data()[i + 1] == '"') { field += '"'; ++i; }
+                    else quoted = false;
+                } else field += c;
+            } else if (c == '"') { quoted = true; any = true; }
+            else if (c == separatorCharacter) { endField(); any = true; }
+            else if (c == '\n') { if (any || !field.empty() || row.size() > 0) endRow(); }
+            else if (c == '\r') { }
+            else { field += c; any = true; }
+        }
+        if (any || !field.empty() || row.size() > 0) endRow();
+        return rows;
+    }
+}(string text: text, string separator: separator): [[string]];
+
+/// <lang name="fr">
+/// <summary>Écrit des lignes en CSV : un champ qui contient le séparateur, un guillemet ou un retour à la ligne est mis entre guillemets.</summary>
+/// <param name="rows">Les lignes, chacune un tableau de champs.</param>
+/// <param name="separator">Le séparateur de champs, un seul caractère.</param>
+/// <returns>Le texte CSV, chaque ligne terminée par `\n`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes rows as CSV: a field containing the separator, a quote or a newline is quoted.</summary>
+/// <param name="rows">The rows, each an array of fields.</param>
+/// <param name="separator">The field separator, a single character.</param>
+/// <returns>The CSV text, each row ending with `\n`.</returns>
+/// </lang>
+@trusted
+gear pure toCsv([[string]] rows, string separator): string => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_rows rows, rgl_arg_separator separator) {
+        const char separatorCharacter = separator.size() > 0 ? separator.data()[0] : ',';
+        std::string result;
+        for (std::size_t r = 0; r < rows.size(); ++r) {
+            const auto& row = rows[r];
+            for (std::size_t i = 0; i < row.size(); ++i) {
+                if (i > 0) result += separatorCharacter;
+                const auto& field = row[i];
+                bool needsQuotes = false;
+                for (std::size_t k = 0; k < field.size(); ++k) {
+                    const char c = field.data()[k];
+                    if (c == separatorCharacter || c == '"' || c == '\n' || c == '\r') { needsQuotes = true; break; }
+                }
+                if (!needsQuotes) result.append(field.data(), field.size());
+                else {
+                    result += '"';
+                    for (std::size_t k = 0; k < field.size(); ++k) {
+                        const char c = field.data()[k];
+                        if (c == '"') result += '"';
+                        result += c;
+                    }
+                    result += '"';
+                }
+            }
+            result += '\n';
+        }
+        return rgl_return(result.c_str(), result.size());
+    }
+}([[string]] rows: rows, string separator: separator): string;
+
+/// <lang name="fr">
+/// <summary>Découpe un texte en mots : suites de lettres, de chiffres et de `_`, les caractères non ASCII (lettres accentuées, idéogrammes…) comptant comme des lettres. Une apostrophe ou un tiret entre deux lettres reste dans le mot (`aujourd'hui`, `peut-être`) ; la ponctuation et les espaces séparent.</summary>
+/// <param name="text">Le texte.</param>
+/// <returns>Les mots, dans l'ordre.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Splits a text into words: runs of letters, digits and `_`, non-ASCII characters (accented letters, ideographs…) counting as letters. An apostrophe or a hyphen between two letters stays in the word (`don't`, `well-known`); punctuation and spaces separate.</summary>
+/// <param name="text">The text.</param>
+/// <returns>The words, in order.</returns>
+/// </lang>
+@trusted
+gear pure splitWords(string text): [string] => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_text text) {
+        const auto view = text.view();
+        const auto is_word = [](unsigned char c) { return c >= 0x80 || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
+        rgl_return result;
+        std::size_t start = 0;
+        bool inside = false;
+        for (std::size_t i = 0; i <= view.size(); ++i) {
+            bool word = i < view.size() && is_word(static_cast<unsigned char>(view[i]));
+            if (i < view.size() && !word && inside && (view[i] == '\'' || view[i] == '-') && i + 1 < view.size() && is_word(static_cast<unsigned char>(view[i + 1]))) word = true;
+            if (word && !inside) { start = i; inside = true; }
+            if (!word && inside) {
+                result.push(rgl::standard::string(view.data() + start, i - start));
+                inside = false;
+            }
+        }
+        return result;
+    }
+}(string text: text): [string];
+
+/// <lang name="fr">
+/// <summary>Remplit un mini-gabarit : chaque `{{nom}}` (des espaces sont permis dans les accolades, `{{ nom }}`) devient la valeur de ce nom. Un nom inconnu reste écrit tel quel, pour qu'on voie ce qui manque. Les valeurs ne sont pas relues : une valeur qui contient `{{x}}` n'est pas développée.</summary>
+/// <param name="text">Le gabarit.</param>
+/// <param name="values">Les valeurs, par nom.</param>
+/// <returns>Le texte rempli.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Fills a mini template: each `{{name}}` (spaces are allowed inside the braces, `{{ name }}`) becomes the value of that name. An unknown name stays written as it is, so that what is missing shows. Values are not read again: a value containing `{{x}}` is not expanded.</summary>
+/// <param name="text">The template.</param>
+/// <param name="values">The values, by name.</param>
+/// <returns>The filled text.</returns>
+/// </lang>
+gear pure fillTemplate(string text, [string:string] values): string => _fillTemplate(text, values.keys(), values.values());
+
+/// <lang name="fr"><summary>Remplit un gabarit avec deux tableaux parallèles (usage interne).</summary><param name="text">Le gabarit.</param><param name="names">Les noms.</param><param name="replacements">Les valeurs, dans le même ordre.</param><returns>Le texte rempli.</returns></lang>
+/// <lang name="en"><summary>Fills a template with two parallel arrays (internal use).</summary><param name="text">The template.</param><param name="names">The names.</param><param name="replacements">The values, in the same order.</param><returns>The filled text.</returns></lang>
+@trusted
+gear pure _fillTemplate(string text, [string] names, [string] replacements): string => cpp {
+    #include <string>
+    rgl_return rgl(rgl_arg_text text, rgl_arg_names names, rgl_arg_replacements replacements) {
+        const auto view = text.view();
+        std::string out;
+        std::size_t i = 0;
+        while (i < view.size()) {
+            if (view[i] == '{' && i + 1 < view.size() && view[i + 1] == '{') {
+                const auto close = view.find("}}", i + 2);
+                if (close != std::string_view::npos) {
+                    auto first = i + 2;
+                    auto last = close;
+                    while (first < last && (view[first] == ' ' || view[first] == '\t')) ++first;
+                    while (last > first && (view[last - 1] == ' ' || view[last - 1] == '\t')) --last;
+                    const auto name = view.substr(first, last - first);
+                    bool found = false;
+                    for (std::size_t k = 0; k < names.size(); ++k) {
+                        if (names[k].view() == name) {
+                            out.append(replacements[k].view());
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) { i = close + 2; continue; }
+                }
+            }
+            out.push_back(view[i]);
+            ++i;
+        }
+        return rgl::standard::string(out.data(), out.size());
+    }
+}(string text: text, [string] names: names, [string] replacements: replacements): string;

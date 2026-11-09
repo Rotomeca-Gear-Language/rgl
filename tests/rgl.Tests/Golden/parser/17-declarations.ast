@@ -1,0 +1,18 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=compteur
+    LiteralExpression 2:15 kind=IntegerLiteral text=0
+  VarDeclaration 3:1 keyword=none name=nom
+    PrimitiveType 3:1 type=string
+    LiteralExpression 3:13 kind=StringLiteral text="RGL"
+  TrainDeclaration 4:1 unguarded=false parameters=none
+    Pipeline 4:7
+      DoneStep 4:10
+  VarDeclaration 5:1 keyword=const name=MAX
+    PrimitiveType 5:7 type=int
+    BinaryExpression 5:16 op=+
+      LiteralExpression 5:16 kind=IntegerLiteral text=5
+      LiteralExpression 5:20 kind=IntegerLiteral text=1
+  VarDeclaration 6:1 keyword=none name=noms
+    ArrayType 6:1
+      PrimitiveType 6:2 type=string
+    NameExpression 6:16 name=args

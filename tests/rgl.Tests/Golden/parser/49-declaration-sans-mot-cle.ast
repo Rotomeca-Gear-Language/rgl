@@ -1,0 +1,30 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=g pure=false parameters=0
+    PrimitiveType 2:11 type=void
+    BlockStatement 2:16
+      VarDeclaration 3:5 keyword=none name=valeur
+        NullableType 3:6
+          UnionType 3:6
+            NamedType 3:6 name=A
+            NamedType 3:10 name=B
+        LiteralExpression 3:22 kind=NullKeyword text=null
+      VarDeclaration 4:5 keyword=none name=n
+        BoundedType 4:5
+          PrimitiveType 4:5 type=int
+          LiteralExpression 4:9 kind=IntegerLiteral text=0
+          LiteralExpression 4:12 kind=IntegerLiteral text=10
+        LiteralExpression 4:19 kind=IntegerLiteral text=3
+      VarDeclaration 5:5 keyword=none name=a
+        NamedType 5:5 name=A
+        NameExpression 5:10 name=x
+      VarDeclaration 6:5 keyword=none name=t
+        ArrayType 6:5
+          PrimitiveType 6:6 type=int
+        NameExpression 6:14 name=liste
+      VarDeclaration 7:5 keyword=none name=peutEtre
+        NullableType 7:5
+          PrimitiveType 7:5 type=int
+        LiteralExpression 7:20 kind=NullKeyword text=null
+  TrainDeclaration 9:1 unguarded=true parameters=none
+    Pipeline 9:8
+      DoneStep 9:11

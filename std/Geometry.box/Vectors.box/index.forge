@@ -1,0 +1,7 @@
+forge: index
+description: ''
+
+import Vectors;
+
+// Les precasts restent dans la box : on lit les zéros par Vector2.ZERO et Vector3.ZERO.
+export {...Vectors};

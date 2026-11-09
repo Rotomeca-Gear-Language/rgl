@@ -1,0 +1,2 @@
+// La parenthèse des arguments n'est pas fermée.
+train |> add(1, 2 |> done;

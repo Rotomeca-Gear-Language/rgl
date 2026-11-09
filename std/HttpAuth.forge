@@ -1,0 +1,112 @@
+forge: gears
+description: "Authentification HTTP : intergiciels Basic, Bearer et JWT prêts à l'emploi"
+
+use <Http> only {HttpRequest, HttpResponse};
+use <Auth> only {BasicCredentials, parseBasicAuthorization, parseBearerAuthorization, verifyJwt};
+
+/// <lang name="fr">
+/// <summary>La réponse 401 qui demande de s'authentifier.</summary>
+/// <param name="scheme">Le schéma demandé (`Basic` ou `Bearer`).</param>
+/// <param name="realm">Le nom de la zone protégée, montré par le navigateur.</param>
+/// <returns>Une réponse 401 avec son en-tête `WWW-Authenticate`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The 401 response asking to authenticate.</summary>
+/// <param name="scheme">The requested scheme (`Basic` or `Bearer`).</param>
+/// <param name="realm">The name of the protected area, shown by the browser.</param>
+/// <returns>A 401 response with its `WWW-Authenticate` header.</returns>
+/// </lang>
+gear pure unauthorized(string scheme: 'Basic', string realm: 'restricted'): HttpResponse =>
+    {status: 401, contentType: 'text/plain; charset=utf-8', body: 'Unauthorized', headers: ['WWW-Authenticate': `{scheme} realm="{realm}"`]};
+
+/// <lang name="fr">
+/// <summary>Un intergiciel qui exige une authentification Basic : sans identifiants valides, il répond 401 sans appeler la route. À ajouter par `server.middleware(basicAuth(verify, 'zone'))`.</summary>
+/// <param name="verify">Décide si l'identifiant et le mot de passe sont acceptés.</param>
+/// <param name="realm">Le nom de la zone protégée.</param>
+/// <returns>L'intergiciel.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A middleware that requires Basic authentication: without valid credentials it answers 401 without calling the route. Add it with `server.middleware(basicAuth(verify, 'area'))`.</summary>
+/// <param name="verify">Decides whether the user name and password are accepted.</param>
+/// <param name="realm">The name of the protected area.</param>
+/// <returns>The middleware.</returns>
+/// </lang>
+gear basicAuth((BasicCredentials) => bool verify, string realm): (HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse =>
+    (HttpRequest request, (HttpRequest) => HttpResponse next) => {
+        if (request.method eq 'OPTIONS') { return next(request); }
+        const BasicCredentials? credentials: parseBasicAuthorization(request.headerFields.getOr('authorization', ''));
+        if (credentials eq null or not verify(credentials ?? {user: '', password: ''})) { return unauthorized('Basic', realm); }
+        return next(request);
+    };
+
+/// <lang name="fr">
+/// <summary>Un intergiciel qui exige un jeton Bearer accepté par `verify`.</summary>
+/// <param name="verify">Décide si le jeton est accepté.</param>
+/// <param name="realm">Le nom de la zone protégée.</param>
+/// <returns>L'intergiciel.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A middleware that requires a Bearer token accepted by `verify`.</summary>
+/// <param name="verify">Decides whether the token is accepted.</param>
+/// <param name="realm">The name of the protected area.</param>
+/// <returns>The middleware.</returns>
+/// </lang>
+gear bearerAuth((string) => bool verify, string realm): (HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse =>
+    (HttpRequest request, (HttpRequest) => HttpResponse next) => {
+        if (request.method eq 'OPTIONS') { return next(request); }
+        const string? token: parseBearerAuthorization(request.headerFields.getOr('authorization', ''));
+        if (token eq null or not verify(token ?? '')) { return unauthorized('Bearer', realm); }
+        return next(request);
+    };
+
+/// <lang name="fr">
+/// <summary>Un intergiciel qui exige un jeton JWT (HS256) signé avec `secret` et non expiré.</summary>
+/// <param name="secret">Le secret qui signe les jetons.</param>
+/// <param name="realm">Le nom de la zone protégée.</param>
+/// <returns>L'intergiciel.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A middleware that requires a JWT (HS256) signed with `secret` and not expired.</summary>
+/// <param name="secret">The secret that signs the tokens.</param>
+/// <param name="realm">The name of the protected area.</param>
+/// <returns>The middleware.</returns>
+/// </lang>
+gear jwtAuth(string secret, string realm): (HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse =>
+    (HttpRequest request, (HttpRequest) => HttpResponse next) => {
+        if (request.method eq 'OPTIONS') { return next(request); }
+        const string? token: parseBearerAuthorization(request.headerFields.getOr('authorization', ''));
+        if (token eq null or verifyJwt(token ?? '', secret) eq null) { return unauthorized('Bearer', realm); }
+        return next(request);
+    };
+
+/// <lang name="fr">
+/// <summary>La réponse 403 « interdit » : la personne est connue, mais son rôle ne suffit pas.</summary>
+/// <returns>La réponse.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The 403 "forbidden" response: the caller is known, but their role is not enough.</summary>
+/// <returns>The response.</returns>
+/// </lang>
+gear pure forbidden(): HttpResponse =>
+    {status: 403, contentType: 'text/plain; charset=utf-8', body: 'Forbidden'};
+
+/// <lang name="fr">
+/// <summary>Un contrôle d'accès par rôle, à brancher sur `@before` (directement, ou par une annotation déclarée : `annotation exigeRole(params [Role] roles) = @before(denyUnless(roleCourant, roles));`). `roleOf` donne le rôle de l'appelant (depuis la session, un jeton JWT, une base…) ou `null` s'il n'est pas identifié : le contrôle répond alors 401 ; si son rôle n'est pas dans `allowed`, 403 ; sinon il rend `null`, et la route s'exécute.</summary>
+/// <param name="roleOf">Donne le rôle de la requête, `null` sans identité.</param>
+/// <param name="allowed">Les rôles autorisés.</param>
+/// <returns>Le contrôle : une réponse de refus, ou `null` pour laisser passer.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A role-based access check, to plug into `@before` (directly, or through a declared annotation: `annotation requireRole(params [Role] roles) = @before(denyUnless(currentRole, roles));`). `roleOf` gives the caller's role (from the session, a JWT, a database…) or `null` when not identified: the check then answers 401; if the role is not in `allowed`, 403; otherwise it returns `null` and the route runs.</summary>
+/// <param name="roleOf">Gives the role of the request, `null` without identity.</param>
+/// <param name="allowed">The allowed roles.</param>
+/// <returns>The check: a refusal response, or `null` to let the request through.</returns>
+/// </lang>
+gear denyUnless<T>((HttpRequest) => T? roleOf, [T] allowed): (HttpRequest) => HttpResponse? {
+    return (HttpRequest request) => {
+        const T? role: roleOf(request);
+        if (role eq null) { return {status: 401, contentType: 'text/plain; charset=utf-8', body: 'Unauthorized'}; }
+        if (not allowed.contains(role)) { return forbidden(); }
+        return null;
+    };
+}

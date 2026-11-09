@@ -1,0 +1,9 @@
+unsafe exemple(ptr<int> entree): int {
+    uptr<int> brut: 7;
+    ptr<int> owner:: brut;
+    *owner <- *owner + *entree;
+    char c: 65 as char;
+    owner.free;
+    return c as int;
+}
+!train |> $ 0;

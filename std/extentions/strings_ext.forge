@@ -1,0 +1,837 @@
+forge: extend
+description: 'Chaînes de caractères'
+
+namespace std/strings;
+
+use <Math> only {pow, floor};
+
+/// <lang name="fr">
+/// <summary>Les lettres minuscules ASCII, dans l'ordre, pour passer d'une casse à l'autre.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The lowercase ASCII letters, in order, for converting between cases.</summary>
+/// </lang>
+const string LOWER_LETTERS: 'abcdefghijklmnopqrstuvwxyz';
+/// <lang name="fr">
+/// <summary>Les lettres majuscules ASCII, dans le même ordre que <see cref="LOWER_LETTERS"/>.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The uppercase ASCII letters, in the same order as <see cref="LOWER_LETTERS"/>.</summary>
+/// </lang>
+const string UPPER_LETTERS: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+/// <lang name="fr">
+/// <summary>Les chiffres décimaux.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The decimal digits.</summary>
+/// </lang>
+const string DIGITS: '0123456789';
+/// <lang name="fr">
+/// <summary>Les signes de ponctuation et symboles ASCII.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ASCII punctuation marks and symbols.</summary>
+/// </lang>
+const string PUNCTUATION: "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
+/// <lang name="fr">
+/// <summary>Un caractère de remplacement : la lettre de l'autre casse si c'en est une, sinon elle-même.</summary>
+/// <param name="c">Le caractère à convertir.</param>
+/// <param name="from">Les lettres de la casse de départ.</param>
+/// <param name="to">Les lettres de la casse d'arrivée, dans le même ordre.</param>
+/// <returns>Le caractère de to à la place de celui de from, sinon c inchangé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A replacement character: the corresponding letter in the other case, or the character itself otherwise.</summary>
+/// <param name="c">The character to convert.</param>
+/// <param name="from">The letters in the source case.</param>
+/// <param name="to">The letters in the target case, in the same order.</param>
+/// <returns>The character in to at the position of the character in from, or c unchanged otherwise.</returns>
+/// </lang>
+gear pure _swapCase(string c, string from, string to): string {
+    const long found: from.indexOf(c) ?? -1;
+    return found < 0 ? c : to[found];
+}
+
+/// <lang name="fr">
+/// <summary>Les caractères de rang start à stop exclu, en une passe sur le texte.</summary>
+/// <param name="s">Le texte.</param>
+/// <param name="start">Le rang du premier caractère.</param>
+/// <param name="stop">Le rang après le dernier caractère.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The characters from rank start to stop (excluded), in one pass over the text.</summary>
+/// <param name="s">The text.</param>
+/// <param name="start">The rank of the first character.</param>
+/// <param name="stop">The rank after the last character.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textSubstring(string s, long start, long stop): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s, rgl_arg_start start, rgl_arg_stop stop) { return rgl::standard::text::substring(s, start, stop); }
+}(string s: s, long start: start, long stop: stop): string;
+
+/// <lang name="fr">
+/// <summary>Le rang du premier caractère où le motif commence, ou null.</summary>
+/// <param name="s">Le texte.</param>
+/// <param name="what">Le motif cherché.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The rank of the first character where the pattern starts, or null.</summary>
+/// <param name="s">The text.</param>
+/// <param name="what">The pattern.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textIndexOf(string s, string what): long? => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s, rgl_arg_what what) {
+        const long long found = rgl::standard::text::index_of(s, what);
+        if (found < 0) return rgl_return{};
+        return rgl_return(static_cast<long long>(found));
+    }
+}(string s: s, string what: what): long?;
+
+/// <lang name="fr">
+/// <summary>Le rang du dernier caractère où le motif commence, ou null.</summary>
+/// <param name="s">Le texte.</param>
+/// <param name="what">Le motif cherché.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The rank of the last character where the pattern starts, or null.</summary>
+/// <param name="s">The text.</param>
+/// <param name="what">The pattern.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textLastIndexOf(string s, string what): long? => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s, rgl_arg_what what) {
+        const long long found = rgl::standard::text::last_index_of(s, what);
+        if (found < 0) return rgl_return{};
+        return rgl_return(static_cast<long long>(found));
+    }
+}(string s: s, string what: what): long?;
+
+/// <lang name="fr">
+/// <summary>Le texte répété, écrit en une passe.</summary>
+/// <param name="s">Le texte.</param>
+/// <param name="count">Le nombre de répétitions.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The text repeated, written in one pass.</summary>
+/// <param name="s">The text.</param>
+/// <param name="count">The number of repetitions.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textRepeat(string s, uint count): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s, rgl_arg_count count) { return rgl::standard::text::repeat(s, count); }
+}(string s: s, uint count: count): string;
+
+/// <lang name="fr">
+/// <summary>Les caractères du texte dans l'ordre inverse.</summary>
+/// <param name="s">Le texte.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The characters of the text in reverse order.</summary>
+/// <param name="s">The text.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textReverse(string s): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s) { return rgl::standard::text::reverse(s); }
+}(string s: s): string;
+
+/// <lang name="fr">
+/// <summary>Les lettres ASCII en majuscules, le reste inchangé.</summary>
+/// <param name="s">Le texte.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ASCII letters in uppercase, everything else unchanged.</summary>
+/// <param name="s">The text.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textUpper(string s): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s) { return rgl::standard::text::upper(s); }
+}(string s: s): string;
+
+/// <lang name="fr">
+/// <summary>Les lettres ASCII en minuscules, le reste inchangé.</summary>
+/// <param name="s">Le texte.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ASCII letters in lowercase, everything else unchanged.</summary>
+/// <param name="s">The text.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textLower(string s): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s) { return rgl::standard::text::lower(s); }
+}(string s: s): string;
+
+/// <lang name="fr">
+/// <summary>Les morceaux du texte séparés par le séparateur, en une passe.</summary>
+/// <param name="s">Le texte.</param>
+/// <param name="separator">Le séparateur.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The parts of the text separated by the separator, in one pass.</summary>
+/// <param name="s">The text.</param>
+/// <param name="separator">The separator.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textSplit(string s, string separator): [string] => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s, rgl_arg_separator separator) { return rgl::standard::text::split(s, separator); }
+}(string s: s, string separator: separator): [string];
+
+/// <lang name="fr">
+/// <summary>Le texte où chaque occurrence du motif est remplacée, en une passe.</summary>
+/// <param name="s">Le texte.</param>
+/// <param name="what">Le motif remplacé.</param>
+/// <param name="by">Le texte de remplacement.</param>
+/// <returns>Le résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The text where every occurrence of the pattern is replaced, in one pass.</summary>
+/// <param name="s">The text.</param>
+/// <param name="what">The pattern to replace.</param>
+/// <param name="by">The replacement.</param>
+/// <returns>The result.</returns>
+/// </lang>
+@trusted
+gear pure _textReplace(string s, string what, string by): string => cpp {
+    #include "rgl/standard/text.hpp"
+    rgl_return rgl(rgl_arg_s s, rgl_arg_what what, rgl_arg_by by) { return rgl::standard::text::replace(s, what, by); }
+}(string s: s, string what: what, string by: by): string;
+
+/// <lang name="fr">
+/// <summary>Opérations sur les chaînes ; les rangs et longueurs comptent des caractères Unicode.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on strings; indices and lengths count Unicode characters.</summary>
+/// </lang>
+extend string {
+    /// <lang name="fr">
+    /// <summary>Dit si le texte n'a aucun caractère.</summary>
+    /// <param name="s">Le texte à tester.</param>
+    /// <returns>Vrai si le texte est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text has no characters.</summary>
+    /// <param name="s">The text to test.</param>
+    /// <returns>True if the text is empty.</returns>
+    /// </lang>
+    gear pure isEmpty(this string s): bool => s.length eq 0;
+
+    /// <lang name="fr">
+    /// <summary>Les caractères de start (inclus) à stop (exclu). Un nombre négatif compte depuis la fin, et les bornes sont ramenées dans le texte.</summary>
+    /// <param name="s">Le texte à découper.</param>
+    /// <param name="start">Le rang du premier caractère gardé.</param>
+    /// <param name="stop">Le rang du premier caractère non gardé.</param>
+    /// <returns>Le morceau de texte, vide si les bornes se croisent.</returns>
+    /// <example><code language="rgl">
+    /// const string morceau: 'bonjour'.substring(0, 3); // bon
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The characters from start (inclusive) to stop (exclusive). Negative indices count from the end, and bounds are clamped to the text.</summary>
+    /// <param name="s">The text to slice.</param>
+    /// <param name="start">The index of the first character to keep.</param>
+    /// <param name="stop">The index of the first character not to keep.</param>
+    /// <returns>The text slice, empty if the bounds cross.</returns>
+    /// <example><code language="rgl">
+    /// const string morceau: 'bonjour'.substring(0, 3); // bon
+    /// </code></example>
+    /// </lang>
+    gear pure substring(this string s, long start, long stop): string => _textSubstring(s, start, stop);
+
+    /// <lang name="fr">
+    /// <summary>Le rang de la première occurrence de what.</summary>
+    /// <param name="s">Le texte à parcourir.</param>
+    /// <param name="what">Le texte cherché.</param>
+    /// <returns>Le rang de la première occurrence, null s'il n'y en a pas.</returns>
+    /// <example><code language="rgl">
+    /// const long? rang: 'bonjour'.indexOf('jo'); // 3
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The index of the first occurrence of what.</summary>
+    /// <param name="s">The text to search.</param>
+    /// <param name="what">The text to find.</param>
+    /// <returns>The index of the first occurrence, or null if none is found.</returns>
+    /// <example><code language="rgl">
+    /// const long? rang: 'bonjour'.indexOf('jo'); // 3
+    /// </code></example>
+    /// </lang>
+    gear pure indexOf(this string s, string what): long? => _textIndexOf(s, what);
+
+    /// <lang name="fr">
+    /// <summary>Dit si le texte contient what.</summary>
+    /// <param name="s">Le texte à parcourir.</param>
+    /// <param name="what">Le texte cherché.</param>
+    /// <returns>Vrai si what apparaît dans s.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text contains what.</summary>
+    /// <param name="s">The text to search.</param>
+    /// <param name="what">The text to find.</param>
+    /// <returns>True if what occurs in s.</returns>
+    /// </lang>
+    gear pure contains(this string s, string what): bool => s.indexOf(what) not eq null;
+
+    /// <lang name="fr"><summary>Cherche la dernière occurrence d'un texte.</summary><param name="s">Le texte parcouru.</param><param name="what">Le texte cherché.</param><returns>Son rang, `s.length` si `what` est vide, ou `null` s'il est absent.</returns></lang>
+    /// <lang name="en"><summary>Finds the last occurrence of text.</summary><param name="s">The searched text.</param><param name="what">The text to find.</param><returns>Its index, `s.length` when `what` is empty, or `null` when absent.</returns></lang>
+    gear pure lastIndexOf(this string s, string what): long? => _textLastIndexOf(s, what);
+
+    /// <lang name="fr">
+    /// <summary>Dit si le texte commence par what.</summary>
+    /// <param name="s">Le texte à tester.</param>
+    /// <param name="what">Le début attendu.</param>
+    /// <returns>Vrai si s commence par what (toujours vrai si what est vide).</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text starts with what.</summary>
+    /// <param name="s">The text to test.</param>
+    /// <param name="what">The expected prefix.</param>
+    /// <returns>True if s starts with what (always true if what is empty).</returns>
+    /// </lang>
+    gear pure startsWith(this string s, string what): bool =>
+        what.length eq 0 or s.substring(0, what.length as long) eq what;
+
+    /// <lang name="fr">
+    /// <summary>Dit si le texte finit par what.</summary>
+    /// <param name="s">Le texte à tester.</param>
+    /// <param name="what">La fin attendue.</param>
+    /// <returns>Vrai si s finit par what (toujours vrai si what est vide).</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text ends with what.</summary>
+    /// <param name="s">The text to test.</param>
+    /// <param name="what">The expected suffix.</param>
+    /// <returns>True if s ends with what (always true if what is empty).</returns>
+    /// </lang>
+    gear pure endsWith(this string s, string what): bool =>
+        what.length eq 0 or s.substring(-(what.length as long), s.length as long) eq what;
+
+    /// <lang name="fr">
+    /// <summary>Le texte répété count fois.</summary>
+    /// <param name="s">Le texte à répéter.</param>
+    /// <param name="count">Le nombre de répétitions.</param>
+    /// <returns>Les répétitions mises bout à bout, vide si count vaut 0.</returns>
+    /// <example><code language="rgl">
+    /// const string ligne: '-'.repeat(3); // ---
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The text repeated count times.</summary>
+    /// <param name="s">The text to repeat.</param>
+    /// <param name="count">The repetition count.</param>
+    /// <returns>The repetitions concatenated; empty if count is 0.</returns>
+    /// <example><code language="rgl">
+    /// const string ligne: '-'.repeat(3); // ---
+    /// </code></example>
+    /// </lang>
+    gear pure repeat(this string s, uint count): string => _textRepeat(s, count);
+
+    /// <lang name="fr">
+    /// <summary>Le texte à l'envers.</summary>
+    /// <param name="s">Le texte à inverser.</param>
+    /// <returns>Les caractères dans l'ordre inverse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The text in reverse order.</summary>
+    /// <param name="s">The text to reverse.</param>
+    /// <returns>The characters in reverse order.</returns>
+    /// </lang>
+    gear pure reverse(this string s): string => _textReverse(s);
+
+    /// <lang name="fr">
+    /// <summary>Le texte en majuscules (lettres ASCII seulement, le reste est inchangé).</summary>
+    /// <param name="s">Le texte à convertir.</param>
+    /// <returns>Le texte en majuscules.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The text in uppercase (ASCII letters only; all other characters are unchanged).</summary>
+    /// <param name="s">The text to convert.</param>
+    /// <returns>The text in uppercase.</returns>
+    /// </lang>
+    gear pure toUpper(this string s): string => _textUpper(s);
+
+    /// <lang name="fr">
+    /// <summary>Le texte en minuscules (lettres ASCII seulement, le reste est inchangé).</summary>
+    /// <param name="s">Le texte à convertir.</param>
+    /// <returns>Le texte en minuscules.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The text in lowercase (ASCII letters only; all other characters are unchanged).</summary>
+    /// <param name="s">The text to convert.</param>
+    /// <returns>The text in lowercase.</returns>
+    /// </lang>
+    gear pure toLower(this string s): string => _textLower(s);
+
+    /// <lang name="fr">
+    /// <summary>Dit si le caractère est un espace, une tabulation ou un retour à la ligne.</summary>
+    /// <param name="c">Le caractère à tester.</param>
+    /// <returns>Vrai pour un espace, une tabulation, un saut de ligne ou un retour chariot.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the character is a space, tab, or line break.</summary>
+    /// <param name="c">The character to test.</param>
+    /// <returns>True for a space, tab, line feed, or carriage return.</returns>
+    /// </lang>
+    gear pure isSpace(this string c): bool => c eq ' ' or c eq "\t" or c eq "\n" or c eq "\r";
+
+    /// <lang name="fr">
+    /// <summary>Dit si le texte est un seul chiffre décimal.</summary>
+    /// <param name="c">Le caractère à tester.</param>
+    /// <returns>Vrai si c est un unique chiffre de 0 à 9.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text is a single decimal digit.</summary>
+    /// <param name="c">The character to test.</param>
+    /// <returns>True if c is a single digit from 0 to 9.</returns>
+    /// </lang>
+    gear pure isDigit(this string c): bool => c.length eq 1 and DIGITS.contains(c);
+
+    /// <lang name="fr">
+    /// <summary>Dit si le texte est une seule lettre ASCII.</summary>
+    /// <param name="c">Le caractère à tester.</param>
+    /// <returns>Vrai si c est une unique lettre de a à z, minuscule ou majuscule.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text is a single ASCII letter.</summary>
+    /// <param name="c">The character to test.</param>
+    /// <returns>True if c is a single letter from a to z, lowercase or uppercase.</returns>
+    /// </lang>
+    gear pure isLetter(this string c): bool => c.length eq 1 and (LOWER_LETTERS.contains(c) or UPPER_LETTERS.contains(c));
+
+    /// <lang name="fr">
+    /// <summary>Sans les espaces, tabulations et retours à la ligne du début.</summary>
+    /// <param name="s">Le texte à nettoyer.</param>
+    /// <returns>Le texte privé de ses blancs de début.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes leading spaces, tabs, and line breaks.</summary>
+    /// <param name="s">The text to trim.</param>
+    /// <returns>The text with its leading whitespace removed.</returns>
+    /// </lang>
+    gear pure trimStart(this string s): string {
+        const long n: s.length as long;
+        long first: n;
+        first <- [0..<n] |+> n with (acc, p) => {
+            if (not s[p].isSpace()) { done p; }
+            return acc;
+        };
+        return s.substring(first, n);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Sans les espaces, tabulations et retours à la ligne de la fin.</summary>
+    /// <param name="s">Le texte à nettoyer.</param>
+    /// <returns>Le texte privé de ses blancs de fin.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes trailing spaces, tabs, and line breaks.</summary>
+    /// <param name="s">The text to trim.</param>
+    /// <returns>The text with its trailing whitespace removed.</returns>
+    /// </lang>
+    gear pure trimEnd(this string s): string {
+        const long n: s.length as long;
+        long none: -1;
+        const long last: [(n - 1)..0 by -1] |+> none with (acc, p) => {
+            if (not s[p].isSpace()) { done p; }
+            return acc;
+        };
+        return s.substring(0, last + 1);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Sans les blancs du début ni de la fin.</summary>
+    /// <param name="s">Le texte à nettoyer.</param>
+    /// <returns>Le texte privé de ses blancs de début et de fin.</returns>
+    /// <example><code language="rgl">
+    /// const string net: '  salut  '.trim(); // salut
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes leading and trailing whitespace.</summary>
+    /// <param name="s">The text to trim.</param>
+    /// <returns>The text with its leading and trailing whitespace removed.</returns>
+    /// <example><code language="rgl">
+    /// const string net: '  salut  '.trim(); // salut
+    /// </code></example>
+    /// </lang>
+    gear pure trim(this string s): string => s.trimStart().trimEnd();
+
+    /// <lang name="fr"><summary>Indique si le texte est vide ou ne contient que des blancs ASCII reconnus.</summary><param name="s">Le texte à tester.</param><returns>`true` pour le texte vide ou composé d'espaces, tabulations, LF et CR.</returns></lang>
+    /// <lang name="en"><summary>Checks whether text is empty or contains only recognized ASCII whitespace.</summary><param name="s">The text to test.</param><returns>`true` for empty text or text made of spaces, tabs, LF, and CR.</returns></lang>
+    gear pure isBlank(this string s): bool => s.trim().isEmpty();
+
+    /// <lang name="fr"><summary>Retire un préfixe s'il est présent.</summary><param name="s">Le texte d'origine.</param><param name="prefix">Le préfixe attendu.</param><returns>Le suffixe restant, ou `s` inchangé.</returns></lang>
+    /// <lang name="en"><summary>Removes a prefix when present.</summary><param name="s">The original text.</param><param name="prefix">The expected prefix.</param><returns>The remaining suffix, or unchanged `s`.</returns></lang>
+    gear pure removePrefix(this string s, string prefix): string =>
+        s.startsWith(prefix) ? s.substring(prefix.length as long, s.length as long) : s;
+
+    /// <lang name="fr"><summary>Retire un suffixe s'il est présent.</summary><param name="s">Le texte d'origine.</param><param name="suffix">Le suffixe attendu.</param><returns>Le préfixe restant, ou `s` inchangé.</returns></lang>
+    /// <lang name="en"><summary>Removes a suffix when present.</summary><param name="s">The original text.</param><param name="suffix">The expected suffix.</param><returns>The remaining prefix, or unchanged `s`.</returns></lang>
+    gear pure removeSuffix(this string s, string suffix): string =>
+        s.endsWith(suffix) ? s.substring(0, (s.length - suffix.length) as long) : s;
+
+    /// <lang name="fr"><summary>Met le premier caractère ASCII en majuscule.</summary><param name="s">Le texte à transformer.</param><returns>Le texte vide inchangé, sinon une nouvelle chaîne dont seul le premier caractère est transformé.</returns></lang>
+    /// <lang name="en"><summary>Uppercases the first ASCII character.</summary><param name="s">The text to transform.</param><returns>Empty text unchanged, otherwise a new string with only its first character transformed.</returns></lang>
+    gear pure capitalize(this string s): string => s.isEmpty() ? s : `{s[0].toUpper()}{s.substring(1, s.length as long)}`;
+
+    /// <lang name="fr">
+    /// <summary>Complète à gauche avec fill jusqu'à size caractères.</summary>
+    /// <param name="s">Le texte à compléter.</param>
+    /// <param name="size">La longueur voulue.</param>
+    /// <param name="fill">Le texte répété à gauche (un espace par défaut).</param>
+    /// <returns>Le texte complété, inchangé s'il a déjà size caractères ou plus.</returns>
+    /// <example><code language="rgl">
+    /// const string num: '7'.padStart(3, '0'); // 007
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Pads the text on the left with fill up to size characters.</summary>
+    /// <param name="s">The text to pad.</param>
+    /// <param name="size">The desired length.</param>
+    /// <param name="fill">The text repeated on the left (a space by default).</param>
+    /// <returns>The padded text; unchanged if it already has size characters or more.</returns>
+    /// <example><code language="rgl">
+    /// const string num: '7'.padStart(3, '0'); // 007
+    /// </code></example>
+    /// </lang>
+    gear pure padStart(this string s, uint size, string fill: ' '): string {
+        const long missing: (size as long) - (s.length as long);
+        return missing <= 0 ? s : `{fill.repeat(missing as uint)}{s}`;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Complète à droite avec fill jusqu'à size caractères.</summary>
+    /// <param name="s">Le texte à compléter.</param>
+    /// <param name="size">La longueur voulue.</param>
+    /// <param name="fill">Le texte répété à droite (un espace par défaut).</param>
+    /// <returns>Le texte complété, inchangé s'il a déjà size caractères ou plus.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Pads the text on the right with fill up to size characters.</summary>
+    /// <param name="s">The text to pad.</param>
+    /// <param name="size">The desired length.</param>
+    /// <param name="fill">The text repeated on the right (a space by default).</param>
+    /// <returns>The padded text; unchanged if it already has size characters or more.</returns>
+    /// </lang>
+    gear pure padEnd(this string s, uint size, string fill: ' '): string {
+        const long missing: (size as long) - (s.length as long);
+        return missing <= 0 ? s : `{s}{fill.repeat(missing as uint)}`;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les morceaux de s séparés par separator, qui ne doit pas être vide.</summary>
+    /// <param name="s">Le texte à couper.</param>
+    /// <param name="separator">Le séparateur ; s'il est vide, s n'est pas coupé.</param>
+    /// <returns>Les morceaux dans l'ordre, séparateurs retirés.</returns>
+    /// <example><code language="rgl">
+    /// const [string] parts: 'a,b,c'.split(','); // ['a', 'b', 'c']
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The parts of s separated by separator, which must not be empty.</summary>
+    /// <param name="s">The text to split.</param>
+    /// <param name="separator">The separator; if empty, s is not split.</param>
+    /// <returns>The parts in order, with separators removed.</returns>
+    /// <example><code language="rgl">
+    /// const [string] parts: 'a,b,c'.split(','); // ['a', 'b', 'c']
+    /// </code></example>
+    /// </lang>
+    gear pure split(this string s, string separator): [string] => _textSplit(s, separator);
+
+    /// <lang name="fr"><summary>Sépare le texte à la première occurrence d'un séparateur.</summary><param name="s">Le texte à découper.</param><param name="separator">Le séparateur recherché.</param><returns>Un tuple `(before, after, found)` ; si le séparateur est absent, `before` vaut `s`.</returns></lang>
+    /// <lang name="en"><summary>Splits text at the first occurrence of a separator.</summary><param name="s">The text to split.</param><param name="separator">The separator to find.</param><returns>A `(before, after, found)` tuple; when absent, `before` equals `s`.</returns></lang>
+    gear pure splitOnce(this string s, string separator): (string before, string after, bool found) {
+        const long? position: s.indexOf(separator);
+        return position eq null
+            ? (before: s, after: '', found: false)
+            : (before: s.substring(0, position ?? 0), after: s.substring((position ?? 0) + (separator.length as long), s.length as long), found: true);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les lignes du texte, coupées sur le saut de ligne.</summary>
+    /// <param name="s">Le texte à couper.</param>
+    /// <returns>Les lignes, sans leur saut de ligne.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The lines of text, split at line feeds.</summary>
+    /// <param name="s">The text to split.</param>
+    /// <returns>The lines without their trailing line feeds.</returns>
+    /// </lang>
+    gear pure lines(this string s): [string] => s.split("\n");
+
+    /// <lang name="fr">
+    /// <summary>Le texte où chaque occurrence de what est remplacée par by.</summary>
+    /// <param name="s">Le texte d'origine.</param>
+    /// <param name="what">Le texte à remplacer ; s'il est vide, s est rendu tel quel.</param>
+    /// <param name="by">Le texte mis à la place.</param>
+    /// <returns>Le nouveau texte.</returns>
+    /// <example><code language="rgl">
+    /// const string t: 'a-b-c'.replace('-', '+'); // a+b+c
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The text with every occurrence of what replaced by by.</summary>
+    /// <param name="s">The original text.</param>
+    /// <param name="what">The text to replace; if empty, s is returned unchanged.</param>
+    /// <param name="by">The replacement text.</param>
+    /// <returns>The new text.</returns>
+    /// <example><code language="rgl">
+    /// const string t: 'a-b-c'.replace('-', '+'); // a+b+c
+    /// </code></example>
+    /// </lang>
+    gear pure replace(this string s, string what, string by): string => _textReplace(s, what, by);
+
+    /// <lang name="fr"><summary>Remplace toutes les occurrences non chevauchantes.</summary><param name="s">Le texte d'origine.</param><param name="what">Le motif ; vide, il ne provoque aucun remplacement.</param><param name="by">Le texte de remplacement.</param><returns>Une nouvelle chaîne avec les remplacements.</returns></lang>
+    /// <lang name="en"><summary>Replaces every non-overlapping occurrence.</summary><param name="s">The original text.</param><param name="what">The pattern; an empty pattern performs no replacement.</param><param name="by">The replacement text.</param><returns>A new string with replacements applied.</returns></lang>
+    gear pure replaceAll(this string s, string what, string by): string => s.replace(what, by);
+
+    /// <lang name="fr">
+    /// <summary>Le nombre entier que le texte écrit.</summary>
+    /// <param name="s">Le texte à lire.</param>
+    /// <returns>L'entier lu, null si le texte n'en est pas un.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The integer represented by the text.</summary>
+    /// <param name="s">The text to parse.</param>
+    /// <returns>The parsed integer, or null if the text is not an integer.</returns>
+    /// </lang>
+    gear pure toInt(this string s): int? => s as? int;
+
+    /// <lang name="fr">
+    /// <summary>Le nombre décimal que le texte écrit.</summary>
+    /// <param name="s">Le texte à lire.</param>
+    /// <returns>Le nombre lu, null si le texte n'en est pas un.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The decimal number represented by the text.</summary>
+    /// <param name="s">The text to parse.</param>
+    /// <returns>The parsed number, or null if the text is not a number.</returns>
+    /// </lang>
+    gear pure toDouble(this string s): double? => s as? double;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur n'importe quelle valeur.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on any value.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// </lang>
+extend<T> T {
+    /// <lang name="fr">
+    /// <summary>La valeur écrite en texte, comme dans un gabarit.</summary>
+    /// <typeparam name="T">Type de la valeur.</typeparam>
+    /// <param name="value">La valeur à écrire.</param>
+    /// <returns>Le texte de la valeur.</returns>
+    /// <example><code language="rgl">
+    /// const string t: 42.toString(); // 42
+    /// </code></example>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The value written as text, as in a template.</summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="value">The value to write.</param>
+    /// <returns>The text representation of the value.</returns>
+    /// <example><code language="rgl">
+    /// const string t: 42.toString(); // 42
+    /// </code></example>
+    /// </lang>
+    gear pure toString(this T value): string => `{value}`;
+}
+
+/// <lang name="fr">
+/// <summary>Les chiffres de n dans la base donnée (usage interne).</summary>
+/// <param name="n">Le nombre.</param>
+/// <param name="base">La base.</param>
+/// <returns>Le texte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The digits of n in the given base (internal use).</summary>
+/// <param name="n">The number.</param>
+/// <param name="base">The base.</param>
+/// <returns>The text.</returns>
+/// </lang>
+gear pure _radixDigits(ulong n, ulong base): string {
+    const string digit: '0123456789abcdefghijklmnopqrstuvwxyz'.substring((n % base) as long, (n % base) as long + 1);
+    return n < base ? digit : _radixDigits(n / base, base) + digit;
+}
+
+/// <lang name="fr">
+/// <summary>Autres opérations sur les chaînes : catégories de caractères et mise en forme.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>More string operations: character categories and formatting.</summary>
+/// </lang>
+extend string {
+    /// <lang name="fr">
+    /// <summary>Indique si le texte est une lettre majuscule (A–Z).</summary>
+    /// <param name="c">Le texte à tester (un seul caractère).</param>
+    /// <returns>`true` pour une majuscule.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text is an uppercase letter (A–Z).</summary>
+    /// <param name="c">The text to test (a single character).</param>
+    /// <returns>`true` for an uppercase letter.</returns>
+    /// </lang>
+    gear pure isUpper(this string c): bool => c.length eq 1 and UPPER_LETTERS.contains(c);
+
+    /// <lang name="fr">
+    /// <summary>Indique si le texte est une lettre minuscule (a–z).</summary>
+    /// <param name="c">Le texte à tester (un seul caractère).</param>
+    /// <returns>`true` pour une minuscule.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text is a lowercase letter (a–z).</summary>
+    /// <param name="c">The text to test (a single character).</param>
+    /// <returns>`true` for a lowercase letter.</returns>
+    /// </lang>
+    gear pure isLower(this string c): bool => c.length eq 1 and LOWER_LETTERS.contains(c);
+
+    /// <lang name="fr">
+    /// <summary>Indique si le texte est une lettre ou un chiffre.</summary>
+    /// <param name="c">Le texte à tester (un seul caractère).</param>
+    /// <returns>`true` pour une lettre ou un chiffre.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text is a letter or a digit.</summary>
+    /// <param name="c">The text to test (a single character).</param>
+    /// <returns>`true` for a letter or a digit.</returns>
+    /// </lang>
+    gear pure isAlphaNumeric(this string c): bool => c.isLetter() or c.isDigit();
+
+    /// <lang name="fr">
+    /// <summary>Indique si le texte est un signe de ponctuation ou un symbole ASCII.</summary>
+    /// <param name="c">Le texte à tester (un seul caractère).</param>
+    /// <returns>`true` pour un signe de ponctuation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the text is an ASCII punctuation mark or symbol.</summary>
+    /// <param name="c">The text to test (a single character).</param>
+    /// <returns>`true` for a punctuation mark.</returns>
+    /// </lang>
+    gear pure isPunctuation(this string c): bool => c.length eq 1 and PUNCTUATION.contains(c);
+
+    /// <lang name="fr">
+    /// <summary>Remplace `{0}`, `{1}`… du modèle par les valeurs données, dans l'ordre.</summary>
+    /// <param name="model">Le modèle, avec des marques `{rang}`.</param>
+    /// <param name="values">Les valeurs à placer.</param>
+    /// <returns>Le texte obtenu ; une marque sans valeur reste telle quelle.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Replaces `{0}`, `{1}`… in the template with the given values, in order.</summary>
+    /// <param name="model">The template, with `{index}` markers.</param>
+    /// <param name="values">The values to place.</param>
+    /// <returns>The resulting text; a marker without a value is left as it is.</returns>
+    /// </lang>
+    gear pure format(this string model, params [string] values): string =>
+        values |+> model with (acc, value, position) => acc.replaceAll(`\{{position}\}`, value);
+}
+
+/// <lang name="fr">
+/// <summary>Mise en forme des nombres.</summary>
+/// <typeparam name="T">Type numérique.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Number formatting.</summary>
+/// <typeparam name="T">The numeric type.</typeparam>
+/// </lang>
+extend<T: number> T {
+    /// <lang name="fr">
+    /// <summary>Écrit le nombre avec un nombre fixe de décimales (arrondi à la plus proche, les égalités vers le haut).</summary>
+    /// <typeparam name="T">Type numérique.</typeparam>
+    /// <param name="value">Le nombre à écrire.</param>
+    /// <param name="decimals">Le nombre de chiffres après la virgule.</param>
+    /// <returns>Le texte, par exemple `3.14` pour `3.14159` avec 2 décimales.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the number with a fixed number of decimals (rounded to nearest, ties upward).</summary>
+    /// <typeparam name="T">The numeric type.</typeparam>
+    /// <param name="value">The number to write.</param>
+    /// <param name="decimals">The number of digits after the decimal point.</param>
+    /// <returns>The text, for example `3.14` for `3.14159` with 2 decimals.</returns>
+    /// </lang>
+    gear pure toFixed(this T value, uint decimals): string {
+        const double x: value as double;
+        const bool negative: x < 0.0;
+        const double magnitude: negative ? -x : x;
+        const long scale: pow(10.0, decimals as int) as long;
+        const long units: floor(magnitude * (scale as double) + 0.5);
+        const string whole: `{units / scale}`;
+        const string digits: decimals eq 0 ? '' : '.' + `{units % scale}`.padStart(decimals, '0');
+        return (negative and units not eq 0 ? '-' : '') + whole + digits;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Écrit la partie entière du nombre dans une base de 2 à 36 (chiffres `0-9a-z`).</summary>
+    /// <typeparam name="T">Type numérique.</typeparam>
+    /// <param name="value">Le nombre à écrire (tronqué vers zéro).</param>
+    /// <param name="radix">La base, de 2 à 36.</param>
+    /// <returns>Le texte, vide si la base est hors de 2 à 36.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the integer part of the number in a base from 2 to 36 (digits `0-9a-z`).</summary>
+    /// <typeparam name="T">The numeric type.</typeparam>
+    /// <param name="value">The number to write (truncated toward zero).</param>
+    /// <param name="radix">The base, from 2 to 36.</param>
+    /// <returns>The text, empty when the base is outside 2 to 36.</returns>
+    /// </lang>
+    gear pure toRadix(this T value, uint radix): string {
+        if (radix < 2 or radix > 36) { return ''; }
+        const long n: value as long;
+        const ulong magnitude: n < 0 ? ((-(n + 1)) as ulong) + 1 : n as ulong;
+        return (n < 0 ? '-' : '') + _radixDigits(magnitude, radix as ulong);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Écrit la partie entière du nombre en hexadécimal minuscule.</summary>
+    /// <typeparam name="T">Type numérique.</typeparam>
+    /// <param name="value">Le nombre à écrire.</param>
+    /// <returns>Le texte hexadécimal.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the integer part of the number in lowercase hexadecimal.</summary>
+    /// <typeparam name="T">The numeric type.</typeparam>
+    /// <param name="value">The number to write.</param>
+    /// <returns>The hexadecimal text.</returns>
+    /// </lang>
+    gear pure toHex(this T value): string => value.toRadix(16);
+
+    /// <lang name="fr">
+    /// <summary>Écrit la partie entière du nombre en binaire.</summary>
+    /// <typeparam name="T">Type numérique.</typeparam>
+    /// <param name="value">Le nombre à écrire.</param>
+    /// <returns>Le texte binaire.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the integer part of the number in binary.</summary>
+    /// <typeparam name="T">The numeric type.</typeparam>
+    /// <param name="value">The number to write.</param>
+    /// <returns>The binary text.</returns>
+    /// </lang>
+    gear pure toBinary(this T value): string => value.toRadix(2);
+}

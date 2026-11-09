@@ -1,0 +1,58 @@
+forge: mold
+description: "Le nœud d'un document XML, tel que le lisent `xml` et `import xml` et que l'écrit `-> xml`"
+
+/// <lang name="fr">
+/// <summary>
+/// Un élément XML : sa balise, ses attributs, ses éléments fils et son texte. C'est ce que donne `var n &lt;- xml "a.xml";` pour la racine du
+/// document, et ce qu'écrit `n -> xml "b.xml";`.
+/// </summary>
+/// <remarks>
+/// Les commentaires, les instructions de traitement et la déclaration `&lt;?xml …?&gt;` ne sont pas gardés, ni l'ordre des attributs (rangés par nom) ;
+/// le texte d'un élément est tout le texte qui y est écrit directement, mis bout à bout, et l'ordre entre ce texte et les fils n'est pas gardé.
+/// Une balise DOCTYPE est refusée.
+/// </remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>
+/// An XML element: its tag, attributes, child elements, and text. This is what `var n &lt;- xml "a.xml";` produces for the document
+/// root, and what `n -> xml "b.xml";` writes.
+/// </summary>
+/// <remarks>
+/// Comments, processing instructions, the `&lt;?xml …?&gt;` declaration, and attribute order are not preserved (attributes are sorted by name);
+/// an element's text is all the text written directly inside it, concatenated, and the ordering between that text and child elements is not preserved.
+/// DOCTYPE declarations are rejected.
+/// </remarks>
+/// </lang>
+mold XmlNode {
+    /// <lang name="fr">
+    /// <summary>Le nom de la balise tel qu'il est écrit, préfixe d'espace de noms compris (`svg:rect`).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The tag name as written, including any namespace prefix (`svg:rect`).</summary>
+    /// </lang>
+    string name;
+
+    /// <lang name="fr">
+    /// <summary>Les attributs, par nom (`xmlns:svg` y est un attribut comme les autres) ; leurs valeurs sont décodées (les entités y sont remplacées par leur caractère).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Attributes by name (`xmlns:svg` is an attribute like any other); their values are decoded (entities are replaced by their characters).</summary>
+    /// </lang>
+    [string:string] attributes;
+
+    /// <lang name="fr">
+    /// <summary>Les éléments fils, dans l'ordre du document.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Child elements, in document order.</summary>
+    /// </lang>
+    [XmlNode] children;
+
+    /// <lang name="fr">
+    /// <summary>Le texte écrit directement dans l'élément, décodé (entités, CDATA), vide s'il n'y a que des espaces entre les fils.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The text written directly inside the element, decoded (entities, CDATA); empty if there is only whitespace between child elements.</summary>
+    /// </lang>
+    string text: "";
+}

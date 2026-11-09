@@ -1,0 +1,6 @@
+34-reprise-apres-erreur.rgl:4:9: erreur[E069]: un rail « !> » n'existe que dans un train
+34-reprise-apres-erreur.rgl:7:10: erreur[E070]: « continue » est un mot réservé
+34-reprise-apres-erreur.rgl:8:5: erreur[E070]: « continue » est un mot réservé
+34-reprise-apres-erreur.rgl:9:13: erreur[E030]: « ; » attendu à la fin de la déclaration
+34-reprise-apres-erreur.rgl:11:1: erreur[E030]: « } » sans « { »
+34-reprise-apres-erreur.rgl:13:14: erreur[E030]: « } » attendu pour fermer le bloc

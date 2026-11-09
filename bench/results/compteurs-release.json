@@ -1,0 +1,110 @@
+{
+    "Commit":  "c4bf097+modifié",
+    "Mode":  "release",
+    "Results":  [
+                    {
+                        "Name":  "chaines",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  13829,
+                        "Octets":  85564773,
+                        "Reallocations":  0,
+                        "Liberations":  13829,
+                        "CopiesTableaux":  2,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "constantes-demarrage",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  7,
+                        "Octets":  720000,
+                        "Reallocations":  0,
+                        "Liberations":  7,
+                        "CopiesTableaux":  0,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "constantes-recherche",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  7,
+                        "Octets":  720000,
+                        "Reallocations":  0,
+                        "Liberations":  7,
+                        "CopiesTableaux":  0,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "demarrage",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  0,
+                        "Octets":  0,
+                        "Reallocations":  0,
+                        "Liberations":  0,
+                        "CopiesTableaux":  0,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "json",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  800023,
+                        "Octets":  65336234,
+                        "Reallocations":  46,
+                        "Liberations":  800023,
+                        "CopiesTableaux":  600005,
+                        "ElementsCopies":  2200003,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "parcours",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  1,
+                        "Octets":  37,
+                        "Reallocations":  0,
+                        "Liberations":  1,
+                        "CopiesTableaux":  0,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "particules",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  74,
+                        "Octets":  171333283,
+                        "Reallocations":  0,
+                        "Liberations":  74,
+                        "CopiesTableaux":  1,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    },
+                    {
+                        "Name":  "recursif",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "Allocations":  0,
+                        "Octets":  0,
+                        "Reallocations":  0,
+                        "Liberations":  0,
+                        "CopiesTableaux":  0,
+                        "ElementsCopies":  0,
+                        "CopiesTextes":  0,
+                        "OctetsTextes":  0
+                    }
+                ]
+}

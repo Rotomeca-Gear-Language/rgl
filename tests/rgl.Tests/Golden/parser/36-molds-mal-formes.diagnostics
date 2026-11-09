@@ -1,0 +1,4 @@
+36-molds-mal-formes.rgl:2:13: erreur[E030]: nom de champ attendu
+36-molds-mal-formes.rgl:2:23: erreur[E030]: « ; » attendu après le champ
+36-molds-mal-formes.rgl:4:17: erreur[E030]: « { » attendu après le type de new
+36-molds-mal-formes.rgl:5:20: erreur[E030]: « } » attendu pour fermer la valeur de mold

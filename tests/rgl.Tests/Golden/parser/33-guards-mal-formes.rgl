@@ -1,0 +1,9 @@
+// Guards et entrées-sorties mal formés : pure, valeur sans effet, cible ou valeur manquantes.
+guard pure positif(int n): int { done; }
+emit pure afficher(int n): void { }
+gear valeur(int n): void {
+    n + 1;
+    n -> ;
+    -> console;
+}
+!train |> done;

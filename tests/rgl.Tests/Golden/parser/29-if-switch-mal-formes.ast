@@ -1,0 +1,18 @@
+CompilationUnit 1:1
+  IfStatement 2:1
+    BinaryExpression 2:4 op=<
+      NameExpression 2:4 name=n
+      LiteralExpression 2:8 kind=IntegerLiteral text=0
+    BlockStatement 2:10
+      AssignmentStatement 3:5 target=n
+        LiteralExpression 3:10 kind=IntegerLiteral text=0
+  IfStatement 5:1
+    NameExpression 5:5 name=n
+    BlockStatement 5:7
+  AssignmentStatement 5:8 target=n
+    LiteralExpression 5:13 kind=IntegerLiteral text=1
+  SwitchStatement 6:1
+    NameExpression 6:9 name=n
+    SwitchSection 8:5 kind=Values
+      LiteralExpression 8:10 kind=IntegerLiteral text=1
+      BreakStatement 9:9

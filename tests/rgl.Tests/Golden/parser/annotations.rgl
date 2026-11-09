@@ -1,0 +1,18 @@
+@deprecated("Utiliser newApi()")
+[db, cache: "5min", description: "Charge le profil"]
+gear fetchProfile(int id): int => id;
+
+@tap(before, `→ {n}` -> console)
+@tap(`← {$}` -> console)
+@tap(closure, after, (int val) => log(val))
+gear twice(int n): int => n * 2;
+
+[cle]
+const int N: 3;
+
+@async
+@inconnue
+mold M { int x; }
+
+[int] nombres: [1, 2];
+train |> done;

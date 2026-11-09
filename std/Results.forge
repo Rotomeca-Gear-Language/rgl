@@ -1,0 +1,208 @@
+forge: gears
+description: "Aides pour les résultats `T ! E` et les valeurs nullables `T?`"
+
+/// <lang name="fr">
+/// <summary>Indique si un résultat est une réussite.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <returns>`true` pour une réussite.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether a result is a success.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <returns>`true` for a success.</returns>
+/// </lang>
+gear pure isOk<T, E>(T ! E result): bool =>
+    match (result) {
+        ok value |> true;
+        err failure |> false;
+    };
+
+/// <lang name="fr">
+/// <summary>La valeur d'une réussite.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <returns>La valeur, `null` pour une erreur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The value of a success.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <returns>The value, `null` for an error.</returns>
+/// </lang>
+gear pure valueOf<T, E>(T ! E result): T? =>
+    match (result) {
+        ok value |> value;
+        err failure |> null;
+    };
+
+/// <lang name="fr">
+/// <summary>L'erreur d'un échec.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <returns>L'erreur, `null` pour une réussite.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The error of a failure.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <returns>The error, `null` for a success.</returns>
+/// </lang>
+gear pure errorOf<T, E>(T ! E result): E? =>
+    match (result) {
+        ok value |> null;
+        err failure |> failure;
+    };
+
+/// <lang name="fr">
+/// <summary>Transforme la valeur d'une réussite ; une erreur passe telle quelle.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="U">Type de la nouvelle valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <param name="transform">La transformation pure de la valeur.</param>
+/// <returns>Le nouveau résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Transforms the value of a success; an error passes through unchanged.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="U">The new value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <param name="transform">The pure transformation of the value.</param>
+/// <returns>The new result.</returns>
+/// </lang>
+gear pure mapOk<T, U, E>(T ! E result, pure (T) => U transform): U ! E =>
+    match (result) {
+        ok value |> ok(transform(value));
+        err failure |> err(failure);
+    };
+
+/// <lang name="fr">
+/// <summary>Transforme l'erreur d'un échec ; une réussite passe telle quelle.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <typeparam name="F">Type de la nouvelle erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <param name="transform">La transformation pure de l'erreur.</param>
+/// <returns>Le nouveau résultat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Transforms the error of a failure; a success passes through unchanged.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <typeparam name="F">The new error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <param name="transform">The pure transformation of the error.</param>
+/// <returns>The new result.</returns>
+/// </lang>
+gear pure mapError<T, E, F>(T ! E result, pure (E) => F transform): T ! F =>
+    match (result) {
+        ok value |> ok(value);
+        err failure |> err(transform(failure));
+    };
+
+/// <lang name="fr">
+/// <summary>Enchaîne un calcul qui peut échouer sur la valeur d'une réussite ; une erreur l'arrête.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="U">Type de la nouvelle valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <param name="next">Le calcul suivant, qui rend un résultat.</param>
+/// <returns>Le résultat du calcul, ou l'erreur d'origine.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Chains a computation that may fail onto the value of a success; an error stops it.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="U">The new value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <param name="next">The next computation, which returns a result.</param>
+/// <returns>The result of the computation, or the original error.</returns>
+/// </lang>
+gear pure andThen<T, U, E>(T ! E result, pure (T) => U ! E next): U ! E =>
+    match (result) {
+        ok value |> next(value);
+        err failure |> err(failure);
+    };
+
+/// <lang name="fr">
+/// <summary>La valeur d'une réussite, ou celle que calcule `recover` à partir de l'erreur.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="E">Type de l'erreur.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <param name="recover">Ce qui remplace une erreur par une valeur.</param>
+/// <returns>Une valeur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The value of a success, or the one `recover` computes from the error.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="E">The error type.</typeparam>
+/// <param name="result">The result.</param>
+/// <param name="recover">What replaces an error with a value.</param>
+/// <returns>A value.</returns>
+/// </lang>
+gear pure orElse<T, E>(T ! E result, pure (E) => T recover): T =>
+    match (result) {
+        ok value |> value;
+        err failure |> recover(failure);
+    };
+
+/// <lang name="fr">
+/// <summary>Transforme une valeur si elle n'est pas nulle.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="U">Type de la nouvelle valeur.</typeparam>
+/// <param name="value">La valeur nullable.</param>
+/// <param name="transform">La transformation pure.</param>
+/// <returns>Le résultat, `null` si la valeur est nulle.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Transforms a value when it is not null.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="U">The new value type.</typeparam>
+/// <param name="value">The nullable value.</param>
+/// <param name="transform">The pure transformation.</param>
+/// <returns>The result, `null` when the value is null.</returns>
+/// </lang>
+gear pure mapNullable<T, U>(T? value, pure (T) => U transform): U? => value eq null ? null : transform(value);
+
+/// <lang name="fr">
+/// <summary>Enchaîne un calcul qui peut ne rien donner sur une valeur non nulle.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <typeparam name="U">Type de la nouvelle valeur.</typeparam>
+/// <param name="value">La valeur nullable.</param>
+/// <param name="transform">Le calcul, qui rend lui-même un nullable.</param>
+/// <returns>Le résultat, `null` si la valeur ou le calcul ne donne rien.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Chains a computation that may produce nothing onto a non-null value.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <typeparam name="U">The new value type.</typeparam>
+/// <param name="value">The nullable value.</param>
+/// <param name="transform">The computation, which itself returns a nullable.</param>
+/// <returns>The result, `null` when the value or the computation gives nothing.</returns>
+/// </lang>
+gear pure flatMapNullable<T, U>(T? value, pure (T) => U? transform): U? => value eq null ? null : transform(value);
+
+/// <lang name="fr">
+/// <summary>Garde la valeur seulement si elle n'est pas nulle et passe le test.</summary>
+/// <typeparam name="T">Type de la valeur.</typeparam>
+/// <param name="value">La valeur nullable.</param>
+/// <param name="test">Le test pur.</param>
+/// <returns>La valeur, ou `null`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Keeps the value only when it is not null and passes the test.</summary>
+/// <typeparam name="T">The value type.</typeparam>
+/// <param name="value">The nullable value.</param>
+/// <param name="test">The pure test.</param>
+/// <returns>The value, or `null`.</returns>
+/// </lang>
+gear pure filterNullable<T>(T? value, pure (T) => bool test): T? => (value eq null or not test(value)) ? null : value;

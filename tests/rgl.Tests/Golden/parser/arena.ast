@@ -1,0 +1,30 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=frame pure=false parameters=1
+    Parameter 1:12 name=n
+      PrimitiveType 1:12 type=int
+    PrimitiveType 1:20 type=int
+    BlockStatement 1:24
+      BlockStatement 2:5 arena=true
+        VarDeclaration 3:9 keyword=var name=xs
+          RangeExpression 3:17 exclusive=true
+            LiteralExpression 3:18 kind=IntegerLiteral text=0
+            LiteralExpression 3:22 kind=IntegerLiteral text=10
+      BlockStatement 5:5 arena=true
+        LiteralExpression 5:11 kind=IntegerLiteral text=65536
+        VarDeclaration 6:9 keyword=var name=ys
+          CallExpression 6:17
+            MemberAccessExpression 6:17 member=set
+              NameExpression 6:17 name=ArenaPool
+            ArrayExpression 6:31
+              LiteralExpression 6:32 kind=IntegerLiteral text=1
+              LiteralExpression 6:35 kind=IntegerLiteral text=2
+              LiteralExpression 6:38 kind=IntegerLiteral text=3
+      ExpressionStatement 8:5
+        CallExpression 8:5
+          NameExpression 8:5 name=arena
+          NameExpression 8:11 name=n
+      ReturnStatement 9:5
+        LiteralExpression 9:12 kind=IntegerLiteral text=0
+  TrainDeclaration 12:1 unguarded=false parameters=none
+    Pipeline 12:7
+      DoneStep 12:10

@@ -1,0 +1,9 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=none name=autre
+    PrimitiveType 2:1 type=int
+    MissingExpression 2:10
+  VarDeclaration 3:1 keyword=var name=vide
+    MissingExpression 3:9
+  TrainDeclaration 4:1 unguarded=false parameters=none
+    Pipeline 4:7
+      DoneStep 4:10

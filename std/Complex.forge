@@ -1,0 +1,91 @@
+forge: gears
+description: "Nombres complexes : opérations, module, argument, forme polaire, exponentielle, puissance et racine"
+
+use <Math> only {sqrt, atan2, exp, cos, sin, hypot};
+
+/// <lang name="fr">
+/// <summary>Un nombre complexe `re + im·i`. Les opérateurs `+`, `-`, `*`, `/` et le `-` unaire s'écrivent comme sur des nombres : `a * b + c`. Une division par zéro donne l'infini ou NaN, comme sur les flottants.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A complex number `re + im·i`. The `+`, `-`, `*`, `/` operators and unary `-` are written as on numbers: `a * b + c`. A division by zero gives infinity or NaN, as with floats.</summary>
+/// </lang>
+mold Complex {
+    /// <lang name="fr"><summary>La partie réelle.</summary></lang>
+    /// <lang name="en"><summary>The real part.</summary></lang>
+    double re;
+    /// <lang name="fr"><summary>La partie imaginaire.</summary></lang>
+    /// <lang name="en"><summary>The imaginary part.</summary></lang>
+    double im;
+
+    /// <lang name="fr"><summary>La somme de deux complexes.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>La somme.</returns></lang>
+    /// <lang name="en"><summary>The sum of two complex numbers.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>The sum.</returns></lang>
+    pure Complex +(Complex a, Complex b) { return {re: a.re + b.re, im: a.im + b.im}; }
+
+    /// <lang name="fr"><summary>La différence de deux complexes.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>La différence.</returns></lang>
+    /// <lang name="en"><summary>The difference of two complex numbers.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>The difference.</returns></lang>
+    pure Complex -(Complex a, Complex b) { return {re: a.re - b.re, im: a.im - b.im}; }
+
+    /// <lang name="fr"><summary>L'opposé d'un complexe.</summary><param name="a">Le complexe.</param><returns>Son opposé.</returns></lang>
+    /// <lang name="en"><summary>The opposite of a complex number.</summary><param name="a">The complex number.</param><returns>Its opposite.</returns></lang>
+    pure Complex -(Complex a) { return {re: -a.re, im: -a.im}; }
+
+    /// <lang name="fr"><summary>Le produit de deux complexes.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>Le produit.</returns></lang>
+    /// <lang name="en"><summary>The product of two complex numbers.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>The product.</returns></lang>
+    pure Complex *(Complex a, Complex b) { return {re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re}; }
+
+    /// <lang name="fr"><summary>Le quotient de deux complexes.</summary><param name="a">Le dividende.</param><param name="b">Le diviseur.</param><returns>Le quotient.</returns></lang>
+    /// <lang name="en"><summary>The quotient of two complex numbers.</summary><param name="a">The dividend.</param><param name="b">The divisor.</param><returns>The quotient.</returns></lang>
+    pure Complex /(Complex a, Complex b) {
+        const double denominator: b.re * b.re + b.im * b.im;
+        return {re: (a.re * b.re + a.im * b.im) / denominator, im: (a.im * b.re - a.re * b.im) / denominator};
+    }
+}
+
+/// <lang name="fr"><summary>Construit un complexe.</summary><param name="re">La partie réelle.</param><param name="im">La partie imaginaire (0 par défaut : un réel).</param><returns>Le complexe.</returns></lang>
+/// <lang name="en"><summary>Builds a complex number.</summary><param name="re">The real part.</param><param name="im">The imaginary part (0 by default: a real number).</param><returns>The complex number.</returns></lang>
+gear pure complex(double re, double im: 0.0): Complex => {re, im};
+
+/// <lang name="fr"><summary>Le module (la longueur) d'un complexe : `√(re² + im²)`.</summary><param name="z">Le complexe.</param><returns>Son module.</returns></lang>
+/// <lang name="en"><summary>The modulus (length) of a complex number: `√(re² + im²)`.</summary><param name="z">The complex number.</param><returns>Its modulus.</returns></lang>
+gear pure magnitude(Complex z): double => hypot(z.re, z.im);
+
+/// <lang name="fr"><summary>L'argument (l'angle) d'un complexe, en radians, entre -π et π.</summary><param name="z">Le complexe.</param><returns>Son angle.</returns></lang>
+/// <lang name="en"><summary>The argument (angle) of a complex number, in radians, between -π and π.</summary><param name="z">The complex number.</param><returns>Its angle.</returns></lang>
+gear pure phase(Complex z): double => atan2(z.im, z.re);
+
+/// <lang name="fr"><summary>Le conjugué d'un complexe : même partie réelle, partie imaginaire opposée.</summary><param name="z">Le complexe.</param><returns>Son conjugué.</returns></lang>
+/// <lang name="en"><summary>The conjugate of a complex number: same real part, opposite imaginary part.</summary><param name="z">The complex number.</param><returns>Its conjugate.</returns></lang>
+gear pure conj(Complex z): Complex => {re: z.re, im: -z.im};
+
+/// <lang name="fr"><summary>Le complexe de module et d'angle donnés (forme polaire).</summary><param name="radius">Le module.</param><param name="angle">L'angle, en radians.</param><returns>`radius·(cos angle + i·sin angle)`.</returns></lang>
+/// <lang name="en"><summary>The complex number with a given modulus and angle (polar form).</summary><param name="radius">The modulus.</param><param name="angle">The angle, in radians.</param><returns>`radius·(cos angle + i·sin angle)`.</returns></lang>
+gear pure fromPolar(double radius, double angle): Complex => {re: radius * cos(angle), im: radius * sin(angle)};
+
+/// <lang name="fr"><summary>L'exponentielle d'un complexe : `e^(a+bi) = e^a·(cos b + i·sin b)`.</summary><param name="z">Le complexe.</param><returns>Son exponentielle.</returns></lang>
+/// <lang name="en"><summary>The exponential of a complex number: `e^(a+bi) = e^a·(cos b + i·sin b)`.</summary><param name="z">The complex number.</param><returns>Its exponential.</returns></lang>
+gear pure complexExp(Complex z): Complex => fromPolar(exp(z.re), z.im);
+
+/// <lang name="fr"><summary>Un complexe élevé à une puissance entière (par multiplications ; une puissance négative est l'inverse).</summary><param name="z">Le complexe.</param><param name="n">L'exposant.</param><returns>`z` puissance `n`.</returns></lang>
+/// <lang name="en"><summary>A complex number raised to an integer power (by multiplications; a negative power is the inverse).</summary><param name="z">The complex number.</param><param name="n">The exponent.</param><returns>`z` to the power `n`.</returns></lang>
+gear pure complexPow(Complex z, int n): Complex {
+    const uint count: n < 0 ? (0 - n) as uint : n as uint;
+    const Complex one: {re: 1.0, im: 0.0};
+    if (count eq 0) { return one; }
+    const Complex result: [1..count] |+> one with (acc, i) => acc * z;
+    return n < 0 ? one / result : result;
+}
+
+/// <lang name="fr"><summary>La racine carrée principale d'un complexe (partie réelle positive ou nulle).</summary><param name="z">Le complexe.</param><returns>Sa racine carrée.</returns></lang>
+/// <lang name="en"><summary>The principal square root of a complex number (non-negative real part).</summary><param name="z">The complex number.</param><returns>Its square root.</returns></lang>
+gear pure complexSqrt(Complex z): Complex {
+    const double root: sqrt(magnitude(z)) ?? 0.0;
+    return fromPolar(root, phase(z) / 2.0);
+}
+
+/// <lang name="fr"><summary>Écrit un complexe : `1+2i`, `3-0.5i`, `4` (un réel) ou `2i`.</summary><param name="z">Le complexe.</param><returns>Le texte.</returns></lang>
+/// <lang name="en"><summary>Writes a complex number: `1+2i`, `3-0.5i`, `4` (a real) or `2i`.</summary><param name="z">The complex number.</param><returns>The text.</returns></lang>
+gear pure complexText(Complex z): string {
+    if (z.im eq 0.0) { return `{z.re}`; }
+    const string imaginary: z.im < 0.0 ? `-{-z.im}i` : `+{z.im}i`;
+    return z.re eq 0.0 ? (z.im < 0.0 ? imaginary : `{z.im}i`) : `{z.re}{imaginary}`;
+}

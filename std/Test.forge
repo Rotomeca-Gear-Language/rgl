@@ -1,0 +1,256 @@
+forge: gears
+description: "Vérifications pour écrire des tests : un échec écrit un rapport sur la sortie d'erreur et arrête le programme avec le code 1"
+
+use <Console> only {writeLine, writeErrorLine};
+use <Environment> only {exit};
+use <Time> only {Stopwatch, startStopwatch, elapsed};
+
+/// <lang name="fr">
+/// <summary>Écrit le rapport d'un échec et arrête le programme avec le code 1 (usage interne).</summary>
+/// <param name="what">Ce qui ne va pas.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a failure report and stops the program with exit code 1 (internal use).</summary>
+/// <param name="what">What is wrong.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear _failure(string what, string message, string where): void {
+    writeErrorLine(`ÉCHEC ({where}) : {what}{message.isEmpty() ? '' : ' - ' + message}`);
+    exit(1);
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie qu'une condition est vraie.</summary>
+/// <param name="condition">La condition.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that a condition is true.</summary>
+/// <param name="condition">The condition.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertTrue(bool condition, string message: '', string where: __WHERE__): void {
+    if (not condition) { _failure('une condition devait être vraie', message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie qu'une condition est fausse.</summary>
+/// <param name="condition">La condition.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that a condition is false.</summary>
+/// <param name="condition">The condition.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertFalse(bool condition, string message: '', string where: __WHERE__): void {
+    if (condition) { _failure('une condition devait être fausse', message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie que deux valeurs sont égales.</summary>
+/// <typeparam name="T">Type des valeurs comparées.</typeparam>
+/// <param name="expected">La valeur attendue.</param>
+/// <param name="actual">La valeur obtenue.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that two values are equal.</summary>
+/// <typeparam name="T">The type of the compared values.</typeparam>
+/// <param name="expected">The expected value.</param>
+/// <param name="actual">The value obtained.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertEqual<T>(T expected, T actual, string message: '', string where: __WHERE__): void {
+    if (expected not eq actual) { _failure(`attendu {expected}, reçu {actual}`, message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie que deux valeurs sont différentes.</summary>
+/// <typeparam name="T">Type des valeurs comparées.</typeparam>
+/// <param name="unexpected">La valeur interdite.</param>
+/// <param name="actual">La valeur obtenue.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that two values are different.</summary>
+/// <typeparam name="T">The type of the compared values.</typeparam>
+/// <param name="unexpected">The forbidden value.</param>
+/// <param name="actual">The value obtained.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertNotEqual<T>(T unexpected, T actual, string message: '', string where: __WHERE__): void {
+    if (unexpected eq actual) { _failure(`la valeur {actual} ne devait pas être obtenue`, message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie que deux flottants sont proches.</summary>
+/// <param name="expected">La valeur attendue.</param>
+/// <param name="actual">La valeur obtenue.</param>
+/// <param name="tolerance">L'écart maximal permis.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that two floats are close.</summary>
+/// <param name="expected">The expected value.</param>
+/// <param name="actual">The value obtained.</param>
+/// <param name="tolerance">The maximal allowed difference.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertNear(double expected, double actual, double tolerance: 0.000001, string message: '', string where: __WHERE__): void {
+    const double difference: expected > actual ? expected - actual : actual - expected;
+    if (difference > tolerance) { _failure(`attendu {expected} à {tolerance} près, reçu {actual}`, message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie qu'une valeur est nulle.</summary>
+/// <typeparam name="T">Type des valeurs comparées.</typeparam>
+/// <param name="value">La valeur nullable.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that a value is null.</summary>
+/// <typeparam name="T">The type of the compared values.</typeparam>
+/// <param name="value">The nullable value.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertNull<T>(T? value, string message: '', string where: __WHERE__): void {
+    if (value not eq null) { _failure('une valeur devait être nulle', message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie qu'une valeur n'est pas nulle.</summary>
+/// <typeparam name="T">Type des valeurs comparées.</typeparam>
+/// <param name="value">La valeur nullable.</param>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks that a value is not null.</summary>
+/// <typeparam name="T">The type of the compared values.</typeparam>
+/// <param name="value">The nullable value.</param>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear assertNotNull<T>(T? value, string message: '', string where: __WHERE__): void {
+    if (value eq null) { _failure('une valeur ne devait pas être nulle', message, where); }
+}
+
+/// <lang name="fr">
+/// <summary>Fait échouer le test tout de suite.</summary>
+/// <param name="message">Un texte ajouté au rapport d'échec (facultatif).</param>
+/// <param name="where">La position de l'appel dans le source, remplie toute seule.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Fails the test right away.</summary>
+/// <param name="message">A text added to the failure report (optional).</param>
+/// <param name="where">The position of the call in the source, filled in automatically.</param>
+/// </lang>
+gear failTest(string message: '', string where: __WHERE__): void => _failure('échec demandé', message, where);
+
+/// <lang name="fr">
+/// <summary>Exécute un test nommé : écrit son nom, lance le corps, puis `réussi` (un échec d'une vérification arrête le programme avant).</summary>
+/// <param name="name">Le nom du test.</param>
+/// <param name="body">Le corps du test, fait de vérifications.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Runs a named test: writes its name, runs the body, then `réussi` (a failed check stops the program before that).</summary>
+/// <param name="name">The name of the test.</param>
+/// <param name="body">The body of the test, made of checks.</param>
+/// </lang>
+gear test(string name, () => void body): void {
+    writeLine(`- {name}`);
+    body();
+    writeLine(`  réussi`);
+}
+
+/// <lang name="fr">
+/// <summary>Un fixture : prépare ce dont le test a besoin (`setup`), lance le test avec lui, puis nettoie (`teardown`).</summary>
+/// <typeparam name="T">Type de ce que prépare `setup` (un dossier temporaire, un serveur, une connexion…).</typeparam>
+/// <param name="setup">Prépare et rend ce qu'utilise le test.</param>
+/// <param name="body">Le test, qui reçoit ce que `setup` a préparé.</param>
+/// <param name="teardown">Nettoie après le test.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>A fixture: prepares what the test needs (`setup`), runs the test with it, then cleans up (`teardown`).</summary>
+/// <typeparam name="T">The type of what `setup` prepares (a temporary folder, a server, a connection…).</typeparam>
+/// <param name="setup">Prepares and returns what the test uses.</param>
+/// <param name="body">The test, which receives what `setup` prepared.</param>
+/// <param name="teardown">Cleans up after the test.</param>
+/// </lang>
+gear withFixture<T>(() => T setup, (T) => void body, (T) => void teardown): void {
+    const T fixture: setup();
+    body(fixture);
+    teardown(fixture);
+}
+
+/// <lang name="fr">
+/// <summary>Mesure le temps d'une action répétée, et l'écrit : `nom : 120 ms pour 1000 itérations`.</summary>
+/// <param name="name">Le nom de la mesure.</param>
+/// <param name="iterations">Le nombre de répétitions (au moins 1).</param>
+/// <param name="body">L'action à mesurer.</param>
+/// <returns>Le temps total.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Measures the time of a repeated action, and writes it: `name : 120 ms pour 1000 itérations`.</summary>
+/// <param name="name">The measurement name.</param>
+/// <param name="iterations">The number of repetitions (at least 1).</param>
+/// <param name="body">The action to measure.</param>
+/// <returns>The total time.</returns>
+/// </lang>
+gear benchmark(string name, uint iterations, () => void body): duration {
+    const uint count: iterations < 1 ? 1 : iterations;
+    const Stopwatch watch: startStopwatch();
+    [1..count] ||> (i) => { body(); };
+    const duration total: elapsed(watch);
+    writeLine(`{name} : {total as long} ms pour {count} itérations`);
+    return total;
+}
+
+/// <lang name="fr"><summary>Le journal des appels d'une doublure (mock) : les appels reçus, dans l'ordre, chacun écrit `nom(arguments)`.</summary></lang>
+/// <lang name="en"><summary>The call log of a test double (mock): the calls received, in order, each written `name(arguments)`.</summary></lang>
+mold CallLog {
+    /// <lang name="fr"><summary>Les appels, dans l'ordre où ils ont eu lieu.</summary></lang>
+    /// <lang name="en"><summary>The calls, in the order they happened.</summary></lang>
+    [string] calls;
+}
+
+/// <lang name="fr"><summary>Crée un journal d'appels vide.</summary><returns>Un journal sans appel.</returns></lang>
+/// <lang name="en"><summary>Creates an empty call log.</summary><returns>A log with no calls.</returns></lang>
+gear pure newCallLog(): CallLog => {calls: []};
+
+/// <lang name="fr"><summary>Note un appel dans le journal ; la doublure (une lambda qui reçoit le journal par une variable `mut` capturée en place) l'appelle à chaque usage.</summary><param name="log">Le journal (variable `mut`).</param><param name="name">Le nom de ce qui a été appelé.</param><param name="arguments">Ses arguments, écrits en texte.</param></lang>
+/// <lang name="en"><summary>Records a call in the log; the double (a lambda that receives the log through a captured `mut` variable, in place) calls it on each use.</summary><param name="log">The log (a `mut` variable).</param><param name="name">The name of what was called.</param><param name="arguments">Its arguments, written as text.</param></lang>
+gear recordCall(mut CallLog log, string name, string arguments: ''): void {
+    log.calls.push(`{name}({arguments})`);
+}
+
+/// <lang name="fr"><summary>Le nombre de fois où un nom a été appelé.</summary><param name="log">Le journal.</param><param name="name">Le nom.</param><returns>Le nombre d'appels.</returns></lang>
+/// <lang name="en"><summary>The number of times a name was called.</summary><param name="log">The log.</param><param name="name">The name.</param><returns>The number of calls.</returns></lang>
+gear pure callCount(CallLog log, string name): uint {
+    const string prefix: `{name}(`;
+    const uint none: 0;
+    return log.calls |+> none with (total, call) => call.startsWith(prefix) ? total + 1 : total;
+}
+
+/// <lang name="fr"><summary>Vérifie qu'un nom a été appelé exactement `times` fois.</summary><param name="log">Le journal.</param><param name="name">Le nom.</param><param name="times">Le nombre d'appels attendu.</param><param name="where">La position de l'appel, remplie toute seule.</param></lang>
+/// <lang name="en"><summary>Checks that a name was called exactly `times` times.</summary><param name="log">The log.</param><param name="name">The name.</param><param name="times">The expected number of calls.</param><param name="where">The position of the call, filled in automatically.</param></lang>
+gear assertCalled(CallLog log, string name, uint times, string where: __WHERE__): void {
+    const uint actual: callCount(log, name);
+    if (actual not eq times) { _failure(`« {name} » appelé {actual} fois au lieu de {times}`, '', where); }
+}

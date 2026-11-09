@@ -1,0 +1,111 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=garder pure=false parameters=2
+    Parameter 1:13 name=valeurs
+      ArrayType 1:13
+        PrimitiveType 1:14 type=int
+    Parameter 1:28 name=test
+      FunctionType 1:28
+        PrimitiveType 1:29 type=int
+        PrimitiveType 1:37 type=bool
+    ArrayType 1:49
+      PrimitiveType 1:50 type=int
+    NameExpression 1:58 name=valeurs
+  GearDeclaration 2:1 kind=gear name=fabrique pure=false parameters=1
+    Parameter 2:15 name=n
+      PrimitiveType 2:15 type=int
+    FunctionType 2:23
+      PrimitiveType 2:24 type=int
+      PrimitiveType 2:32 type=int
+    BlockStatement 2:36
+      ReturnStatement 3:5
+        LambdaExpression 3:12 parameters=1
+          LambdaParameter 3:13 name=x
+            PrimitiveType 3:13 type=int
+          BinaryExpression 3:23 op=+
+            NameExpression 3:23 name=x
+            NameExpression 3:27 name=n
+  GearDeclaration 5:1 kind=gear name=paire pure=false parameters=0
+    TupleType 5:15
+      TupleTypeElement 5:16
+        PrimitiveType 5:16 type=int
+      TupleTypeElement 5:21
+        PrimitiveType 5:21 type=string
+    TupleExpression 5:32
+      TupleElement 5:33
+        LiteralExpression 5:33 kind=IntegerLiteral text=1
+      TupleElement 5:36
+        LiteralExpression 5:36 kind=StringLiteral text="a"
+  GearDeclaration 6:1 kind=gear name=compose pure=false parameters=0
+    FunctionType 6:18
+      PrimitiveType 6:19 type=int
+      PrimitiveType 6:27 type=int
+    LambdaExpression 6:35 parameters=1
+      LambdaParameter 6:36 name=x
+      BinaryExpression 6:42 op=*
+        NameExpression 6:42 name=x
+        LiteralExpression 6:46 kind=IntegerLiteral text=2
+  GearDeclaration 7:1 kind=gear name=rien pure=false parameters=2
+    Parameter 7:11 name=f
+      FunctionType 7:11 pure=true
+        PrimitiveType 7:17 type=string
+        PrimitiveType 7:30 type=void
+    Parameter 7:38 name=g
+      FunctionType 7:38
+        PrimitiveType 7:44 type=int
+    PrimitiveType 7:52 type=void
+    BlockStatement 7:57
+      VarDeclaration 8:5 keyword=var name=seuil
+        LiteralExpression 8:16 kind=IntegerLiteral text=10
+      VarDeclaration 9:5 keyword=var name=filtre
+        LambdaExpression 9:17 parameters=1
+          LambdaParameter 9:18 name=v
+            PrimitiveType 9:18 type=int
+          BinaryExpression 9:28 op=>
+            NameExpression 9:28 name=v
+            NameExpression 9:32 name=seuil
+      VarDeclaration 10:5 keyword=var name=log
+        LambdaExpression 10:14 parameters=1
+          LambdaParameter 10:15 name=m
+            PrimitiveType 10:15 type=string
+          BlockStatement 10:28
+            WriteStatement 10:30 target=console
+              NameExpression 10:30 name=m
+      VarDeclaration 11:5 keyword=var name=deux
+        LambdaExpression 11:15 parameters=2
+          LambdaParameter 11:16 name=a
+          LambdaParameter 11:19 name=b
+          BinaryExpression 11:25 op=+
+            NameExpression 11:25 name=a
+            NameExpression 11:29 name=b
+      VarDeclaration 12:5 keyword=none name=ops
+        ArrayType 12:5
+          FunctionType 12:6
+            PrimitiveType 12:7 type=int
+            PrimitiveType 12:15 type=int
+        ArrayExpression 12:25
+          LambdaExpression 12:26 parameters=1
+            LambdaParameter 12:27 name=x
+              PrimitiveType 12:27 type=int
+            BinaryExpression 12:37 op=+
+              NameExpression 12:37 name=x
+              LiteralExpression 12:41 kind=IntegerLiteral text=1
+      VarDeclaration 13:5 keyword=var name=r
+        CallExpression 13:12
+          IndexExpression 13:12
+            NameExpression 13:12 name=ops
+            LiteralExpression 13:16 kind=IntegerLiteral text=0
+          LiteralExpression 13:19 kind=IntegerLiteral text=3
+      VarDeclaration 14:5 keyword=var name=s
+        CallExpression 14:12
+          CallExpression 14:12
+            NameExpression 14:12 name=fabrique
+            LiteralExpression 14:21 kind=IntegerLiteral text=2
+          LiteralExpression 14:24 kind=IntegerLiteral text=5
+      VarDeclaration 15:5 keyword=var name=t
+        CallExpression 15:12
+          ParenthesizedExpression 15:12
+            NameExpression 15:13 name=filtre
+          LiteralExpression 15:21 kind=IntegerLiteral text=4
+  TrainDeclaration 17:1 unguarded=false parameters=none
+    Pipeline 17:7
+      DoneStep 17:10

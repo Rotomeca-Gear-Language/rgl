@@ -1,0 +1,124 @@
+forge: gears
+description: "Markdown vers HTML : titres, paragraphes, listes, citations, blocs de code, emphase, code, liens et images, avec le texte échappé"
+
+/// <lang name="fr"><summary>Le code en ligne, entre accents graves.</summary></lang>
+/// <lang name="en"><summary>Inline code, between backticks.</summary></lang>
+const regex _codeSpan: /`([^`]+)`/g;
+/// <lang name="fr"><summary>Une image `![texte](adresse)` dont l'adresse est sûre.</summary></lang>
+/// <lang name="en"><summary>An image `![text](address)` whose address is safe.</summary></lang>
+const regex _imageSpan: /!\[([^\]]*)\]\(((?:https?:\/\/|mailto:)[^)\s]*|[^):\s]*)\)/g;
+/// <lang name="fr"><summary>Un lien `[texte](adresse)` dont l'adresse est sûre.</summary></lang>
+/// <lang name="en"><summary>A link `[text](address)` whose address is safe.</summary></lang>
+const regex _linkSpan: /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]*|[^):\s]*)\)/g;
+/// <lang name="fr"><summary>Le texte en gras, entre deux astérisques doublés.</summary></lang>
+/// <lang name="en"><summary>Bold text, between doubled asterisks.</summary></lang>
+const regex _boldSpan: /\*\*([^*]+)\*\*/g;
+/// <lang name="fr"><summary>Le texte en italique, entre deux astérisques.</summary></lang>
+/// <lang name="en"><summary>Italic text, between two asterisks.</summary></lang>
+const regex _italicSpan: /\*([^*]+)\*/g;
+/// <lang name="fr"><summary>Une ligne de titre : des dièses puis le texte.</summary></lang>
+/// <lang name="en"><summary>A heading line: hashes then the text.</summary></lang>
+const regex _headingLine: /^(#{1,6})\s+(.*?)\s*$/;
+/// <lang name="fr"><summary>Une règle horizontale.</summary></lang>
+/// <lang name="en"><summary>A horizontal rule.</summary></lang>
+const regex _ruleLine: /^\s*(?:\*\*\*+|---+|___+)\s*$/;
+/// <lang name="fr"><summary>Un élément de liste à puces.</summary></lang>
+/// <lang name="en"><summary>A bullet list item.</summary></lang>
+const regex _bulletLine: /^\s*[\-*+]\s+(.*)$/;
+/// <lang name="fr"><summary>Un élément de liste numérotée.</summary></lang>
+/// <lang name="en"><summary>A numbered list item.</summary></lang>
+const regex _numberLine: /^\s*[0-9]+[.)]\s+(.*)$/;
+/// <lang name="fr"><summary>Une ligne de citation.</summary></lang>
+/// <lang name="en"><summary>A quote line.</summary></lang>
+const regex _quoteLine: /^>\s?(.*)$/;
+
+/// <lang name="fr"><summary>Où en est la conversion d'un document Markdown : le HTML écrit et le bloc ouvert (usage interne).</summary></lang>
+/// <lang name="en"><summary>Where the conversion of a Markdown document stands: the HTML written and the open block (internal use).</summary></lang>
+mold _MarkdownState {
+    /// <lang name="fr"><summary>Le HTML écrit jusqu'ici.</summary></lang>
+    /// <lang name="en"><summary>The HTML written so far.</summary></lang>
+    string html;
+    /// <lang name="fr"><summary>Le bloc ouvert : `p`, `ul`, `ol`, `quote`, `code`, ou vide.</summary></lang>
+    /// <lang name="en"><summary>The open block: `p`, `ul`, `ol`, `quote`, `code`, or empty.</summary></lang>
+    string open;
+}
+
+/// <lang name="fr"><summary>Échappe le texte pour l'écrire dans du HTML (usage interne).</summary><param name="text">Le texte.</param><returns>Le texte où `&amp;`, `&lt;` et `&gt;` sont remplacés.</returns></lang>
+/// <lang name="en"><summary>Escapes text to write it into HTML (internal use).</summary><param name="text">The text.</param><returns>The text with `&amp;`, `&lt;` and `&gt;` replaced.</returns></lang>
+gear pure _mdEscape(string text): string => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+/// <lang name="fr"><summary>Convertit le texte courant d'une ligne : code, images, liens, gras, italique (usage interne). Un lien ou une image n'est écrit que si son adresse est `http`, `https`, `mailto:` ou relative (jamais `javascript:`).</summary><param name="text">Le texte de la ligne.</param><returns>Le HTML de la ligne.</returns></lang>
+/// <lang name="en"><summary>Converts the running text of a line: code, images, links, bold, italic (internal use). A link or an image is only written when its address is `http`, `https`, `mailto:` or relative (never `javascript:`).</summary><param name="text">The text of the line.</param><returns>The HTML of the line.</returns></lang>
+gear pure _mdInline(string text): string {
+    const string safe: _mdEscape(text);
+    const string coded: _codeSpan.replace(safe, '<code>$1</code>');
+    const string pictured: _imageSpan.replace(coded, '<img src="$2" alt="$1">');
+    const string linked: _linkSpan.replace(pictured, '<a href="$2">$1</a>');
+    return _italicSpan.replace(_boldSpan.replace(linked, '<strong>$1</strong>'), '<em>$1</em>');
+}
+
+/// <lang name="fr"><summary>Ferme le bloc ouvert (usage interne).</summary><param name="open">Le bloc ouvert.</param><returns>La balise fermante, vide s'il n'y a pas de bloc.</returns></lang>
+/// <lang name="en"><summary>Closes the open block (internal use).</summary><param name="open">The open block.</param><returns>The closing tag, empty when there is no block.</returns></lang>
+gear pure _mdClose(string open): string {
+    if (open eq 'p') { return "</p>\n"; }
+    if (open eq 'ul') { return "</ul>\n"; }
+    if (open eq 'ol') { return "</ol>\n"; }
+    if (open eq 'quote') { return "</blockquote>\n"; }
+    if (open eq 'code') { return "</code></pre>\n"; }
+    return '';
+}
+
+/// <lang name="fr"><summary>Ajoute une ligne au document (usage interne).</summary><param name="state">Où en est la conversion.</param><param name="line">La ligne.</param><returns>Le nouvel état.</returns></lang>
+/// <lang name="en"><summary>Adds a line to the document (internal use).</summary><param name="state">Where the conversion stands.</param><param name="line">The line.</param><returns>The new state.</returns></lang>
+gear pure _mdLine(_MarkdownState state, string line): _MarkdownState {
+    if (state.open eq 'code') {
+        if (line.startsWith('```')) { return {html: state.html + _mdClose('code'), open: ''}; }
+        return {html: `{state.html}{_mdEscape(line)}\n`, open: 'code'};
+    }
+    const [string] none: [];
+    const string closed: state.html + _mdClose(state.open);
+    if (line.startsWith('```')) { return {html: closed + '<pre><code>', open: 'code'}; }
+    if (line.trim() eq '') { return {html: closed, open: ''}; }
+
+    const [string]? heading: _headingLine.match(line);
+    if (heading not eq null) {
+        const [string] groups: heading ?? none;
+        return {html: `{closed}<h{groups[1].length}>{_mdInline(groups[2])}</h{groups[1].length}>\n`, open: ''};
+    }
+    if (_ruleLine.test(line)) { return {html: closed + "<hr>\n", open: ''}; }
+
+    const [string]? bullet: _bulletLine.match(line);
+    if (bullet not eq null) {
+        const string item: `<li>{_mdInline((bullet ?? none)[1])}</li>\n`;
+        return state.open eq 'ul' ? {html: state.html + item, open: 'ul'} : {html: closed + "<ul>\n" + item, open: 'ul'};
+    }
+    const [string]? numbered: _numberLine.match(line);
+    if (numbered not eq null) {
+        const string item: `<li>{_mdInline((numbered ?? none)[1])}</li>\n`;
+        return state.open eq 'ol' ? {html: state.html + item, open: 'ol'} : {html: closed + "<ol>\n" + item, open: 'ol'};
+    }
+    const [string]? quoted: _quoteLine.match(line);
+    if (quoted not eq null) {
+        const string text: `{_mdInline((quoted ?? none)[1])}\n`;
+        return state.open eq 'quote' ? {html: state.html + text, open: 'quote'} : {html: closed + "<blockquote>\n" + text, open: 'quote'};
+    }
+    if (state.open eq 'p') { return {html: `{state.html}\n{_mdInline(line.trim())}`, open: 'p'}; }
+    return {html: `{closed}<p>{_mdInline(line.trim())}`, open: 'p'};
+}
+
+/// <lang name="fr">
+/// <summary>Convertit du Markdown en HTML : titres `#` à `######`, paragraphes (les lignes se suivent dans le même `p`), listes `-`, `*`, `+` et numérotées, citations `&gt;`, blocs de code entre trois accents graves, règle horizontale, et dans le texte `**gras**`, `*italique*`, `` `code` ``, `[lien](adresse)` et `![image](adresse)`. Tout le texte est échappé (`&lt;`, `&gt;`, `&amp;`) : du HTML écrit dans le Markdown n'est jamais recopié tel quel, et une adresse `javascript:` ne devient pas un lien. Pas de listes imbriquées, de tableaux, de titres soulignés ni de lignes de code indentées.</summary>
+/// <param name="text">Le document Markdown.</param>
+/// <returns>Le HTML.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Converts Markdown to HTML: `#` to `######` headings, paragraphs (consecutive lines stay in the same `p`), `-`, `*`, `+` and numbered lists, `&gt;` quotes, code blocks between three backticks, horizontal rule, and in text `**bold**`, `*italic*`, `` `code` ``, `[link](address)` and `![image](address)`. All text is escaped (`&lt;`, `&gt;`, `&amp;`): HTML written in the Markdown is never copied as is, and a `javascript:` address does not become a link. No nested lists, tables, underlined titles or indented code lines.</summary>
+/// <param name="text">The Markdown document.</param>
+/// <returns>The HTML.</returns>
+/// </lang>
+gear pure markdownToHtml(string text): string {
+    const [string] lines: text.replaceAll("\r\n", "\n").split("\n");
+    const _MarkdownState start: {html: '', open: ''};
+    const _MarkdownState end: lines |+> start with (state, line) => _mdLine(state, line);
+    return end.html + _mdClose(end.open);
+}

@@ -1,0 +1,27 @@
+// Dictionnaire : 100 000 clés ajoutées une à une dans un ordre brouillé (un [K:V] construit par add successifs), puis relues.
+emit fin(): uint {
+    [int:int] table: [0: 0];
+    int i: 1;
+    switch (0) {
+        case 0:
+            if (i < 100000) {
+                table.add((i * 7919) % 100000, i);
+                increment i;
+                goto 0;
+            }
+    }
+    long somme: 0;
+    int j: 0;
+    switch (0) {
+        case 0:
+            if (j < 100000) {
+                somme <- somme + table[j] as long;
+                increment j;
+                goto 0;
+            }
+    }
+    `{table.length} {somme}\n` -> console;
+    return 0;
+}
+
+!train |> fin;

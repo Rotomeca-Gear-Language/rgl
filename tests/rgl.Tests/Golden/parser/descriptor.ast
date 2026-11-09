@@ -1,0 +1,15 @@
+CompilationUnit 1:1
+  DescriptorDeclaration 2:1 type=ns::Counter name=Compteur
+    DescriptorMember 3:5 kind=Constructor name=constructor cpp=ns::Counter(start)
+      Parameter 3:17 name=start
+        PrimitiveType 3:17 type=int
+    DescriptorMember 4:5 kind=Method name=add cpp=add
+      Parameter 4:9 name=n
+        PrimitiveType 4:9 type=int
+      PrimitiveType 4:17 type=int
+    DescriptorMember 5:5 kind=Field name=total const=true cpp=$self.total()
+      PrimitiveType 5:24 type=int
+    DescriptorMember 6:5 kind=Field name=label cpp=_label
+      PrimitiveType 6:18 type=string
+    DescriptorMember 7:5 kind=Static name=Zero cpp=ns::Counter::zero(1, {2, 3})
+      NamedType 7:20 name=Compteur

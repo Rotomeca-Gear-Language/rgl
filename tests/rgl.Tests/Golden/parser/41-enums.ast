@@ -1,0 +1,30 @@
+CompilationUnit 1:1
+  EnumDeclaration 2:1 name=Direction
+    EnumVariant 2:18 name=North
+    EnumVariant 2:25 name=South
+  EnumDeclaration 3:1 name=Status
+    PrimitiveType 3:14 type=int
+    EnumVariant 3:20 name=Idle
+      LiteralExpression 3:26 kind=IntegerLiteral text=0
+    EnumVariant 3:29 name=Error
+      UnaryExpression 3:36 op=-
+        LiteralExpression 3:37 kind=IntegerLiteral text=1
+  GearDeclaration 5:1 kind=gear name=nom pure=false parameters=1
+    Parameter 5:10 name=d
+      NamedType 5:10 name=Direction
+    PrimitiveType 5:24 type=string
+    BlockStatement 5:31
+      SwitchStatement 6:5
+        NameExpression 6:13 name=d
+        SwitchSection 7:9 kind=Values
+          NameExpression 7:14 name=North
+          ReturnStatement 8:13
+            LiteralExpression 8:20 kind=StringLiteral text="nord"
+        SwitchSection 9:9 kind=Values
+          MemberAccessExpression 9:14 member=South
+            NameExpression 9:14 name=Direction
+          ReturnStatement 10:13
+            LiteralExpression 10:20 kind=StringLiteral text="sud"
+  TrainDeclaration 14:1 unguarded=true parameters=none
+    Pipeline 14:8
+      DoneStep 14:11

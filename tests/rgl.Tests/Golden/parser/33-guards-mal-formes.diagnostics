@@ -1,0 +1,5 @@
+33-guards-mal-formes.rgl:2:7: erreur[E068]: un guard ne peut pas être pure
+33-guards-mal-formes.rgl:3:6: erreur[E068]: un emit ne peut pas être pure
+33-guards-mal-formes.rgl:5:10: erreur[E030]: « -> » attendu après la valeur
+33-guards-mal-formes.rgl:6:10: erreur[E030]: nom de cible attendu
+33-guards-mal-formes.rgl:7:5: erreur[E030]: « } » attendu pour fermer le bloc

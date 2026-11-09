@@ -1,0 +1,15 @@
+mold Vec2 {
+    float x;
+    float y;
+
+    pure Vec2 +(Vec2 a, Vec2 b) { return {x: a.x + b.x, y: a.y + b.y}; }
+    Vec2 -(Vec2 v) { return {x: -v.x, y: -v.y}; }
+    bool eq(Vec2 a, Vec2 b) { return a.x eq b.x; }
+    bool <(Vec2 a, Vec2 b) { return a.x < b.x; }
+    bool >(Vec2 a, Vec2 b) { return a.x > b.x; }
+    Vec3 implicit(Vec2 v) { return {x: v.x, y: v.y, z: 0.0}; }
+    string explicit(Vec2 v) { return `({v.x}, {v.y})`; }
+    float scale: 1.0;
+}
+
+train |> done;

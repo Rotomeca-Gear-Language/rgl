@@ -1,0 +1,82 @@
+forge: gears
+description: "Les signaux du système (Ctrl+C, arrêt demandé…) gardés par le programme au lieu de l'arrêter, et l'observation de fichiers"
+
+/// <lang name="fr"><summary>Un changement vu sous un fichier ou un dossier observé.</summary></lang>
+/// <lang name="en"><summary>A change seen under an observed file or folder.</summary></lang>
+mold FileChange {
+    /// <lang name="fr"><summary>Ce qui s'est passé : `created`, `modified` ou `removed`.</summary></lang>
+    /// <lang name="en"><summary>What happened: `created`, `modified` or `removed`.</summary></lang>
+    string kind;
+    /// <lang name="fr"><summary>Le chemin concerné, avec des `/`.</summary></lang>
+    /// <lang name="en"><summary>The path concerned, with `/` separators.</summary></lang>
+    string path;
+}
+
+/// <lang name="fr"><summary>Garde un signal : au lieu d'arrêter le programme, le système le laisse lire par `takeSignal` ou `waitSignal`. Les noms sont `interrupt` (Ctrl+C), `terminate` (arrêt demandé) et, hors de Windows, `hangup`, `user1` et `user2`.</summary><param name="name">Le nom du signal.</param><returns>Vrai si le signal est gardé, faux s'il n'existe pas sur cette plateforme.</returns></lang>
+/// <lang name="en"><summary>Keeps a signal: instead of stopping the program, the system lets it be read with `takeSignal` or `waitSignal`. The names are `interrupt` (Ctrl+C), `terminate` (requested stop) and, outside Windows, `hangup`, `user1` and `user2`.</summary><param name="name">The signal name.</param><returns>True when the signal is kept, false when it does not exist on this platform.</returns></lang>
+@trusted
+gear onSignal(string name): bool => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl(rgl_arg_name name) { return rgl::standard::system::install_signal(name); }
+}(string name: name): bool;
+
+/// <lang name="fr"><summary>Le premier signal gardé qui est arrivé, retiré de la file (usage interne).</summary><returns>Son nom, le texte vide s'il n'en est pas arrivé.</returns></lang>
+/// <lang name="en"><summary>The first kept signal that arrived, removed from the queue (internal use).</summary><returns>Its name, empty text when none has arrived.</returns></lang>
+@trusted
+gear _takeSignal(): string => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl() { return rgl::standard::system::take_signal(); }
+}(): string;
+
+/// <lang name="fr"><summary>Attend un signal gardé (usage interne).</summary><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Son nom, le texte vide au délai.</returns></lang>
+/// <lang name="en"><summary>Waits for a kept signal (internal use).</summary><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>Its name, empty text on timeout.</returns></lang>
+@trusted
+gear _waitSignal(uint timeoutMs): string => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl(rgl_arg_timeoutMs timeoutMs) { return rgl::standard::system::wait_signal(timeoutMs); }
+}(uint timeoutMs: timeoutMs): string;
+
+/// <lang name="fr"><summary>Rend le signal gardé qui est arrivé, sans attendre.</summary><returns>Son nom (`interrupt`…), `null` s'il n'en est pas arrivé.</returns></lang>
+/// <lang name="en"><summary>Returns the kept signal that has arrived, without waiting.</summary><returns>Its name (`interrupt`…), `null` when none has arrived.</returns></lang>
+gear takeSignal(): string? {
+    const string name: _takeSignal();
+    return name eq '' ? null : name;
+}
+
+/// <lang name="fr"><summary>Attend un signal gardé.</summary><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Son nom, `null` si le délai est passé.</returns></lang>
+/// <lang name="en"><summary>Waits for a kept signal.</summary><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>Its name, `null` when the delay has passed.</returns></lang>
+gear waitSignal(uint timeoutMs: 0): string? {
+    const string name: _waitSignal(timeoutMs);
+    return name eq '' ? null : name;
+}
+
+/// <lang name="fr"><summary>Attend un changement sous un fichier ou un dossier (usage interne).</summary><param name="path">Le chemin.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Une ligne `genre chemin` par changement, vide au délai.</returns></lang>
+/// <lang name="en"><summary>Waits for a change under a file or folder (internal use).</summary><param name="path">The path.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>One `kind path` line per change, empty on timeout.</returns></lang>
+@trusted
+gear _watch(string path, uint timeoutMs): [string] => cpp {
+    #include <rgl/standard/system.hpp>
+    rgl_return rgl(rgl_arg_path path, rgl_arg_timeoutMs timeoutMs) {
+        rgl_return result;
+        for (auto& line : rgl::standard::system::wait_for_change(path, timeoutMs)) result.push(std::move(line));
+        return result;
+    }
+}(string path: path, uint timeoutMs: timeoutMs): [string];
+
+/// <lang name="fr">
+/// <summary>Attend qu'un fichier, ou quelque chose sous un dossier, soit créé, modifié ou supprimé, et rend ce qui a changé. L'attente est bloquante : pour ne pas arrêter le reste du programme, lance-la par `task watch(chemin)` depuis un gear `@async`. Les changements sont vus en comparant la taille et la date de modification toutes les 50 millisecondes, sur toutes les plateformes ; un changement plus court que cela peut passer inaperçu.</summary>
+/// <param name="path">Le fichier ou le dossier (parcouru en profondeur).</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>Les changements ; une liste vide si le délai est passé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Waits for a file, or something under a folder, to be created, modified or removed, and returns what changed. Waiting is blocking: to avoid stopping the rest of the program, start it with `task watch(path)` from an `@async` gear. Changes are seen by comparing size and modification time every 50 milliseconds, on every platform; a change shorter than that may go unnoticed.</summary>
+/// <param name="path">The file or the folder (walked in depth).</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>The changes; an empty list when the delay has passed.</returns>
+/// </lang>
+gear watch(string path, uint timeoutMs: 0): [FileChange] =>
+    _watch(path, timeoutMs) ||> (line) => {
+        const (string before, string after, bool found) parts: line.splitOnce(' ');
+        const FileChange change: {kind: parts.before, path: parts.after};
+        return change;
+    };

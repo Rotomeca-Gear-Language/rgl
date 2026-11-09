@@ -1,0 +1,17 @@
+gear garder([int] valeurs, (int) => bool test): [int] => valeurs;
+gear fabrique(int n): (int) => int {
+    return (int x) => x + n;
+}
+gear paire(): (int, string) => (1, "a");
+gear compose(): ((int) => int) => (x) => x * 2;
+gear rien(pure (string m) => void f, () => int g): void {
+    var seuil: 10;
+    var filtre: (int v) => v > seuil;
+    var log: (string m) => { m -> console; };
+    var deux: (a, b) => a + b;
+    [(int) => int] ops: [(int x) => x + 1];
+    var r: ops[0](3);
+    var s: fabrique(2)(5);
+    var t: (filtre)(4);
+}
+train |> done;

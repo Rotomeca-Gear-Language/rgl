@@ -1,0 +1,444 @@
+forge: gears
+description: "Vecteurs 2D et 3D de base"
+
+import PreVec2 only {VEC2_ZERO};
+import PreVec3 only {VEC3_ZERO};
+
+/// <lang name="fr">
+/// <summary>Un vecteur en 2 dimensions, de composantes `x` et `y`.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A two-dimensional vector with `x` and `y` components.</summary>
+/// </lang>
+mold Vector2 {
+    /// <lang name="fr">
+    /// <summary>La composante sur l'axe x.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The component along the x axis.</summary>
+    /// </lang>
+    double x;
+    /// <lang name="fr">
+    /// <summary>La composante sur l'axe y.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The component along the y axis.</summary>
+    /// </lang>
+    double y;
+
+    // --- Opérations arithmétiques ---
+    /// <lang name="fr">
+    /// <summary>Additionne deux vecteurs composante par composante.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>La somme des deux vecteurs.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds two vectors component by component.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>The sum of the two vectors.</returns>
+    /// </lang>
+    pure Vector2 +(Vector2 a, Vector2 b) { return {x: a.x + b.x, y: a.y + b.y}; }
+    /// <lang name="fr">
+    /// <summary>Soustrait deux vecteurs composante par composante.</summary>
+    /// <param name="a">Le vecteur dont on soustrait.</param>
+    /// <param name="b">Le vecteur soustrait.</param>
+    /// <returns>La différence `a - b`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Subtracts two vectors component by component.</summary>
+    /// <param name="a">The vector to subtract from.</param>
+    /// <param name="b">The vector to subtract.</param>
+    /// <returns>The difference `a - b`.</returns>
+    /// </lang>
+    pure Vector2 -(Vector2 a, Vector2 b) { return {x: a.x - b.x, y: a.y - b.y}; }
+    /// <lang name="fr">
+    /// <summary>L'opposé d'un vecteur.</summary>
+    /// <param name="v">Le vecteur.</param>
+    /// <returns>Le vecteur de composantes opposées.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The negation of a vector.</summary>
+    /// <param name="v">The vector.</param>
+    /// <returns>The vector with each component negated.</returns>
+    /// </lang>
+    pure Vector2 -(Vector2 v)         { return {x: -v.x, y: -v.y}; }
+    /// <lang name="fr">
+    /// <summary>Multiplie un vecteur par un scalaire.</summary>
+    /// <param name="v">Le vecteur.</param>
+    /// <param name="k">Le facteur.</param>
+    /// <returns>Le vecteur dont chaque composante est multipliée par `k`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Multiplies a vector by a scalar.</summary>
+    /// <param name="v">The vector.</param>
+    /// <param name="k">The factor.</param>
+    /// <returns>The vector with each component multiplied by `k`.</returns>
+    /// </lang>
+    pure Vector2 *(Vector2 v, double k) { return {x: v.x * k, y: v.y * k}; }
+    /// <lang name="fr">
+    /// <summary>Multiplie un scalaire par un vecteur (même résultat que l'ordre inverse).</summary>
+    /// <param name="k">Le facteur.</param>
+    /// <param name="v">Le vecteur.</param>
+    /// <returns>Le vecteur dont chaque composante est multipliée par `k`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Multiplies a scalar by a vector (the same result as the reverse order).</summary>
+    /// <param name="k">The factor.</param>
+    /// <param name="v">The vector.</param>
+    /// <returns>The vector with each component multiplied by `k`.</returns>
+    /// </lang>
+    pure Vector2 *(double k, Vector2 v) { return v * k; }
+
+    // --- Comparaisons ---
+    /// <lang name="fr">
+    /// <summary>Égalité de deux vecteurs, composante par composante.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Vrai si toutes les composantes sont égales.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Component-wise equality of two vectors.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>True if all components are equal.</returns>
+    /// </lang>
+    pure bool eq(Vector2 a, Vector2 b) { return a.x eq b.x and a.y eq b.y; }
+    /// <lang name="fr">
+    /// <summary>Ordre lexicographique : x d'abord, puis y.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Vrai si `a` précède strictement `b`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Lexicographic order: x first, then y.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>True if `a` strictly precedes `b`.</returns>
+    /// </lang>
+    pure bool <(Vector2 a, Vector2 b)  { return a.x < b.x or (a.x eq b.x and a.y < b.y); }
+    /// <lang name="fr">
+    /// <summary>Ordre lexicographique inverse de `&lt;`.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Vrai si `a` suit strictement `b`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The reverse lexicographic order of `&lt;`.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>True if `a` strictly follows `b`.</returns>
+    /// </lang>
+    pure bool >(Vector2 a, Vector2 b)  { return a.x > b.x or (a.x eq b.x and a.y > b.y); }
+
+    /// <lang name="fr">
+    /// <summary>Conversion implicite d'un vecteur 2D en vecteur 3D, avec `z` à 0.</summary>
+    /// <param name="v">Le vecteur 2D.</param>
+    /// <returns>Le vecteur 3D de mêmes `x` et `y`, et de `z` nul.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Implicit conversion of a 2D vector to a 3D vector, with `z` set to 0.</summary>
+    /// <param name="v">The 2D vector.</param>
+    /// <returns>The 3D vector with the same `x` and `y` and a zero `z`.</returns>
+    /// </lang>
+    pure Vector3 implicit(Vector2 v)   { return {x: v.x, y: v.y, z: 0.0}; }
+    /// <lang name="fr">
+    /// <summary>Conversion explicite en texte.</summary>
+    /// <param name="v">Le vecteur.</param>
+    /// <returns>Le texte `(x, y)`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Explicit conversion to text.</summary>
+    /// <param name="v">The vector.</param>
+    /// <returns>The text `(x, y)`.</returns>
+    /// </lang>
+    pure string explicit(Vector2 v) { return `({v.x}, {v.y})`; }
+}
+
+/// <lang name="fr">
+/// <summary>Un vecteur en 3 dimensions : les composantes de `Vector2` plus `z`.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A three-dimensional vector: the components of `Vector2` plus `z`.</summary>
+/// </lang>
+mold Vector3 {
+    ...Vector2;
+    /// <lang name="fr">
+    /// <summary>La composante sur l'axe z.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The component along the z axis.</summary>
+    /// </lang>
+    double z;
+
+    // --- Opérations arithmétiques ---
+    /// <lang name="fr">
+    /// <summary>Additionne deux vecteurs composante par composante.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>La somme des deux vecteurs.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds two vectors component by component.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>The sum of the two vectors.</returns>
+    /// </lang>
+    pure Vector3 +(Vector3 a, Vector3 b) { return {x: a.x + b.x, y: a.y + b.y, z: a.z + b.z}; }
+    /// <lang name="fr">
+    /// <summary>Soustrait deux vecteurs composante par composante.</summary>
+    /// <param name="a">Le vecteur dont on soustrait.</param>
+    /// <param name="b">Le vecteur soustrait.</param>
+    /// <returns>La différence `a - b`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Subtracts two vectors component by component.</summary>
+    /// <param name="a">The vector to subtract from.</param>
+    /// <param name="b">The vector to subtract.</param>
+    /// <returns>The difference `a - b`.</returns>
+    /// </lang>
+    pure Vector3 -(Vector3 a, Vector3 b) { return {x: a.x - b.x, y: a.y - b.y, z: a.z - b.z}; }
+    /// <lang name="fr">
+    /// <summary>L'opposé d'un vecteur.</summary>
+    /// <param name="v">Le vecteur.</param>
+    /// <returns>Le vecteur de composantes opposées.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The negation of a vector.</summary>
+    /// <param name="v">The vector.</param>
+    /// <returns>The vector with each component negated.</returns>
+    /// </lang>
+    pure Vector3 -(Vector3 v)         { return {x: -v.x, y: -v.y, z: -v.z}; }
+    /// <lang name="fr">
+    /// <summary>Multiplie un vecteur par un scalaire.</summary>
+    /// <param name="v">Le vecteur.</param>
+    /// <param name="k">Le facteur.</param>
+    /// <returns>Le vecteur dont chaque composante est multipliée par `k`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Multiplies a vector by a scalar.</summary>
+    /// <param name="v">The vector.</param>
+    /// <param name="k">The factor.</param>
+    /// <returns>The vector with each component multiplied by `k`.</returns>
+    /// </lang>
+    pure Vector3 *(Vector3 v, double k) { return {x: v.x * k, y: v.y * k, z: v.z * k}; }
+    /// <lang name="fr">
+    /// <summary>Multiplie un scalaire par un vecteur (même résultat que l'ordre inverse).</summary>
+    /// <param name="k">Le facteur.</param>
+    /// <param name="v">Le vecteur.</param>
+    /// <returns>Le vecteur dont chaque composante est multipliée par `k`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Multiplies a scalar by a vector (the same result as the reverse order).</summary>
+    /// <param name="k">The factor.</param>
+    /// <param name="v">The vector.</param>
+    /// <returns>The vector with each component multiplied by `k`.</returns>
+    /// </lang>
+    pure Vector3 *(double k, Vector3 v) { return v * k; }
+
+    // --- Comparaisons ---
+    /// <lang name="fr">
+    /// <summary>Égalité de deux vecteurs, composante par composante.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Vrai si toutes les composantes sont égales.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Component-wise equality of two vectors.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>True if all components are equal.</returns>
+    /// </lang>
+    pure bool eq(Vector3 a, Vector3 b) { return a.x eq b.x and a.y eq b.y and a.z eq b.z; }
+    /// <lang name="fr">
+    /// <summary>Ordre lexicographique : x d'abord, puis y, puis z.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Vrai si `a` précède strictement `b`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Lexicographic order: x first, then y, then z.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>True if `a` strictly precedes `b`.</returns>
+    /// </lang>
+    pure bool <(Vector3 a, Vector3 b)  { return a.x < b.x or (a.x eq b.x and (a.y < b.y or (a.y eq b.y and a.z < b.z))); }
+    /// <lang name="fr">
+    /// <summary>Ordre lexicographique inverse de `&lt;`.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Vrai si `a` suit strictement `b`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The reverse lexicographic order of `&lt;`.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>True if `a` strictly follows `b`.</returns>
+    /// </lang>
+    pure bool >(Vector3 a, Vector3 b)  { return a.x > b.x or (a.x eq b.x and (a.y > b.y or (a.y eq b.y and a.z > b.z))); }
+
+    /// <lang name="fr">
+    /// <summary>Conversion explicite en texte.</summary>
+    /// <param name="v">Le vecteur.</param>
+    /// <returns>Le texte `(x, y, z)`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Explicit conversion to text.</summary>
+    /// <param name="v">The vector.</param>
+    /// <returns>The text `(x, y, z)`.</returns>
+    /// </lang>
+    pure string explicit(Vector3 v) { return `({v.x}, {v.y}, {v.z})`; }
+}
+
+/// <lang name="fr">
+/// <summary>Constante et opérations d'un vecteur 2D.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The constant and operations for a 2D vector.</summary>
+/// </lang>
+extend Vector2 {
+    /// <lang name="fr">
+    /// <summary>Le vecteur nul (0, 0).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The zero vector (0, 0).</summary>
+    /// </lang>
+    const Vector2 ZERO: VEC2_ZERO;
+
+    /// <lang name="fr">
+    /// <summary>Le produit scalaire de deux vecteurs.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>La somme des produits des composantes de même nom.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The dot product of two vectors.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>The sum of the products of corresponding components.</returns>
+    /// </lang>
+    gear pure dot(this Vector2 a, Vector2 b): double => 
+        a.x * b.x + a.y * b.y;
+
+    /// <lang name="fr">
+    /// <summary>Le carré de la longueur du vecteur (évite une racine carrée).</summary>
+    /// <param name="self">Le vecteur.</param>
+    /// <returns>Le produit scalaire du vecteur par lui-même.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The squared length of the vector (avoids a square root).</summary>
+    /// <param name="self">The vector.</param>
+    /// <returns>The dot product of the vector with itself.</returns>
+    /// </lang>
+    gear pure lengthSquared(this Vector2 self): double => 
+        self.dot(self);
+
+    /// <lang name="fr">
+    /// <summary>Le carré de la distance entre deux points.</summary>
+    /// <param name="a">Le premier point.</param>
+    /// <param name="b">Le second point.</param>
+    /// <returns>La somme des carrés des différences des composantes.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The squared distance between two points.</summary>
+    /// <param name="a">The first point.</param>
+    /// <param name="b">The second point.</param>
+    /// <returns>The sum of the squared differences between components.</returns>
+    /// </lang>
+    gear pure distanceSquared(this Vector2 a, Vector2 b): double {
+        const double dx: a.x - b.x;
+        const double dy: a.y - b.y;
+        return dx * dx + dy * dy;
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Constante et opérations d'un vecteur 3D.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The constant and operations for a 3D vector.</summary>
+/// </lang>
+extend Vector3 {
+    /// <lang name="fr">
+    /// <summary>Le vecteur nul (0, 0, 0).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The zero vector (0, 0, 0).</summary>
+    /// </lang>
+    const Vector3 ZERO: VEC3_ZERO;
+
+    /// <lang name="fr">
+    /// <summary>Le produit scalaire de deux vecteurs.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>La somme des produits des composantes de même nom.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The dot product of two vectors.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>The sum of the products of corresponding components.</returns>
+    /// </lang>
+    gear pure dot(this Vector3 a, Vector3 b): double => 
+        a.x * b.x + a.y * b.y + a.z * b.z;
+
+    /// <lang name="fr">
+    /// <summary>Le carré de la longueur du vecteur (évite une racine carrée).</summary>
+    /// <param name="self">Le vecteur.</param>
+    /// <returns>Le produit scalaire du vecteur par lui-même.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The squared length of the vector (avoids a square root).</summary>
+    /// <param name="self">The vector.</param>
+    /// <returns>The dot product of the vector with itself.</returns>
+    /// </lang>
+    gear pure lengthSquared(this Vector3 self): double => 
+        self.dot(self);
+
+    /// <lang name="fr">
+    /// <summary>Le carré de la distance entre deux points.</summary>
+    /// <param name="a">Le premier point.</param>
+    /// <param name="b">Le second point.</param>
+    /// <returns>La somme des carrés des différences des composantes.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The squared distance between two points.</summary>
+    /// <param name="a">The first point.</param>
+    /// <param name="b">The second point.</param>
+    /// <returns>The sum of the squared differences between components.</returns>
+    /// </lang>
+    gear pure distanceSquared(this Vector3 a, Vector3 b): double {
+        const double dx: a.x - b.x;
+        const double dy: a.y - b.y;
+        const double dz: a.z - b.z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le produit vectoriel de deux vecteurs.</summary>
+    /// <param name="a">Le premier vecteur.</param>
+    /// <param name="b">Le second vecteur.</param>
+    /// <returns>Le vecteur perpendiculaire à `a` et `b` (règle de la main droite) ; il est nul si les deux sont colinéaires.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The cross product of two vectors.</summary>
+    /// <param name="a">The first vector.</param>
+    /// <param name="b">The second vector.</param>
+    /// <returns>The vector perpendicular to `a` and `b` (right-hand rule); zero if they are collinear.</returns>
+    /// </lang>
+    gear pure cross(this Vector3 a, Vector3 b): Vector3 => 
+        new Vector3 {
+            x: a.y * b.z - a.z * b.y,
+            y: a.z * b.x - a.x * b.z,
+            z: a.x * b.y - a.y * b.x
+        };
+}
+
+/// <lang name="fr">
+/// <summary>Un `Vector3` de longueur 1 ; le type l'indique, mais rien ne le vérifie à la construction.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A `Vector3` of length 1; the type indicates this, but construction does not enforce it.</summary>
+/// </lang>
+ingot normalizedVec3: Vector3;

@@ -1,0 +1,8 @@
+{
+  "zig": "0.17.0",
+  "openssl": {
+    "version": "3.6.5-1",
+    "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-openssl-3.6.5-1-any.pkg.tar.zst",
+    "sha256": "389d1af21e99223d9e2cd32d4c073131b276da85be7636bd8d23571f6938864f"
+  }
+}

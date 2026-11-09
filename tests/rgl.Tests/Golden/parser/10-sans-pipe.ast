@@ -1,0 +1,5 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    NameExpression 2:7 name=done
+    Pipeline 2:11
+      MissingStep 2:11

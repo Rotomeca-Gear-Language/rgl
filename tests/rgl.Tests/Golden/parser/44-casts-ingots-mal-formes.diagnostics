@@ -1,0 +1,4 @@
+44-casts-ingots-mal-formes.rgl:2:7: erreur[E030]: nom d'ingot attendu
+44-casts-ingots-mal-formes.rgl:3:8: erreur[E030]: « : » attendu avant le type de base de l'ingot
+44-casts-ingots-mal-formes.rgl:5:8: erreur[E030]: nom de variable attendu
+44-casts-ingots-mal-formes.rgl:6:15: erreur[E030]: « > » attendu pour fermer les bornes

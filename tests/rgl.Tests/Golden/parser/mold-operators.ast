@@ -1,0 +1,118 @@
+CompilationUnit 1:1
+  MoldDeclaration 1:1 name=Vec2
+    MoldField 2:5 name=x
+      PrimitiveType 2:5 type=float
+    MoldField 3:5 name=y
+      PrimitiveType 3:5 type=float
+    MoldOperator 5:5 operator=+ pure=true
+      NamedType 5:10 name=Vec2
+      Parameter 5:17 name=a
+        NamedType 5:17 name=Vec2
+      Parameter 5:25 name=b
+        NamedType 5:25 name=Vec2
+      BlockStatement 5:33
+        ReturnStatement 5:35
+          MoldExpression 5:42
+            MoldFieldValue 5:43 name=x
+              BinaryExpression 5:46 op=+
+                MemberAccessExpression 5:46 member=x
+                  NameExpression 5:46 name=a
+                MemberAccessExpression 5:52 member=x
+                  NameExpression 5:52 name=b
+            MoldFieldValue 5:57 name=y
+              BinaryExpression 5:60 op=+
+                MemberAccessExpression 5:60 member=y
+                  NameExpression 5:60 name=a
+                MemberAccessExpression 5:66 member=y
+                  NameExpression 5:66 name=b
+    MoldOperator 6:5 operator=- pure=false
+      NamedType 6:5 name=Vec2
+      Parameter 6:12 name=v
+        NamedType 6:12 name=Vec2
+      BlockStatement 6:20
+        ReturnStatement 6:22
+          MoldExpression 6:29
+            MoldFieldValue 6:30 name=x
+              UnaryExpression 6:33 op=-
+                MemberAccessExpression 6:34 member=x
+                  NameExpression 6:34 name=v
+            MoldFieldValue 6:39 name=y
+              UnaryExpression 6:42 op=-
+                MemberAccessExpression 6:43 member=y
+                  NameExpression 6:43 name=v
+    MoldOperator 7:5 operator=eq pure=false
+      PrimitiveType 7:5 type=bool
+      Parameter 7:13 name=a
+        NamedType 7:13 name=Vec2
+      Parameter 7:21 name=b
+        NamedType 7:21 name=Vec2
+      BlockStatement 7:29
+        ReturnStatement 7:31
+          BinaryExpression 7:38 op=eq
+            MemberAccessExpression 7:38 member=x
+              NameExpression 7:38 name=a
+            MemberAccessExpression 7:45 member=x
+              NameExpression 7:45 name=b
+    MoldOperator 8:5 operator=< pure=false
+      PrimitiveType 8:5 type=bool
+      Parameter 8:12 name=a
+        NamedType 8:12 name=Vec2
+      Parameter 8:20 name=b
+        NamedType 8:20 name=Vec2
+      BlockStatement 8:28
+        ReturnStatement 8:30
+          BinaryExpression 8:37 op=<
+            MemberAccessExpression 8:37 member=x
+              NameExpression 8:37 name=a
+            MemberAccessExpression 8:43 member=x
+              NameExpression 8:43 name=b
+    MoldOperator 9:5 operator=> pure=false
+      PrimitiveType 9:5 type=bool
+      Parameter 9:12 name=a
+        NamedType 9:12 name=Vec2
+      Parameter 9:20 name=b
+        NamedType 9:20 name=Vec2
+      BlockStatement 9:28
+        ReturnStatement 9:30
+          BinaryExpression 9:37 op=>
+            MemberAccessExpression 9:37 member=x
+              NameExpression 9:37 name=a
+            MemberAccessExpression 9:43 member=x
+              NameExpression 9:43 name=b
+    MoldOperator 10:5 operator=implicit pure=false
+      NamedType 10:5 name=Vec3
+      Parameter 10:19 name=v
+        NamedType 10:19 name=Vec2
+      BlockStatement 10:27
+        ReturnStatement 10:29
+          MoldExpression 10:36
+            MoldFieldValue 10:37 name=x
+              MemberAccessExpression 10:40 member=x
+                NameExpression 10:40 name=v
+            MoldFieldValue 10:45 name=y
+              MemberAccessExpression 10:48 member=y
+                NameExpression 10:48 name=v
+            MoldFieldValue 10:53 name=z
+              LiteralExpression 10:56 kind=FloatLiteral text=0.0
+    MoldOperator 11:5 operator=explicit pure=false
+      PrimitiveType 11:5 type=string
+      Parameter 11:21 name=v
+        NamedType 11:21 name=Vec2
+      BlockStatement 11:29
+        ReturnStatement 11:31
+          TemplateExpression 11:38
+            TemplateText 11:39 text=(
+            TemplateInterpolation 11:40
+              MemberAccessExpression 11:41 member=x
+                NameExpression 11:41 name=v
+            TemplateText 11:45 text=, 
+            TemplateInterpolation 11:47
+              MemberAccessExpression 11:48 member=y
+                NameExpression 11:48 name=v
+            TemplateText 11:52 text=)
+    MoldField 12:5 name=scale
+      PrimitiveType 12:5 type=float
+      LiteralExpression 12:18 kind=FloatLiteral text=1.0
+  TrainDeclaration 15:1 unguarded=false parameters=none
+    Pipeline 15:7
+      DoneStep 15:10

@@ -1,0 +1,298 @@
+forge: gears
+description: "L'environnement du programme : arguments, variables d'environnement, plateforme, arrêt"
+
+/// <lang name="fr">
+/// <summary>Les arguments de la ligne de commande, sans le nom du programme, en UTF-8 : ceux que le train d'entrée reçoit dans `args`, lus de n'importe où.</summary>
+/// <returns>Un texte par argument.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The command-line arguments, without the program name, in UTF-8: the ones the entry train receives in `args`, readable from anywhere.</summary>
+/// <returns>One string per argument.</returns>
+/// </lang>
+@trusted
+gear arguments(): [string] => cpp {
+    #include <rgl/standard/arguments.hpp>
+    rgl_return rgl() {
+        return rgl::standard::read_arguments(0, nullptr);
+    }
+}(): [string];
+
+/// <lang name="fr">
+/// <summary>Lit une variable d'environnement.</summary>
+/// <param name="name">Le nom de la variable.</param>
+/// <returns>Sa valeur, `null` si elle n'est pas définie.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads an environment variable.</summary>
+/// <param name="name">The variable name.</param>
+/// <returns>Its value, `null` when it is not set.</returns>
+/// </lang>
+@trusted
+gear getEnv(string name): string? => cpp {
+    #include <string>
+    #include <cstdlib>
+    #if defined(_WIN32)
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #else
+    #include <stdlib.h>
+    extern char** environ;
+    #endif
+
+    #if defined(_WIN32)
+    static std::wstring to_wide(const rgl::standard::string& text) {
+        if (text.size() == 0) return std::wstring();
+        const int size = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+        std::wstring result(static_cast<std::size_t>(size), L'\0');
+        ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size);
+        return result;
+    }
+    static std::string to_utf8(const wchar_t* text, std::size_t length) {
+        if (length == 0) return std::string();
+        const int size = ::WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), nullptr, 0, nullptr, nullptr);
+        std::string result(static_cast<std::size_t>(size), '\0');
+        ::WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), result.data(), size, nullptr, nullptr);
+        return result;
+    }
+    #endif
+    rgl_return rgl(rgl_arg_name name) {
+        #if defined(_WIN32)
+        const std::wstring wide = to_wide(name);
+        const DWORD needed = ::GetEnvironmentVariableW(wide.c_str(), nullptr, 0);
+        if (needed == 0) return rgl_return{};
+        std::wstring value(needed, L'\0');
+        const DWORD length = ::GetEnvironmentVariableW(wide.c_str(), value.data(), needed);
+        const std::string text = to_utf8(value.data(), length);
+        return rgl_return(rgl::standard::string(text.c_str(), text.size()));
+        #else
+        const char* value = ::getenv(std::string(name.data(), name.size()).c_str());
+        if (value == nullptr) return rgl_return{};
+        return rgl_return(rgl::standard::string(value));
+        #endif
+    }
+}(string name: name): string?;
+
+/// <lang name="fr">
+/// <summary>Définit une variable d'environnement pour ce programme et ses processus enfants.</summary>
+/// <param name="name">Le nom de la variable.</param>
+/// <param name="value">Sa nouvelle valeur.</param>
+/// <returns>`true` si la variable a été définie.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sets an environment variable for this program and its child processes.</summary>
+/// <param name="name">The variable name.</param>
+/// <param name="value">Its new value.</param>
+/// <returns>`true` when the variable was set.</returns>
+/// </lang>
+@trusted
+gear setEnv(string name, string value): bool => cpp {
+    #include <string>
+    #include <cstdlib>
+    #if defined(_WIN32)
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #else
+    #include <stdlib.h>
+    extern char** environ;
+    #endif
+
+    #if defined(_WIN32)
+    static std::wstring to_wide(const rgl::standard::string& text) {
+        if (text.size() == 0) return std::wstring();
+        const int size = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+        std::wstring result(static_cast<std::size_t>(size), L'\0');
+        ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size);
+        return result;
+    }
+    static std::string to_utf8(const wchar_t* text, std::size_t length) {
+        if (length == 0) return std::string();
+        const int size = ::WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), nullptr, 0, nullptr, nullptr);
+        std::string result(static_cast<std::size_t>(size), '\0');
+        ::WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), result.data(), size, nullptr, nullptr);
+        return result;
+    }
+    #endif
+    rgl_return rgl(rgl_arg_name name, rgl_arg_value value) {
+        #if defined(_WIN32)
+        return ::SetEnvironmentVariableW(to_wide(name).c_str(), to_wide(value).c_str()) != 0;
+        #else
+        return ::setenv(std::string(name.data(), name.size()).c_str(), std::string(value.data(), value.size()).c_str(), 1) == 0;
+        #endif
+    }
+}(string name: name, string value: value): bool;
+
+/// <lang name="fr">
+/// <summary>Les variables d'environnement à plat : nom, valeur, nom, valeur… (usage interne).</summary>
+/// <returns>La liste à plat.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The environment variables flattened: name, value, name, value… (internal use).</summary>
+/// <returns>The flat list.</returns>
+/// </lang>
+@trusted
+gear _environmentList(): [string] => cpp {
+    #include <string>
+    #include <cwchar>
+    #if defined(_WIN32)
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #else
+    #include <stdlib.h>
+    extern char** environ;
+    #endif
+
+    #if defined(_WIN32)
+    static std::wstring to_wide(const rgl::standard::string& text) {
+        if (text.size() == 0) return std::wstring();
+        const int size = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+        std::wstring result(static_cast<std::size_t>(size), L'\0');
+        ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size);
+        return result;
+    }
+    static std::string to_utf8(const wchar_t* text, std::size_t length) {
+        if (length == 0) return std::string();
+        const int size = ::WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), nullptr, 0, nullptr, nullptr);
+        std::string result(static_cast<std::size_t>(size), '\0');
+        ::WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), result.data(), size, nullptr, nullptr);
+        return result;
+    }
+    #endif
+    rgl_return rgl() {
+        rgl_return result;
+        #if defined(_WIN32)
+        wchar_t* block = ::GetEnvironmentStringsW();
+        if (block == nullptr) return result;
+        for (const wchar_t* entry = block; *entry != L'\0'; entry += std::wcslen(entry) + 1) {
+            const std::size_t length = std::wcslen(entry);
+            if (entry[0] == L'=') continue;
+            std::size_t split = 0;
+            while (split < length && entry[split] != L'=') ++split;
+            if (split == length) continue;
+            const std::string key = to_utf8(entry, split);
+            const std::string value = to_utf8(entry + split + 1, length - split - 1);
+            result.push(rgl::standard::string(key.c_str(), key.size()));
+            result.push(rgl::standard::string(value.c_str(), value.size()));
+        }
+        ::FreeEnvironmentStringsW(block);
+        #else
+        for (char** entry = environ; entry != nullptr && *entry != nullptr; ++entry) {
+            const std::string text(*entry);
+            const std::size_t split = text.find('=');
+            if (split == std::string::npos) continue;
+            result.push(rgl::standard::string(text.c_str(), split));
+            result.push(rgl::standard::string(text.c_str() + split + 1, text.size() - split - 1));
+        }
+        #endif
+        return result;
+    }
+}(): [string];
+
+/// <lang name="fr">
+/// <summary>Toutes les variables d'environnement.</summary>
+/// <returns>Un dictionnaire nom → valeur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>All the environment variables.</summary>
+/// <returns>A name → value dictionary.</returns>
+/// </lang>
+gear environment(): [string:string] {
+    const [string] flat: _environmentList();
+    [string:string] none: [:];
+    return [0..<(flat.length / 2)] |+> none with (acc, i) => acc.put(flat[i * 2], flat[i * 2 + 1]);
+}
+
+/// <lang name="fr">
+/// <summary>Arrête le programme tout de suite avec ce code de sortie ; ce qui est écrit sur la console est d'abord vidé.</summary>
+/// <param name="code">Le code de sortie (0 pour un succès).</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Stops the program right away with this exit code; anything written to the console is flushed first.</summary>
+/// <param name="code">The exit code (0 for success).</param>
+/// </lang>
+@trusted
+gear exit(int code): void => cpp {
+    #include <cstdlib>
+    rgl_return rgl(rgl_arg_code code) {
+        std::exit(code);
+    }
+}(int code: code): void;
+
+/// <lang name="fr">
+/// <summary>Le système d'exploitation pour lequel le programme est compilé.</summary>
+/// <returns>`windows`, `linux` ou `macos` (`unknown` pour un autre).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The operating system the program is compiled for.</summary>
+/// <returns>`windows`, `linux` or `macos` (`unknown` otherwise).</returns>
+/// </lang>
+@trusted
+gear pure platform(): string => cpp {
+    #include <cstdint>
+    rgl_return rgl() {
+        #if defined(_WIN32)
+        return rgl::standard::string("windows");
+        #elif defined(__APPLE__)
+        return rgl::standard::string("macos");
+        #elif defined(__linux__)
+        return rgl::standard::string("linux");
+        #else
+        return rgl::standard::string("unknown");
+        #endif
+    }
+}(): string;
+
+/// <lang name="fr">
+/// <summary>L'architecture du processeur pour laquelle le programme est compilé.</summary>
+/// <returns>`x86_64`, `aarch64`, `x86` ou `unknown`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The processor architecture the program is compiled for.</summary>
+/// <returns>`x86_64`, `aarch64`, `x86` or `unknown`.</returns>
+/// </lang>
+@trusted
+gear pure architecture(): string => cpp {
+    #include <cstdint>
+    rgl_return rgl() {
+        #if defined(__x86_64__) || defined(_M_X64)
+        return rgl::standard::string("x86_64");
+        #elif defined(__aarch64__) || defined(_M_ARM64)
+        return rgl::standard::string("aarch64");
+        #elif defined(__i386__) || defined(_M_IX86)
+        return rgl::standard::string("x86");
+        #else
+        return rgl::standard::string("unknown");
+        #endif
+    }
+}(): string;
+
+/// <lang name="fr">
+/// <summary>Le nombre de threads matériels de la machine.</summary>
+/// <returns>Au moins 1.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The number of hardware threads of the machine.</summary>
+/// <returns>At least 1.</returns>
+/// </lang>
+@trusted
+gear pure cpuCount(): uint => cpp {
+    #include <thread>
+    rgl_return rgl() {
+        const unsigned count = std::thread::hardware_concurrency();
+        return count == 0 ? 1u : count;
+    }
+}(): uint;

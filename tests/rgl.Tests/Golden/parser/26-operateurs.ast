@@ -1,0 +1,49 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=a
+    LiteralExpression 2:8 kind=IntegerLiteral text=1
+  VarDeclaration 3:1 keyword=var name=signe
+    ConditionalExpression 3:12
+      BinaryExpression 3:12 op=<
+        NameExpression 3:12 name=a
+        LiteralExpression 3:16 kind=IntegerLiteral text=0
+      UnaryExpression 3:20 op=-
+        LiteralExpression 3:21 kind=IntegerLiteral text=1
+      ConditionalExpression 3:25
+        BinaryExpression 3:25 op=eq
+          NameExpression 3:25 name=a
+          LiteralExpression 3:30 kind=IntegerLiteral text=0
+        LiteralExpression 3:34 kind=IntegerLiteral text=0
+        LiteralExpression 3:38 kind=IntegerLiteral text=1
+  VarDeclaration 4:1 keyword=var name=b
+    ConditionalExpression 4:8
+      BinaryExpression 4:8 op=>
+        NameExpression 4:8 name=a
+        LiteralExpression 4:12 kind=IntegerLiteral text=0
+      BinaryExpression 4:16 op=+
+        NameExpression 4:16 name=a
+        LiteralExpression 4:20 kind=IntegerLiteral text=1
+      BinaryExpression 4:24 op=-
+        NameExpression 4:24 name=a
+        LiteralExpression 4:28 kind=IntegerLiteral text=1
+  ExpressionStatement 5:1
+    IncrementExpression 5:1 op=increment
+      NameExpression 5:11 name=a
+  ExpressionStatement 6:1
+    IncrementExpression 6:1 op=increment step=3
+      NameExpression 6:14 name=a
+  VarDeclaration 7:1 keyword=var name=ancien
+    IncrementExpression 7:13 op=post_decrement step=2
+      NameExpression 7:31 name=a
+  AssignmentStatement 8:1 target=a op=+<-
+    LiteralExpression 8:7 kind=IntegerLiteral text=10
+  AssignmentStatement 9:1 target=a op=*<-
+    PrimitiveType 9:4 type=int
+    LiteralExpression 9:12 kind=IntegerLiteral text=2
+  VarDeclaration 10:1 keyword=var name=masque
+    BinaryExpression 10:13 op=bitand
+      UnaryExpression 10:13 op=invert
+        LiteralExpression 10:20 kind=IntegerLiteral text=0b1010
+      NameExpression 10:34 name=a
+  TrainDeclaration 11:1 unguarded=false parameters=none
+    Pipeline 11:7
+      DoneStep 11:10

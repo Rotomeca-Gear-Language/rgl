@@ -1,0 +1,15 @@
+"use strict";
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const { serverOptions } = require("../server-launch");
+const dll = serverOptions("/shadow/rgl.dll", "/repo/bin/rgl.dll");
+assert.equal(dll.command, "dotnet");
+assert.deepEqual(dll.args, ["/shadow/rgl.dll", "lsp"]);
+assert.equal(dll.options.env.RGL_COMPILER_DIRECTORY, path.resolve("/repo/bin"));
+assert.equal(dll.options.env.PATH, process.env.PATH);
+const exe = serverOptions("/shadow/rgl.exe", "/repo/bin/rgl.exe");
+assert.equal(exe.command, "/shadow/rgl.exe");
+assert.deepEqual(exe.args, ["lsp"]);
+assert.equal(exe.options.env.RGL_COMPILER_DIRECTORY, path.resolve("/repo/bin"));
+assert.deepEqual(serverOptions("rgl"), { command: "rgl", args: ["lsp"] });
+console.log("VS Code : le serveur copié conserve l’accès à sa chaîne native d’origine.");

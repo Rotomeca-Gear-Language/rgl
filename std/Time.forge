@@ -1,0 +1,497 @@
+forge: gears
+description: "L'heure et les dates : l'instant présent, construire et lire une date"
+
+export {now, isLeapYear, daysInMonth, dateTime, parseDateTime, milliseconds, seconds, minutes, hours, days, weeks, Stopwatch, startStopwatch, elapsed, localOffset};
+
+/// <lang name="fr">
+/// <summary>L'instant présent, lu sur l'horloge du système, en UTC.</summary>
+/// <returns>La date et l'heure d'maintenant.</returns>
+/// <example><code language="rgl">
+/// datetime debut: std.now();
+/// datetime fin: std.now();
+/// duration ecoule: fin - debut;
+/// </code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>The current instant, read from the system clock, in UTC.</summary>
+/// <returns>The current date and time.</returns>
+/// <example><code language="rgl">
+/// datetime debut: std.now();
+/// datetime fin: std.now();
+/// duration ecoule: fin - debut;
+/// </code></example>
+/// </lang>
+gear now(): datetime {
+    var t <- clock;
+    return t;
+}
+
+/// <lang name="fr">
+/// <summary>Dit si une année est bissextile (calendrier grégorien).</summary>
+/// <param name="year">L'année.</param>
+/// <returns>Vrai si `year` est bissextile.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether a year is a leap year (Gregorian calendar).</summary>
+/// <param name="year">The year.</param>
+/// <returns>True if `year` is a leap year.</returns>
+/// </lang>
+gear pure isLeapYear(long year): bool => year % 4 eq 0 and (year % 100 not eq 0 or year % 400 eq 0);
+
+/// <lang name="fr">
+/// <summary>Le nombre de jours d'un mois.</summary>
+/// <param name="year">L'année, qui décide de février.</param>
+/// <param name="month">Le mois, de 1 à 12.</param>
+/// <returns>De 28 à 31 ; 0 si le mois n'existe pas.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The number of days in a month.</summary>
+/// <param name="year">The year, which determines the length of February.</param>
+/// <param name="month">The month, from 1 to 12.</param>
+/// <returns>From 28 to 31; 0 if the month does not exist.</returns>
+/// </lang>
+gear pure daysInMonth(long year, long month): long {
+    if (month < 1 or month > 12) { return 0; }
+    if (month eq 2) { return isLeapYear(year) ? 29 : 28; }
+    return month eq 4 or month eq 6 or month eq 9 or month eq 11 ? 30 : 31;
+}
+
+/// <lang name="fr">
+/// <summary>Le nombre de jours entre le 1er janvier 1970 et un jour du calendrier (négatif avant), sans le valider.</summary>
+/// <param name="year">L'année.</param>
+/// <param name="month">Le mois, de 1 à 12.</param>
+/// <param name="day">Le jour du mois.</param>
+/// <returns>Les jours depuis 1970-01-01.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The number of days between January 1, 1970 and a calendar date (negative before that), without validation.</summary>
+/// <param name="year">The year.</param>
+/// <param name="month">The month, from 1 to 12.</param>
+/// <param name="day">The day of the month.</param>
+/// <returns>Days since 1970-01-01.</returns>
+/// </lang>
+gear pure _daysFromCivil(long year, long month, long day): long {
+    const long y: month <= 2 ? year - 1 : year;
+    const long era: (y >= 0 ? y : y - 399) / 400;
+    const long yoe: y - era * 400;
+    const long mp: month > 2 ? month - 3 : month + 9;
+    const long doy: (153 * mp + 2) / 5 + day - 1;
+    const long doe: yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + doe - 719468;
+}
+
+/// <lang name="fr">
+/// <summary>Fait une date (UTC) de ses morceaux.</summary>
+/// <param name="year">L'année, de 0 à 9999 comme dans le texte ISO 8601.</param>
+/// <param name="month">Le mois, de 1 à 12.</param>
+/// <param name="day">Le jour du mois, de 1 à la fin du mois.</param>
+/// <param name="hour">L'heure, de 0 à 23.</param>
+/// <param name="minute">La minute, de 0 à 59.</param>
+/// <param name="second">La seconde, de 0 à 59.</param>
+/// <param name="millisecond">La milliseconde, de 0 à 999.</param>
+/// <returns>La date, ou `null` si un morceau est hors de son intervalle (le 30 février, la 25e heure…).</returns>
+/// <example><code language="rgl">
+/// datetime? noel: std.dateTime(2026, 12, 25);
+/// </code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates a date (UTC) from its components.</summary>
+/// <param name="year">The year, from 0 to 9999 as in ISO 8601 text.</param>
+/// <param name="month">The month, from 1 to 12.</param>
+/// <param name="day">The day of the month, from 1 to the end of the month.</param>
+/// <param name="hour">The hour, from 0 to 23.</param>
+/// <param name="minute">The minute, from 0 to 59.</param>
+/// <param name="second">The second, from 0 to 59.</param>
+/// <param name="millisecond">The millisecond, from 0 to 999.</param>
+/// <returns>The date, or `null` if a component is outside its range (February 30, hour 25, etc.).</returns>
+/// <example><code language="rgl">
+/// datetime? noel: std.dateTime(2026, 12, 25);
+/// </code></example>
+/// </lang>
+gear pure dateTime(long year, long month, long day, long hour: 0, long minute: 0, long second: 0, long millisecond: 0): datetime? {
+    if (year < 0 or year > 9999 or month < 1 or month > 12 or day < 1 or day > daysInMonth(year, month)) { return null; }
+    if (hour < 0 or hour > 23 or minute < 0 or minute > 59 or second < 0 or second > 59 or millisecond < 0 or millisecond > 999) { return null; }
+
+    const long days: _daysFromCivil(year, month, day);
+    return (days * 86400000 + hour * 3600000 + minute * 60000 + second * 1000 + millisecond) as datetime;
+}
+
+/// <lang name="fr">
+/// <summary>Lit `count` chiffres de `text` à partir du rang `from`.</summary>
+/// <param name="text">Le texte.</param>
+/// <param name="from">Le rang du premier chiffre.</param>
+/// <param name="count">Le nombre de chiffres.</param>
+/// <returns>Le nombre lu, ou `null` si le texte est trop court ou si un de ces caractères n'est pas un chiffre.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads `count` digits from `text` starting at index `from`.</summary>
+/// <param name="text">The text.</param>
+/// <param name="from">The index of the first digit.</param>
+/// <param name="count">The number of digits.</param>
+/// <returns>The parsed number, or `null` if the text is too short or one of these characters is not a digit.</returns>
+/// </lang>
+gear pure _digits(string text, long from, long count): long? {
+    if (from + count > text.length as long) { return null; }
+    const string part: text.substring(from, from + count);
+    const bool allDigits: [0..<count] |+> true with (acc, i) => acc and part[i].isDigit();
+    return allDigits ? part as? long : null;
+}
+
+/// <lang name="fr">
+/// <summary>Compte les chiffres qui se suivent dans `text` à partir du rang `from`.</summary>
+/// <param name="text">Le texte.</param>
+/// <param name="from">Le rang où l'on commence à compter.</param>
+/// <returns>Le nombre de chiffres consécutifs, 0 si le rang est hors du texte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Counts consecutive digits in `text` starting at index `from`.</summary>
+/// <param name="text">The text.</param>
+/// <param name="from">The index at which to start counting.</param>
+/// <returns>The number of consecutive digits, or 0 if the index is outside the text.</returns>
+/// </lang>
+gear pure _digitRun(string text, long from): long {
+    const long n: text.length as long;
+    if (from >= n) { return 0; }
+    return [from..<n] |+> 0 with (acc, i) => {
+        if (not text[i].isDigit()) { done acc; }
+        return acc + 1;
+    };
+}
+
+/// <lang name="fr">
+/// <summary>Lit une date ISO 8601 : `2026-10-24`, `2026-10-24T10:30`, `2026-10-24T10:30:00`, avec `.mmm` et une zone `Z` ou `+02:00` (UTC sans zone).</summary>
+/// <param name="text">Le texte à lire ; le `T` peut être une espace.</param>
+/// <returns>La date en UTC (la zone est retranchée), ou `null` si le texte n'est pas une date valide.</returns>
+/// <example><code language="rgl">
+/// datetime? d: std.parseDateTime('2026-10-24T10:30:00+02:00'); // 2026-10-24T08:30:00Z
+/// </code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Parses an ISO 8601 date: `2026-10-24`, `2026-10-24T10:30`, `2026-10-24T10:30:00`, with `.mmm` and a `Z` or `+02:00` time zone (UTC if no zone is specified).</summary>
+/// <param name="text">The text to parse; `T` may be a space.</param>
+/// <returns>The date in UTC (the time zone offset is subtracted), or `null` if the text is not a valid date.</returns>
+/// <example><code language="rgl">
+/// datetime? d: std.parseDateTime('2026-10-24T10:30:00+02:00'); // 2026-10-24T08:30:00Z
+/// </code></example>
+/// </lang>
+gear pure parseDateTime(string text): datetime? {
+    const long n: text.length as long;
+    if (n < 10 or text[4] not eq '-' or text[7] not eq '-') { return null; }
+
+    const long year: _digits(text, 0, 4) ?? -1;
+    const long month: _digits(text, 5, 2) ?? -1;
+    const long day: _digits(text, 8, 2) ?? -1;
+    long hour: 0;
+    long minute: 0;
+    long second: 0;
+    long millisecond: 0;
+    long rank: 10;
+
+    if (n > 10) {
+        if ((text[10] not eq 'T' and text[10] not eq ' ') or n < 16 or text[13] not eq ':') { return null; }
+        hour <- _digits(text, 11, 2) ?? -1;
+        minute <- _digits(text, 14, 2) ?? -1;
+        rank <- 16;
+
+        if (n > 16 and text[16] eq ':') {
+            second <- _digits(text, 17, 2) ?? -1;
+            rank <- 19;
+
+            if (n > 19 and text[19] eq '.') {
+                const long run: _digitRun(text, 20);
+                if (run < 1) { return null; }
+                const long kept: run > 3 ? 3 : run;
+                const long scale: kept eq 1 ? 100 : (kept eq 2 ? 10 : 1);
+                millisecond <- (_digits(text, 20, kept) ?? -1) * scale;
+                rank <- 20 + run;
+            }
+        }
+    }
+
+    // La zone : rien (UTC), Z, ou ±HH:MM.
+    long offset: 0;
+    const long rest: n - rank;
+    if (rest eq 1 and text[rank] eq 'Z') {
+        offset <- 0;
+    } else if (rest eq 6 and (text[rank] eq '+' or text[rank] eq '-') and text[rank + 3] eq ':') {
+        const long hours: _digits(text, rank + 1, 2) ?? -1;
+        const long minutes: _digits(text, rank + 4, 2) ?? -1;
+        if (hours < 0 or hours > 23 or minutes < 0 or minutes > 59) { return null; }
+        offset <- (hours * 3600000 + minutes * 60000) * (text[rank] eq '-' ? -1 : 1);
+    } else if (rest not eq 0) {
+        return null;
+    }
+
+    const datetime? local: dateTime(year, month, day, hour, minute, second, millisecond);
+    if (local eq null) { return null; }
+    return local - offset * 1ms;
+}
+
+/// <lang name="fr">
+/// <summary>Une durée de `count` millisecondes.</summary>
+/// <param name="count">Le nombre d'unités.</param>
+/// <returns>La durée ; le programme s'arrête si elle dépasse ce qu'une durée peut compter.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A duration of `count` milliseconds.</summary>
+/// <param name="count">The number of units.</param>
+/// <returns>The duration; the program stops when it exceeds what a duration can hold.</returns>
+/// </lang>
+gear pure milliseconds(long count): duration => (count * 1) as duration;
+
+/// <lang name="fr">
+/// <summary>Une durée de `count` secondes.</summary>
+/// <param name="count">Le nombre d'unités.</param>
+/// <returns>La durée ; le programme s'arrête si elle dépasse ce qu'une durée peut compter.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A duration of `count` seconds.</summary>
+/// <param name="count">The number of units.</param>
+/// <returns>The duration; the program stops when it exceeds what a duration can hold.</returns>
+/// </lang>
+gear pure seconds(long count): duration => (count * 1000) as duration;
+
+/// <lang name="fr">
+/// <summary>Une durée de `count` minutes.</summary>
+/// <param name="count">Le nombre d'unités.</param>
+/// <returns>La durée ; le programme s'arrête si elle dépasse ce qu'une durée peut compter.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A duration of `count` minutes.</summary>
+/// <param name="count">The number of units.</param>
+/// <returns>The duration; the program stops when it exceeds what a duration can hold.</returns>
+/// </lang>
+gear pure minutes(long count): duration => (count * 60000) as duration;
+
+/// <lang name="fr">
+/// <summary>Une durée de `count` heures.</summary>
+/// <param name="count">Le nombre d'unités.</param>
+/// <returns>La durée ; le programme s'arrête si elle dépasse ce qu'une durée peut compter.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A duration of `count` hours.</summary>
+/// <param name="count">The number of units.</param>
+/// <returns>The duration; the program stops when it exceeds what a duration can hold.</returns>
+/// </lang>
+gear pure hours(long count): duration => (count * 3600000) as duration;
+
+/// <lang name="fr">
+/// <summary>Une durée de `count` jours (de 24 heures).</summary>
+/// <param name="count">Le nombre d'unités.</param>
+/// <returns>La durée ; le programme s'arrête si elle dépasse ce qu'une durée peut compter.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A duration of `count` days (of 24 hours).</summary>
+/// <param name="count">The number of units.</param>
+/// <returns>The duration; the program stops when it exceeds what a duration can hold.</returns>
+/// </lang>
+gear pure days(long count): duration => (count * 86400000) as duration;
+
+/// <lang name="fr">
+/// <summary>Une durée de `count` semaines.</summary>
+/// <param name="count">Le nombre d'unités.</param>
+/// <returns>La durée ; le programme s'arrête si elle dépasse ce qu'une durée peut compter.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A duration of `count` weeks.</summary>
+/// <param name="count">The number of units.</param>
+/// <returns>The duration; the program stops when it exceeds what a duration can hold.</returns>
+/// </lang>
+gear pure weeks(long count): duration => (count * 604800000) as duration;
+
+/// <lang name="fr">
+/// <summary>Les millisecondes d'une horloge qui ne revient jamais en arrière, d'origine quelconque (usage interne).</summary>
+/// <returns>Le temps écoulé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The milliseconds of a clock that never goes backwards, from an arbitrary origin (internal use).</summary>
+/// <returns>The elapsed time.</returns>
+/// </lang>
+@trusted
+gear _monotonicMilliseconds(): long => cpp {
+    #include <chrono>
+    #include <cstdint>
+    rgl_return rgl() {
+        return static_cast<std::int64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
+}(): long;
+
+/// <lang name="fr">
+/// <summary>Le décalage entre l'heure locale et UTC à cet instant, en millisecondes (usage interne).</summary>
+/// <param name="milliseconds">L'instant, en millisecondes depuis 1970.</param>
+/// <returns>Le décalage.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The offset between local time and UTC at that instant, in milliseconds (internal use).</summary>
+/// <param name="milliseconds">The instant, in milliseconds since 1970.</param>
+/// <returns>The offset.</returns>
+/// </lang>
+@trusted
+gear _localOffsetMilliseconds(long milliseconds): long => cpp {
+    #include <ctime>
+    #include <cstdint>
+    rgl_return rgl(rgl_arg_milliseconds milliseconds) {
+        std::time_t seconds = static_cast<std::time_t>(milliseconds / 1000);
+        if (milliseconds % 1000 < 0) --seconds;
+        std::tm local{};
+        #if defined(_WIN32)
+        if (localtime_s(&local, &seconds) != 0) return 0;
+        const std::time_t shifted = _mkgmtime(&local);
+        #else
+        if (localtime_r(&seconds, &local) == nullptr) return 0;
+        const std::time_t shifted = timegm(&local);
+        #endif
+        return static_cast<std::int64_t>(shifted - seconds) * 1000;
+    }
+}(long milliseconds: milliseconds): long;
+
+/// <lang name="fr">
+/// <summary>Un chronomètre : l'instant de son départ sur une horloge monotone, qui ne revient jamais en arrière.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A stopwatch: the instant it started on a monotonic clock, which never goes backwards.</summary>
+/// </lang>
+mold Stopwatch {
+    /// <lang name="fr">
+    /// <summary>Le départ, en millisecondes d'une horloge d'origine quelconque.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The start, in milliseconds of a clock with an arbitrary origin.</summary>
+    /// </lang>
+    long start;
+}
+
+/// <lang name="fr">
+/// <summary>Démarre un chronomètre.</summary>
+/// <returns>Un chronomètre qui vient de partir.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Starts a stopwatch.</summary>
+/// <returns>A stopwatch that just started.</returns>
+/// </lang>
+gear startStopwatch(): Stopwatch => {start: _monotonicMilliseconds()};
+
+/// <lang name="fr">
+/// <summary>Le temps écoulé depuis le départ du chronomètre.</summary>
+/// <param name="stopwatch">Le chronomètre.</param>
+/// <returns>La durée écoulée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The time elapsed since the stopwatch started.</summary>
+/// <param name="stopwatch">The stopwatch.</param>
+/// <returns>The elapsed duration.</returns>
+/// </lang>
+gear elapsed(Stopwatch stopwatch): duration => (_monotonicMilliseconds() - stopwatch.start) as duration;
+
+/// <lang name="fr">
+/// <summary>Le décalage entre l'heure locale du système et UTC à un instant (il change avec l'heure d'été).</summary>
+/// <param name="instant">L'instant.</param>
+/// <returns>Le décalage, positif à l'est de Greenwich.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The offset between the system's local time and UTC at an instant (it changes with daylight saving time).</summary>
+/// <param name="instant">The instant.</param>
+/// <returns>The offset, positive east of Greenwich.</returns>
+/// </lang>
+gear localOffset(datetime instant): duration => _localOffsetMilliseconds(instant as long) as duration;
+
+/// <lang name="fr"><summary>L'état de la lecture d'une date selon un motif (usage interne).</summary></lang>
+/// <lang name="en"><summary>The state of reading a date against a pattern (internal use).</summary></lang>
+mold _Scan {
+    /// <lang name="fr"><summary>Le rang du prochain caractère du texte.</summary></lang>
+    /// <lang name="en"><summary>The index of the next character of the text.</summary></lang>
+    long at;
+    /// <lang name="fr"><summary>Les caractères du motif encore couverts par le dernier jeton.</summary></lang>
+    /// <lang name="en"><summary>The pattern characters still covered by the last token.</summary></lang>
+    long skip;
+    /// <lang name="fr"><summary>Faux dès que le texte ne suit plus le motif.</summary></lang>
+    /// <lang name="en"><summary>False as soon as the text no longer follows the pattern.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>L'année lue.</summary></lang>
+    /// <lang name="en"><summary>The year read.</summary></lang>
+    long year;
+    /// <lang name="fr"><summary>Le mois lu.</summary></lang>
+    /// <lang name="en"><summary>The month read.</summary></lang>
+    long month;
+    /// <lang name="fr"><summary>Le jour lu.</summary></lang>
+    /// <lang name="en"><summary>The day read.</summary></lang>
+    long day;
+    /// <lang name="fr"><summary>L'heure lue.</summary></lang>
+    /// <lang name="en"><summary>The hour read.</summary></lang>
+    long hour;
+    /// <lang name="fr"><summary>La minute lue.</summary></lang>
+    /// <lang name="en"><summary>The minute read.</summary></lang>
+    long minute;
+    /// <lang name="fr"><summary>La seconde lue.</summary></lang>
+    /// <lang name="en"><summary>The second read.</summary></lang>
+    long second;
+    /// <lang name="fr"><summary>La milliseconde lue.</summary></lang>
+    /// <lang name="en"><summary>The millisecond read.</summary></lang>
+    long millisecond;
+}
+
+/// <lang name="fr"><summary>Le jeton de date qui commence à un rang du motif (usage interne).</summary><param name="pattern">Le motif.</param><param name="rank">Le rang.</param><returns>`yyyy`, `yy`, `MM`, `dd`, `HH`, `mm`, `ss`, `SSS` ou `M`, `d`, `H`, `m`, `s` ; le texte vide si un caractère ordinaire commence ici.</returns></lang>
+/// <lang name="en"><summary>The date token that starts at a pattern index (internal use).</summary><param name="pattern">The pattern.</param><param name="rank">The index.</param><returns>`yyyy`, `yy`, `MM`, `dd`, `HH`, `mm`, `ss`, `SSS` or `M`, `d`, `H`, `m`, `s`; the empty text when an ordinary character starts here.</returns></lang>
+gear pure _dateToken(string pattern, long rank): string {
+    const long m: pattern.length as long;
+    const [string] tokens: ['yyyy', 'SSS', 'yy', 'MM', 'dd', 'HH', 'mm', 'ss', 'M', 'd', 'H', 'm', 's'];
+    const string none: '';
+    return tokens |+> none with (found, token) => {
+        if (found not eq '') { done found; }
+        const long size: token.length as long;
+        return rank + size <= m and pattern.substring(rank, rank + size) eq token ? token : found;
+    };
+}
+
+/// <lang name="fr">
+/// <summary>Lit une date écrite selon un motif : `yyyy` l'année (quatre chiffres), `yy` (deux chiffres, 2000 à 2099), `MM` le mois, `dd` le jour, `HH` l'heure, `mm` les minutes, `ss` les secondes, `SSS` les millisecondes, écrits avec leurs zéros (`M`, `d`, `H`, `m` et `s` lisent un ou deux chiffres, sans zéro obligatoire) ; tout autre caractère doit se retrouver tel quel dans le texte. C'est le miroir de `format`. Le résultat est en UTC.</summary>
+/// <param name="text">Le texte à lire.</param>
+/// <param name="pattern">Le motif, par exemple `dd/MM/yyyy HH:mm`.</param>
+/// <returns>La date, `null` si le texte ne suit pas le motif ou si la date n'existe pas (30 février).</returns>
+/// <example><code language="rgl">
+/// datetime? d: std.parseDateTime('24/10/2026 18:30', 'dd/MM/yyyy HH:mm');
+/// </code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads a date written according to a pattern: `yyyy` the year (four digits), `yy` (two digits, 2000 to 2099), `MM` the month, `dd` the day, `HH` the hour, `mm` the minutes, `ss` the seconds, `SSS` the milliseconds, written with their zeros (`M`, `d`, `H`, `m` and `s` read one or two digits, no zero required); any other character must appear as is in the text. This is the mirror of `format`. The result is in UTC.</summary>
+/// <param name="text">The text to read.</param>
+/// <param name="pattern">The pattern, for example `dd/MM/yyyy HH:mm`.</param>
+/// <returns>The date, or `null` when the text does not follow the pattern or the date does not exist (February 30).</returns>
+/// <example><code language="rgl">
+/// datetime? d: std.parseDateTime('24/10/2026 18:30', 'dd/MM/yyyy HH:mm');
+/// </code></example>
+/// </lang>
+gear pure parseDateTime(string text, string pattern): datetime? {
+    const long n: text.length as long;
+    const long m: pattern.length as long;
+    const _Scan start: {at: 0, skip: 0, ok: true, year: 1970, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0};
+    const _Scan end: [0..<m] |+> start with (acc, rank) => {
+        if (not acc.ok) { done acc; }
+        if (acc.skip > 0) { return {...acc, skip: acc.skip - 1}; }
+
+        const string token: _dateToken(pattern, rank);
+        if (token eq '') {
+            const bool same: acc.at < n and text.substring(acc.at, acc.at + 1) eq pattern.substring(rank, rank + 1);
+            return same ? {...acc, at: acc.at + 1} : {...acc, ok: false};
+        }
+
+        // Un jeton d'une lettre (`M`, `d`, `H`, `m`, `s`) lit un ou deux chiffres, sans zéro obligatoire.
+        const long run: _digitRun(text, acc.at);
+        const long size: token.length eq 1 ? (run > 2 ? 2 : run) : (token.length as long);
+        if (size < 1) { return {...acc, ok: false}; }
+        const long? value: _digits(text, acc.at, size);
+        if (value eq null) { return {...acc, ok: false}; }
+        const long read: value ?? 0;
+        const _Scan moved: {...acc, at: acc.at + size, skip: (token.length as long) - 1};
+        if (token eq 'yyyy') { return {...moved, year: read}; }
+        if (token eq 'yy') { return {...moved, year: 2000 + read}; }
+        if (token eq 'MM' or token eq 'M') { return {...moved, month: read}; }
+        if (token eq 'dd' or token eq 'd') { return {...moved, day: read}; }
+        if (token eq 'HH' or token eq 'H') { return {...moved, hour: read}; }
+        if (token eq 'mm' or token eq 'm') { return {...moved, minute: read}; }
+        if (token eq 'ss' or token eq 's') { return {...moved, second: read}; }
+        return {...moved, millisecond: read};
+    };
+    if (not end.ok or end.at not eq n) { return null; }
+    return dateTime(end.year, end.month, end.day, end.hour, end.minute, end.second, end.millisecond);
+}

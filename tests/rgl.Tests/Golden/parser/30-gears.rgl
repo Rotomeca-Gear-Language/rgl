@@ -1,0 +1,22 @@
+// Gears : corps bloc et expression, pure, return, appels et pipeline.
+const int MAX: 10;
+
+gear twice(int n): int {
+    var x: n * 2;
+    return x;
+}
+
+gear pure add(int a, int b): int => a + b;
+
+gear log(string message): void {
+    return;
+}
+
+gear calcul(): uint {
+    var v: 3 |> twice |> add(1);
+    log(`v = {v}`);
+    v |> twice |> log2;
+    return 0;
+}
+
+train([string] args) args |> calcul |> $ 0;

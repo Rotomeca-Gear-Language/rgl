@@ -1,0 +1,301 @@
+forge: gears
+description: "Journal : niveaux, seuil, écriture dans un fichier et messages typés"
+
+use <Console> only { writeLine };
+
+/// <lang name="fr">
+/// <summary>Un message de journal : un texte d'une autre identité, pour ne pas le confondre avec le nom de l'appelant.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A log message: branded text, to distinguish it from the caller's name.</summary>
+/// </lang>
+export ingot logMessage: string;
+
+/// <lang name="fr">
+/// <summary>La gravité d'un message de journal.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The severity of a log message.</summary>
+/// </lang>
+export enum LogLevel {
+    /// <lang name="fr">
+    /// <summary>Détail de suivi, sans préfixe ajouté.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Tracing detail, with no added prefix.</summary>
+    /// </lang>
+    Trace,
+
+    /// <lang name="fr">
+    /// <summary>Information de mise au point.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Debugging information.</summary>
+    /// </lang>
+    Debug,
+
+    /// <lang name="fr">
+    /// <summary>Information normale.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Normal information.</summary>
+    /// </lang>
+    Info,
+
+    /// <lang name="fr">
+    /// <summary>Un problème qui n'empêche pas de continuer.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A problem that does not prevent execution from continuing.</summary>
+    /// </lang>
+    Warning,
+
+    /// <lang name="fr">
+    /// <summary>Une erreur.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>An error.</summary>
+    /// </lang>
+    Error,
+
+    /// <lang name="fr">
+    /// <summary>Une erreur après laquelle le programme ne peut pas continuer.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>An error after which the program cannot continue.</summary>
+    /// </lang>
+    Fatal
+ }
+
+/// <lang name="fr">
+/// <summary>Retient le rang minimal des messages écrits (usage interne).</summary>
+/// <param name="rank">Le rang de la gravité.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Keeps the minimal rank of the messages written (internal use).</summary>
+/// <param name="rank">The severity rank.</param>
+/// </lang>
+@trusted
+gear _setLogThreshold(int rank): void => cpp {
+    #include <rgl/standard/logging.hpp>
+    rgl_return rgl(rgl_arg_rank rank) {
+        rgl::standard::logging::threshold().store(rank);
+    }
+}(int rank: rank): void;
+
+/// <lang name="fr">
+/// <summary>Le rang minimal des messages écrits (usage interne).</summary>
+/// <returns>Le rang.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The minimal rank of the messages written (internal use).</summary>
+/// <returns>The rank.</returns>
+/// </lang>
+@trusted
+gear _logThreshold(): int => cpp {
+    #include <rgl/standard/logging.hpp>
+    rgl_return rgl() {
+        return rgl::standard::logging::threshold().load();
+    }
+}(): int;
+
+/// <lang name="fr">
+/// <summary>Choisit le fichier du journal (usage interne).</summary>
+/// <param name="path">Le chemin ; vide pour aucun.</param>
+/// <returns>`true` si le fichier est utilisable.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Chooses the log file (internal use).</summary>
+/// <param name="path">The path; empty for none.</param>
+/// <returns>`true` when the file is usable.</returns>
+/// </lang>
+@trusted
+gear _setLogFile(string path): bool => cpp {
+    #include <rgl/standard/logging.hpp>
+    #include <string>
+    rgl_return rgl(rgl_arg_path path) {
+        return rgl::standard::logging::set_file(std::string(path.data(), path.size()));
+    }
+}(string path: path): bool;
+
+/// <lang name="fr">
+/// <summary>Ajoute une ligne au fichier du journal (usage interne).</summary>
+/// <param name="line">La ligne, avec son retour à la ligne.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Appends a line to the log file (internal use).</summary>
+/// <param name="line">The line, with its newline.</param>
+/// </lang>
+@trusted
+gear _appendLogFile(string line): void => cpp {
+    #include <rgl/standard/logging.hpp>
+    rgl_return rgl(rgl_arg_line line) {
+        rgl::standard::logging::append(line.data(), line.size());
+    }
+}(string line: line): void;
+
+/// <lang name="fr">
+/// <summary>Le rang d'une gravité, de 0 (`Trace`) à 5 (`Fatal`) (usage interne).</summary>
+/// <param name="level">La gravité.</param>
+/// <returns>Son rang.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The rank of a severity, from 0 (`Trace`) to 5 (`Fatal`) (internal use).</summary>
+/// <param name="level">The severity.</param>
+/// <returns>Its rank.</returns>
+/// </lang>
+gear pure _levelRank(LogLevel level): int {
+    switch (level) {
+        case LogLevel.Trace:
+            return 0;
+        case LogLevel.Debug:
+            return 1;
+        case LogLevel.Info:
+            return 2;
+        case LogLevel.Warning:
+            return 3;
+        case LogLevel.Error:
+            return 4;
+        default:
+            return 5;
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Règle la gravité minimale des messages : ceux de gravité moindre ne sont ni écrits ni enregistrés.</summary>
+/// <param name="minimum">La gravité minimale (par défaut tout est écrit : `Trace`).</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sets the minimal severity of messages: lower ones are neither written nor recorded.</summary>
+/// <param name="minimum">The minimal severity (everything is written by default: `Trace`).</param>
+/// </lang>
+export gear setLogLevel(LogLevel minimum): void => _setLogThreshold(_levelRank(minimum));
+
+/// <lang name="fr">
+/// <summary>Recopie aussi chaque message dans un fichier, ajouté à sa fin.</summary>
+/// <param name="path">Le fichier du journal ; une chaîne vide arrête la recopie.</param>
+/// <returns>`true` si le fichier peut être ouvert en ajout (ou si la recopie est arrêtée).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Also copies every message into a file, appended to its end.</summary>
+/// <param name="path">The log file; an empty string stops the copy.</param>
+/// <returns>`true` when the file can be opened for appending (or when copying is stopped).</returns>
+/// </lang>
+export gear setLogFile(string path): bool => _setLogFile(path);
+
+/// <lang name="fr">
+/// <summary>Écrit une ligne de journal : un préfixe selon la gravité, l'appelant entre crochets, puis le message. Non exporté.</summary>
+/// <param name="level">La gravité.</param>
+/// <param name="caller">Le nom de l'appelant.</param>
+/// <param name="message">Le message.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a log line: a severity-dependent prefix, the caller in brackets, then the message. Not exported.</summary>
+/// <param name="level">The severity.</param>
+/// <param name="caller">The caller's name.</param>
+/// <param name="message">The message.</param>
+/// </lang>
+gear _log(LogLevel level, string caller, string message): void {
+    string prefix: '';
+
+    switch (level) {
+        case LogLevel.Debug:
+            prefix <- '- dbg -';
+            break;
+
+        case LogLevel.Info:
+            prefix <- '(i)';
+            break;
+
+        case LogLevel.Warning:
+            prefix <- '/!\';
+            break;
+
+        case LogLevel.Error:
+            prefix <- '###';
+            break;
+
+        case LogLevel.Fatal:
+            prefix <- '!!###!!';
+            break;
+
+        case LogLevel.Trace:
+        default: 
+            break;
+    }
+
+    if (_levelRank(level) < _logThreshold()) {
+        return;
+    }
+
+    const string line: `{prefix} [{caller}] {message}`;
+    writeLine(line);
+    _appendLogFile(line + "\n");
+}
+
+/// <lang name="fr">
+/// <summary>Écrit un message de gravité `Info` sur la console.</summary>
+/// <param name="message">Le message.</param>
+/// <param name="caller">Le nom de l'appelant ; par défaut le gear, le train ou la lambda qui contient l'appel.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes an `Info` message to the console.</summary>
+/// <param name="message">The message.</param>
+/// <param name="caller">The caller's name; defaults to the gear, train, or lambda containing the call.</param>
+/// </lang>
+export gear info(logMessage message, string caller: __CALLER__): void => _log(LogLevel.Info, caller, message°);
+/// <lang name="fr">
+/// <summary>Écrit un message de gravité `Debug` sur la console.</summary>
+/// <param name="message">Le message.</param>
+/// <param name="caller">Le nom de l'appelant ; par défaut le gear, le train ou la lambda qui contient l'appel.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a `Debug` message to the console.</summary>
+/// <param name="message">The message.</param>
+/// <param name="caller">The caller's name; defaults to the gear, train, or lambda containing the call.</param>
+/// </lang>
+export gear debug(logMessage message, string caller: __CALLER__): void => _log(LogLevel.Debug, caller, message°);
+/// <lang name="fr">
+/// <summary>Écrit un message de gravité `Trace` sur la console.</summary>
+/// <param name="message">Le message.</param>
+/// <param name="caller">Le nom de l'appelant ; par défaut le gear, le train ou la lambda qui contient l'appel.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a `Trace` message to the console.</summary>
+/// <param name="message">The message.</param>
+/// <param name="caller">The caller's name; defaults to the gear, train, or lambda containing the call.</param>
+/// </lang>
+export gear trace(logMessage message, string caller: __CALLER__): void => _log(LogLevel.Trace, caller, message°);
+/// <lang name="fr">
+/// <summary>Écrit un message de gravité `Warning` sur la console.</summary>
+/// <param name="message">Le message.</param>
+/// <param name="caller">Le nom de l'appelant ; par défaut le gear, le train ou la lambda qui contient l'appel.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a `Warning` message to the console.</summary>
+/// <param name="message">The message.</param>
+/// <param name="caller">The caller's name; defaults to the gear, train, or lambda containing the call.</param>
+/// </lang>
+export gear warning(logMessage message, string caller: __CALLER__): void => _log(LogLevel.Warning, caller, message°);
+/// <lang name="fr">
+/// <summary>Écrit un message de gravité `Error` sur la console.</summary>
+/// <param name="message">Le message.</param>
+/// <param name="caller">Le nom de l'appelant ; par défaut le gear, le train ou la lambda qui contient l'appel.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes an `Error` message to the console.</summary>
+/// <param name="message">The message.</param>
+/// <param name="caller">The caller's name; defaults to the gear, train, or lambda containing the call.</param>
+/// </lang>
+export gear error(logMessage message, string caller: __CALLER__): void => _log(LogLevel.Error, caller, message°);
+/// <lang name="fr">
+/// <summary>Écrit un message de gravité `Fatal` sur la console.</summary>
+/// <param name="message">Le message.</param>
+/// <param name="caller">Le nom de l'appelant ; par défaut le gear, le train ou la lambda qui contient l'appel.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a `Fatal` message to the console.</summary>
+/// <param name="message">The message.</param>
+/// <param name="caller">The caller's name; defaults to the gear, train, or lambda containing the call.</param>
+/// </lang>
+export gear fatal(logMessage message, string caller: __CALLER__): void => _log(LogLevel.Fatal, caller, message°);

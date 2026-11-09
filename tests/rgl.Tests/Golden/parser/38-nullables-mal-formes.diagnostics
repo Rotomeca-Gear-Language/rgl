@@ -1,0 +1,5 @@
+38-nullables-mal-formes.rgl:2:11: erreur[E077]: un type n'est nullable qu'une fois
+38-nullables-mal-formes.rgl:3:14: erreur[E076]: « ?: » n'existe pas en RGL
+38-nullables-mal-formes.rgl:4:6: erreur[E076]: « ++ » n'existe pas en RGL
+38-nullables-mal-formes.rgl:5:12: erreur[E076]: « ++ » n'existe pas en RGL
+38-nullables-mal-formes.rgl:6:12: erreur[E076]: « -- » n'existe pas en RGL

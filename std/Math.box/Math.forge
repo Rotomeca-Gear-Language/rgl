@@ -1,0 +1,680 @@
+forge: gears
+description: "Fonctions mathématiques de base"
+
+import Private only {_turn};
+import Constants only {PI, TAU, E, LN2, SQRT2};
+
+/// <lang name="fr">
+/// <summary>Un pourcentage entier, de 0 à 100 inclus.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An integer percentage, from 0 to 100 inclusive.</summary>
+/// </lang>
+ingot percent: uint<0..100>; 
+
+/// <lang name="fr">
+/// <summary>La valeur absolue d'un nombre.</summary>
+/// <typeparam name="T">Le type numérique du nombre.</typeparam>
+/// <param name="i">Le nombre.</param>
+/// <returns>`i` s'il est positif ou nul, son opposé sinon.</returns>
+/// <example><code language="rgl">const int a: abs(-3); // 3</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>The absolute value of a number.</summary>
+/// <typeparam name="T">The numeric type of the number.</typeparam>
+/// <param name="i">The number.</param>
+/// <returns>`i` if it is nonnegative, or its negation otherwise.</returns>
+/// <example><code language="rgl">const int a: abs(-3); // 3</code></example>
+/// </lang>
+gear pure abs<T: number>(T i):T => (i < 0 ? -i : i);
+/// <lang name="fr">
+/// <summary>L'opposée de la valeur absolue : toujours négative ou nulle.</summary>
+/// <typeparam name="T">Le type numérique du nombre.</typeparam>
+/// <param name="i">Le nombre.</param>
+/// <returns>`i` s'il est négatif ou nul, son opposé sinon.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The negation of the absolute value: always negative or zero.</summary>
+/// <typeparam name="T">The numeric type of the number.</typeparam>
+/// <param name="i">The number.</param>
+/// <returns>`i` if it is nonpositive, or its negation otherwise.</returns>
+/// </lang>
+gear pure nAbs<T: number>(T i): T => (i > 0 ? -i : i);
+/// <lang name="fr">
+/// <summary>Le signe d'un nombre.</summary>
+/// <typeparam name="T">Le type numérique du nombre.</typeparam>
+/// <param name="i">Le nombre.</param>
+/// <returns>-1 si `i` est négatif, 1 s'il est positif, 0 s'il est nul.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The sign of a number.</summary>
+/// <typeparam name="T">The numeric type of the number.</typeparam>
+/// <param name="i">The number.</param>
+/// <returns>-1 if `i` is negative, 1 if it is positive, and 0 if it is zero.</returns>
+/// </lang>
+gear pure sign<T: number>(T i): int<-1..1> => i < 0 ? -1 : (i > 0 ? 1 : 0);
+/// <lang name="fr">
+/// <summary>Le plus petit de deux nombres.</summary>
+/// <typeparam name="T">Le type numérique des nombres.</typeparam>
+/// <param name="a">Le premier nombre.</param>
+/// <param name="b">Le second nombre.</param>
+/// <returns>`a` s'il est strictement plus petit que `b`, `b` sinon.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The smaller of two numbers.</summary>
+/// <typeparam name="T">The numeric type of the numbers.</typeparam>
+/// <param name="a">The first number.</param>
+/// <param name="b">The second number.</param>
+/// <returns>`a` if it is strictly less than `b`, or `b` otherwise.</returns>
+/// </lang>
+gear pure min<T: number>(T a, T b): T => (a < b ? a : b);
+/// <lang name="fr">
+/// <summary>Le plus grand de deux nombres.</summary>
+/// <typeparam name="T">Le type numérique des nombres.</typeparam>
+/// <param name="a">Le premier nombre.</param>
+/// <param name="b">Le second nombre.</param>
+/// <returns>`a` s'il est strictement plus grand que `b`, `b` sinon.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The larger of two numbers.</summary>
+/// <typeparam name="T">The numeric type of the numbers.</typeparam>
+/// <param name="a">The first number.</param>
+/// <param name="b">The second number.</param>
+/// <returns>`a` if it is strictly greater than `b`, or `b` otherwise.</returns>
+/// </lang>
+gear pure max<T: number>(T a, T b): T => (a > b ? a : b);
+
+/// <lang name="fr">
+/// <summary>Borne une valeur entre un minimum et un maximum ; les deux bornes peuvent être données dans n'importe quel ordre.</summary>
+/// <typeparam name="T">Le type numérique de la valeur et des bornes.</typeparam>
+/// <param name="value">La valeur à borner.</param>
+/// <param name="minVal">Une des deux bornes.</param>
+/// <param name="maxVal">L'autre borne.</param>
+/// <returns>La valeur ramenée dans l'intervalle des deux bornes, inchangée si elle y est déjà.</returns>
+/// <example><code language="rgl">const int a: clamp(15, 0, 10); // 10</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Clamps a value between a minimum and a maximum; the bounds may be supplied in either order.</summary>
+/// <typeparam name="T">The numeric type of the value and bounds.</typeparam>
+/// <param name="value">The value to clamp.</param>
+/// <param name="minVal">One of the two bounds.</param>
+/// <param name="maxVal">The other bound.</param>
+/// <returns>The value clamped to the interval between the bounds, unchanged if already inside it.</returns>
+/// <example><code language="rgl">const int a: clamp(15, 0, 10); // 10</code></example>
+/// </lang>
+gear pure clamp<T: number>(T value, T minVal, T maxVal): T {
+    const T trueMin: min(minVal, maxVal);
+    const T trueMax: max(minVal, maxVal);
+
+    switch (value) {
+        case eval $ < trueMin:
+            return trueMin;
+        case eval $ > trueMax:
+            return trueMax; 
+        default:
+            return value;
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Interpolation linéaire entre deux nombres, sans borner le résultat.</summary>
+/// <typeparam name="T">Le type numérique des extrémités.</typeparam>
+/// <param name="start">La valeur obtenue pour `interp` égal à 0.</param>
+/// <param name="end">La valeur obtenue pour `interp` égal à 1.</param>
+/// <param name="interp">La position, 0 au début et 1 à la fin ; hors de 0 à 1, on extrapole.</param>
+/// <returns>`start + (end - start) * interp`, en `double`.</returns>
+/// <example><code language="rgl">const double a: lerp(0, 10, 0.25); // 2.5</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Linear interpolation between two numbers, without clamping the result.</summary>
+/// <typeparam name="T">The numeric type of the endpoints.</typeparam>
+/// <param name="start">The value returned when `interp` is 0.</param>
+/// <param name="end">The value returned when `interp` is 1.</param>
+/// <param name="interp">The position: 0 at the start and 1 at the end; values outside 0 to 1 extrapolate.</param>
+/// <returns>`start + (end - start) * interp`, as a `double`.</returns>
+/// <example><code language="rgl">const double a: lerp(0, 10, 0.25); // 2.5</code></example>
+/// </lang>
+gear pure lerp<T: number>(T start, T end, double interp): double => (start as double) + ((end - start) as double) * interp;
+
+/// <lang name="fr">
+/// <summary>Alias historique de la surcharge entière de `pow`.</summary>
+/// <param name="base">L'entier à élever.</param>
+/// <param name="exp">L'exposant ; 0 donne 1.</param>
+/// <returns>`pow(base, exp)` ; le programme s'arrête si le résultat dépasse un `int`.</returns>
+/// <example><code language="rgl">const int a: powInt(2, 10); // 1024</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Legacy alias for the integer overload of `pow`.</summary>
+/// <param name="base">The integer to raise to a power.</param>
+/// <param name="exp">The exponent; 0 yields 1.</param>
+/// <returns>`pow(base, exp)`; the program stops if the result exceeds the range of an `int`.</returns>
+/// <example><code language="rgl">const int a: powInt(2, 10); // 1024</code></example>
+/// </lang>
+gear pure powInt(int base, uint exp): int {
+    return pow(base, exp);
+}
+
+/// <lang name="fr">
+/// <summary>Élève un entier à une puissance entière positive ou nulle.</summary>
+/// <param name="base">La base entière.</param>
+/// <param name="exp">L'exposant positif ou nul.</param>
+/// <returns>`base` à la puissance `exp`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Raises an integer to a nonnegative integer power.</summary>
+/// <param name="base">The integer base.</param>
+/// <param name="exp">The nonnegative exponent.</param>
+/// <returns>`base` raised to `exp`.</returns>
+/// </lang>
+@trusted
+gear pure pow(int base, uint exp): int => cpp {
+    int rgl(int base, unsigned int exp) {
+        int result = 1;
+        while (exp != 0) {
+            if ((exp & 1u) != 0) result *= base;
+            exp >>= 1u;
+            if (exp != 0) base *= base;
+        }
+        return result;
+    }
+}(int base: base, uint exp: exp): int;
+
+/// <lang name="fr">
+/// <summary>Le plus grand commun diviseur de deux entiers (algorithme d'Euclide).</summary>
+/// <param name="a">Le premier entier.</param>
+/// <param name="b">Le second entier.</param>
+/// <returns>Le plus grand commun diviseur, positif ou nul ; 0 si les deux entiers sont nuls.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The greatest common divisor of two integers (Euclid's algorithm).</summary>
+/// <param name="a">The first integer.</param>
+/// <param name="b">The second integer.</param>
+/// <returns>The nonnegative greatest common divisor; 0 if both integers are zero.</returns>
+/// </lang>
+gear pure gcd(int a, int b): int => (b eq 0 ? abs(a) : gcd(b, a % b));
+
+/// <lang name="fr">
+/// <summary>La valeur absolue d'un entier, sans signe : elle existe même pour le plus petit des `int`.</summary>
+/// <param name="i">L'entier.</param>
+/// <returns>La valeur absolue de `i`, en `uint`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The unsigned absolute value of an integer: representable even for the smallest `int`.</summary>
+/// <param name="i">The integer.</param>
+/// <returns>The absolute value of `i`, as a `uint`.</returns>
+/// </lang>
+gear pure unsignedAbs(int i): uint => i < 0 ? (-(i as long)) as uint : i as uint;
+
+/// <lang name="fr">
+/// <summary>Dit si un entier est pair.</summary>
+/// <param name="n">L'entier.</param>
+/// <returns>Vrai si `n` est divisible par 2.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether an integer is even.</summary>
+/// <param name="n">The integer.</param>
+/// <returns>True if `n` is divisible by 2.</returns>
+/// </lang>
+gear pure isEven(long n): bool => n % 2 eq 0;
+
+/// <lang name="fr">
+/// <summary>Dit si un entier est impair.</summary>
+/// <param name="n">L'entier.</param>
+/// <returns>Vrai si `n` n'est pas divisible par 2.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether an integer is odd.</summary>
+/// <param name="n">The integer.</param>
+/// <returns>True if `n` is not divisible by 2.</returns>
+/// </lang>
+gear pure isOdd(long n): bool => n % 2 not eq 0;
+
+/// <lang name="fr">
+/// <summary>Convertit des degrés en radians.</summary>
+/// <param name="degrees">L'angle en degrés.</param>
+/// <returns>L'angle en radians.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Converts degrees to radians.</summary>
+/// <param name="degrees">The angle in degrees.</param>
+/// <returns>The angle in radians.</returns>
+/// </lang>
+gear pure toRadians(double degrees): double => degrees * (PI / 180.0);
+
+/// <lang name="fr">
+/// <summary>Convertit des radians en degrés.</summary>
+/// <param name="radians">L'angle en radians.</param>
+/// <returns>L'angle en degrés.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Converts radians to degrees.</summary>
+/// <param name="radians">The angle in radians.</param>
+/// <returns>The angle in degrees.</returns>
+/// </lang>
+gear pure toDegrees(double radians): double => radians * (180.0 / PI);
+
+/// <lang name="fr">
+/// <summary>La partie entière d'un nombre, arrondie vers le bas.</summary>
+/// <param name="x">Le nombre ; il doit tenir dans un `long`.</param>
+/// <returns>Le plus grand entier inférieur ou égal à `x`.</returns>
+/// <example><code language="rgl">const long a: floor(-2.5); // -3</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>The integer part of a number, rounded down.</summary>
+/// <param name="x">The number; it must fit in a `long`.</param>
+/// <returns>The largest integer less than or equal to `x`.</returns>
+/// <example><code language="rgl">const long a: floor(-2.5); // -3</code></example>
+/// </lang>
+gear pure floor(double x): long {
+    const long t: x as long;
+    return (t as double) > x ? t - 1 : t;
+}
+
+/// <lang name="fr">
+/// <summary>La partie entière d'un nombre, arrondie vers le haut.</summary>
+/// <param name="x">Le nombre ; il doit tenir dans un `long`.</param>
+/// <returns>Le plus petit entier supérieur ou égal à `x`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The integer part of a number, rounded up.</summary>
+/// <param name="x">The number; it must fit in a `long`.</param>
+/// <returns>The smallest integer greater than or equal to `x`.</returns>
+/// </lang>
+gear pure ceil(double x): long {
+    const long t: x as long;
+    return (t as double) < x ? t + 1 : t;
+}
+
+/// <lang name="fr">
+/// <summary>La partie entière d'un nombre, sans la décimale (arrondie vers zéro).</summary>
+/// <param name="x">Le nombre ; il doit tenir dans un `long`.</param>
+/// <returns>`x` privé de sa partie décimale.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The integer part of a number, with its fractional part discarded (rounded toward zero).</summary>
+/// <param name="x">The number; it must fit in a `long`.</param>
+/// <returns>`x` without its fractional part.</returns>
+/// </lang>
+gear pure trunc(double x): long => x as long;
+
+/// <lang name="fr">
+/// <summary>L'entier le plus proche d'un nombre ; la moitié monte.</summary>
+/// <param name="x">Le nombre ; il doit tenir dans un `long`.</param>
+/// <returns>L'entier le plus proche de `x` (2,5 donne 3 et -2,5 donne -2).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The nearest integer to a number; halfway values round upward.</summary>
+/// <param name="x">The number; it must fit in a `long`.</param>
+/// <returns>The nearest integer to `x` (2.5 gives 3 and -2.5 gives -2).</returns>
+/// </lang>
+gear pure round(double x): long => floor(x + 0.5);
+
+/// <lang name="fr">
+/// <summary>La partie après la virgule, toujours positive ou nulle.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>`x` moins sa partie entière arrondie vers le bas, entre 0 inclus et 1 exclu.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The fractional part, always nonnegative.</summary>
+/// <param name="x">The number.</param>
+/// <returns>`x` minus its floor, from 0 inclusive to 1 exclusive.</returns>
+/// </lang>
+gear pure fract(double x): double => x - (floor(x) as double);
+
+/// <lang name="fr">
+/// <summary>La longueur de l'hypoténuse d'un triangle rectangle, soit la racine de a² + b².</summary>
+/// <param name="a">Le premier côté.</param>
+/// <param name="b">Le second côté.</param>
+/// <returns>La racine carrée de `a * a + b * b`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The length of a right triangle's hypotenuse, the square root of a² + b².</summary>
+/// <param name="a">The first side.</param>
+/// <param name="b">The second side.</param>
+/// <returns>The square root of `a * a + b * b`.</returns>
+/// </lang>
+@trusted
+gear pure hypot(double a, double b): double => cpp {
+    #include <cmath>
+    double rgl(double a, double b) { return std::hypot(a, b); }
+}(double a: a, double b: b): double;
+
+/// <lang name="fr">
+/// <summary>La racine carrée native, via une frontière C++ pure de confiance.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>La racine carrée de `x`, ou null si `x` est négatif.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The native square root, through a trusted pure C++ boundary.</summary>
+/// <param name="x">The number.</param>
+/// <returns>The square root of `x`, or null if `x` is negative.</returns>
+/// </lang>
+@trusted
+gear pure sqrt(double x): double? {
+    if (x < 0.0) { return null; }
+    if (x eq 0.0) { return 0.0; }
+
+    return cpp {
+        #include <cmath>
+        double rgl(double x) { return std::sqrt(x); }
+    }(double x: x): double;
+}
+
+/// <lang name="fr">
+/// <summary>Élève un nombre à une puissance entière, négative comprise.</summary>
+/// <param name="base">Le nombre à élever.</param>
+/// <param name="exp">L'exposant entier ; négatif, le résultat est l'inverse de la puissance positive.</param>
+/// <returns>`base` à la puissance `exp`.</returns>
+/// <example><code language="rgl">const double a: pow(2.0, -2); // 0.25</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Raises a number to an integer power, including negative exponents.</summary>
+/// <param name="base">The number to raise to a power.</param>
+/// <param name="exp">The integer exponent; for negative values, the result is the reciprocal of the positive power.</param>
+/// <returns>`base` raised to `exp`.</returns>
+/// <example><code language="rgl">const double a: pow(2.0, -2); // 0.25</code></example>
+/// </lang>
+@trusted
+gear pure pow(double base, int exp): double => cpp {
+    #include <cmath>
+    double rgl(double base, int exp) { return std::pow(base, exp); }
+}(double base: base, int exp: exp): double;
+
+/// <lang name="fr">
+/// <summary>Élève un nombre réel à une puissance réelle.</summary>
+/// <param name="base">La base.</param>
+/// <param name="exp">L'exposant.</param>
+/// <returns>`base` à la puissance `exp`, avec le comportement IEEE 754 de la bibliothèque C++.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Raises a real number to a real power.</summary>
+/// <param name="base">The base.</param>
+/// <param name="exp">The exponent.</param>
+/// <returns>`base` raised to `exp`, using the C++ library's IEEE 754 behavior.</returns>
+/// </lang>
+@trusted
+gear pure pow(double base, double exp): double => cpp {
+    #include <cmath>
+    double rgl(double base, double exp) { return std::pow(base, exp); }
+}(double base: base, double exp: exp): double;
+
+/// <lang name="fr"><summary>Calcule la racine cubique native.</summary><param name="x">Le nombre, positif, nul ou négatif.</param><returns>La racine cubique de `x` selon le comportement IEEE 754 de la bibliothèque C++.</returns></lang>
+/// <lang name="en"><summary>Computes the native cube root.</summary><param name="x">The positive, zero, or negative value.</param><returns>The cube root of `x` using the C++ library's IEEE 754 behavior.</returns></lang>
+@trusted
+gear pure cbrt(double x): double => cpp {
+    #include <cmath>
+    double rgl(double x) { return std::cbrt(x); }
+}(double x: x): double;
+
+/// <lang name="fr"><summary>Compare deux réels avec une tolérance absolue ou relative.</summary><param name="a">Le premier nombre.</param><param name="b">Le second nombre.</param><param name="absoluteTolerance">L'écart maximal accepté près de zéro.</param><param name="relativeTolerance">L'écart maximal rapporté à la plus grande magnitude.</param><returns>`true` si l'une des deux tolérances accepte l'écart.</returns></lang>
+/// <lang name="en"><summary>Compares two real values using absolute or relative tolerance.</summary><param name="a">The first value.</param><param name="b">The second value.</param><param name="absoluteTolerance">The maximum accepted difference near zero.</param><param name="relativeTolerance">The maximum difference relative to the larger magnitude.</param><returns>`true` when either tolerance accepts the difference.</returns></lang>
+gear pure approxEqual(double a, double b, double absoluteTolerance: 0.000000000001, double relativeTolerance: 0.000000001): bool {
+    const double difference: abs(a - b);
+    return difference <= absoluteTolerance or difference <= relativeTolerance * max(abs(a), abs(b));
+}
+
+/// <lang name="fr"><summary>Calcule la position d'une valeur entre deux bornes, sans la borner.</summary><param name="start">La position correspondant à zéro.</param><param name="end">La position correspondant à un.</param><param name="value">La valeur à situer.</param><returns>`(value - start) / (end - start)`, ou zéro si les bornes sont égales.</returns></lang>
+/// <lang name="en"><summary>Computes a value's position between two endpoints without clamping it.</summary><param name="start">The position corresponding to zero.</param><param name="end">The position corresponding to one.</param><param name="value">The value to locate.</param><returns>`(value - start) / (end - start)`, or zero when endpoints are equal.</returns></lang>
+gear pure inverseLerp(double start, double end, double value): double => start eq end ? 0.0 : (value - start) / (end - start);
+
+/// <lang name="fr"><summary>Transpose linéairement une valeur d'un intervalle vers un autre.</summary><param name="value">La valeur à transposer.</param><param name="fromStart">Le début de l'intervalle source.</param><param name="fromEnd">La fin de l'intervalle source.</param><param name="toStart">Le début de l'intervalle cible.</param><param name="toEnd">La fin de l'intervalle cible.</param><returns>La valeur transposée, sans bornage.</returns></lang>
+/// <lang name="en"><summary>Linearly maps a value from one interval to another.</summary><param name="value">The value to map.</param><param name="fromStart">The source interval start.</param><param name="fromEnd">The source interval end.</param><param name="toStart">The target interval start.</param><param name="toEnd">The target interval end.</param><returns>The mapped value without clamping.</returns></lang>
+gear pure remap(double value, double fromStart, double fromEnd, double toStart, double toEnd): double =>
+    lerp(toStart, toEnd, inverseLerp(fromStart, fromEnd, value));
+
+/// <lang name="fr"><summary>Calcule une interpolation cubique lissée entre deux bornes.</summary><param name="edge0">La borne qui produit zéro.</param><param name="edge1">La borne qui produit un.</param><param name="x">La valeur à interpoler.</param><returns>Un résultat borné entre zéro et un.</returns></lang>
+/// <lang name="en"><summary>Computes smooth cubic interpolation between two edges.</summary><param name="edge0">The edge producing zero.</param><param name="edge1">The edge producing one.</param><param name="x">The value to interpolate.</param><returns>A result clamped between zero and one.</returns></lang>
+gear pure smoothstep(double edge0, double edge1, double x): double {
+    const double t: clamp(inverseLerp(edge0, edge1, x), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+/// <lang name="fr">
+/// <summary>La factorielle d'un entier, soit n!.</summary>
+/// <param name="n">L'entier ; 0 donne 1.</param>
+/// <returns>n! ; le programme s'arrête si le résultat dépasse un `ulong` (à partir de 21).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The factorial of an integer, n!.</summary>
+/// <param name="n">The integer; 0 yields 1.</param>
+/// <returns>n!; the program stops if the result exceeds the range of a `ulong` (starting at 21).</returns>
+/// </lang>
+gear pure factorial(uint n): ulong => [1..n] |+> (1 as ulong) with (acc, k) => acc * (k as ulong);
+
+/// <lang name="fr">
+/// <summary>Le plus petit commun multiple de deux entiers.</summary>
+/// <param name="a">Le premier entier.</param>
+/// <param name="b">Le second entier.</param>
+/// <returns>Le plus petit commun multiple, positif ; 0 si l'un des entiers est nul. Le programme s'arrête si le résultat dépasse un `int`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The least common multiple of two integers.</summary>
+/// <param name="a">The first integer.</param>
+/// <param name="b">The second integer.</param>
+/// <returns>The positive least common multiple; 0 if either integer is zero. The program stops if the result exceeds the range of an `int`.</returns>
+/// </lang>
+gear pure lcm(int a, int b): int => (a eq 0 or b eq 0) ? 0 : abs(a / gcd(a, b) * b);
+
+/// <lang name="fr">
+/// <summary>Le sinus d'un angle, calculé par une série de 14 termes après avoir ramené l'angle dans un tour : le résultat est approché.</summary>
+/// <param name="x">L'angle en radians.</param>
+/// <returns>Le sinus de `x`, entre -1 et 1.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The sine of an angle, calculated using a 14-term series after reducing the angle to one turn: the result is approximate.</summary>
+/// <param name="x">The angle in radians.</param>
+/// <returns>The sine of `x`, between -1 and 1.</returns>
+/// </lang>
+gear pure sin(double x): double {
+    const double a: _turn(x);
+    // L'état : la somme, et le dernier terme (-1)^k a^(2k+1) / (2k+1)!, dont le suivant se déduit.
+    (double, double) start: (a, a);
+    return ([0..<14] |+> start with (state, k) => {
+        const double term: state.Item2 * -(a * a) / (((2 * k + 2) * (2 * k + 3)) as double);
+        return (state.Item1 + term, term);
+    }).Item1;
+}
+
+/// <lang name="fr">
+/// <summary>Le cosinus d'un angle, calculé par une série de 14 termes après avoir ramené l'angle dans un tour : le résultat est approché.</summary>
+/// <param name="x">L'angle en radians.</param>
+/// <returns>Le cosinus de `x`, entre -1 et 1.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The cosine of an angle, calculated using a 14-term series after reducing the angle to one turn: the result is approximate.</summary>
+/// <param name="x">The angle in radians.</param>
+/// <returns>The cosine of `x`, between -1 and 1.</returns>
+/// </lang>
+gear pure cos(double x): double {
+    const double a: _turn(x);
+    (double, double) start: (1.0, 1.0);
+    return ([0..<14] |+> start with (state, k) => {
+        const double term: state.Item2 * -(a * a) / (((2 * k + 1) * (2 * k + 2)) as double);
+        return (state.Item1 + term, term);
+    }).Item1;
+}
+
+/// <lang name="fr">
+/// <summary>La tangente d'un angle, quotient du sinus par le cosinus (résultat approché).</summary>
+/// <param name="x">L'angle en radians.</param>
+/// <returns>La tangente de `x`, ou null là où le cosinus est nul (valeur absolue sous 1e-12), car le résultat serait infini.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The tangent of an angle, the sine divided by the cosine (approximate result).</summary>
+/// <param name="x">The angle in radians.</param>
+/// <returns>The tangent of `x`, or null where the cosine is zero (absolute value below 1e-12), since the result would be infinite.</returns>
+/// </lang>
+gear pure tan(double x): double? {
+    const double c: cos(x);
+    return abs(c) < 0.000000000001 ? null : sin(x) / c;
+}
+
+/// <lang name="fr">
+/// <summary>L'exponentielle, soit e à la puissance x : la série de x / 256 puis le résultat élevé au carré huit fois (résultat approché).</summary>
+/// <param name="x">L'exposant.</param>
+/// <returns>e à la puissance `x`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The exponential, e raised to x: a series for x / 256 followed by eight squarings (approximate result).</summary>
+/// <param name="x">The exponent.</param>
+/// <returns>e raised to `x`.</returns>
+/// </lang>
+gear pure exp(double x): double {
+    const double r: x / 256.0;
+    (double, double) start: (1.0, 1.0);
+    const double small: ([0..<14] |+> start with (state, k) => {
+        const double term: state.Item2 * r / ((k + 1) as double);
+        return (state.Item1 + term, term);
+    }).Item1;
+    return [0..<8] |+> small with (acc, _) => acc * acc;
+}
+
+/// <lang name="fr">
+/// <summary>Le logarithme népérien (résultat approché : réduction par division par 2 puis série).</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>Le logarithme népérien de `x`, ou null si `x` n'est pas strictement positif.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The natural logarithm (approximate result: reduction by division by 2 followed by a series).</summary>
+/// <param name="x">The number.</param>
+/// <returns>The natural logarithm of `x`, or null if `x` is not strictly positive.</returns>
+/// </lang>
+gear pure ln(double x): double? {
+    if (x <= 0.0) { return null; }
+
+    // x ou son inverse, au moins 1 ; on le divise par 2 jusqu'à ce qu'il passe sous 2.
+    const double big: x < 1.0 ? 1.0 / x : x;
+    (double, int) halving: (big, 0);
+    const (double, int) reduced: [0..<1100] |+> halving with (state, _) => {
+        if (state.Item1 <= 2.0) { done state; }
+        return (state.Item1 / 2.0, state.Item2 + 1);
+    };
+
+    // ln(m) = 2 (z + z^3/3 + z^5/5 + …) avec z = (m - 1) / (m + 1).
+    const double z: (reduced.Item1 - 1.0) / (reduced.Item1 + 1.0);
+    (double, double) start: (z, z);
+    const (double, double) series: [0..<24] |+> start with (state, j) => {
+        const double power: state.Item2 * z * z;
+        return (state.Item1 + power / ((2 * j + 3) as double), power);
+    };
+    const double result: 2.0 * series.Item1 + (reduced.Item2 as double) * LN2;
+    return x < 1.0 ? -result : result;
+}
+
+/// <lang name="fr">
+/// <summary>Le logarithme de x dans une base donnée, quotient de deux logarithmes népériens (résultat approché).</summary>
+/// <param name="x">Le nombre.</param>
+/// <param name="base">La base du logarithme.</param>
+/// <returns>Le logarithme de `x` en base `base`, ou null si `x` ou la base ne sont pas strictement positifs, ou si la base vaut 1.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The logarithm of x to a given base, the quotient of two natural logarithms (approximate result).</summary>
+/// <param name="x">The number.</param>
+/// <param name="base">The logarithm base.</param>
+/// <returns>The logarithm of `x` to `base`, or null if `x` or the base is not strictly positive, or if the base is 1.</returns>
+/// </lang>
+gear pure log(double x, double base): double? {
+    const double top: ln(x) ?? 0.0;
+    const double bottom: ln(base) ?? 0.0;
+    return (ln(x) eq null or ln(base) eq null or bottom eq 0.0) ? null : top / bottom;
+}
+
+/// <lang name="fr">
+/// <summary>Le logarithme en base 2.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>Le logarithme de `x` en base 2, ou null si `x` n'est pas strictement positif.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The base-2 logarithm.</summary>
+/// <param name="x">The number.</param>
+/// <returns>The base-2 logarithm of `x`, or null if `x` is not strictly positive.</returns>
+/// </lang>
+gear pure log2(double x): double? => log(x, 2.0);
+
+/// <lang name="fr">
+/// <summary>Le logarithme en base 10.</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>Le logarithme de `x` en base 10, ou null si `x` n'est pas strictement positif.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The base-10 logarithm.</summary>
+/// <param name="x">The number.</param>
+/// <returns>The base-10 logarithm of `x`, or null if `x` is not strictly positive.</returns>
+/// </lang>
+gear pure log10(double x): double? => log(x, 10.0);
+
+/// <lang name="fr">
+/// <summary>L'arc tangente (résultat approché : réduction de l'argument puis série).</summary>
+/// <param name="x">Le nombre.</param>
+/// <returns>L'angle en radians dont la tangente est `x`, entre -PI/2 et PI/2.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The arctangent (approximate result: argument reduction followed by a series).</summary>
+/// <param name="x">The number.</param>
+/// <returns>The angle in radians whose tangent is `x`, between -PI/2 and PI/2.</returns>
+/// </lang>
+gear pure atan(double x): double {
+    const double a: abs(x);
+    // Au-delà de 1, atan(a) = PI/2 - atan(1/a) ; on réduit deux fois par atan(a) = 2 atan(a / (1 + racine(1 + a²))).
+    const double inverted: a > 1.0 ? 1.0 / a : a;
+    const double once: inverted / (1.0 + (sqrt(1.0 + inverted * inverted) ?? 1.0));
+    const double twice: once / (1.0 + (sqrt(1.0 + once * once) ?? 1.0));
+    (double, double) start: (twice, twice);
+    const double series: ([0..<14] |+> start with (state, k) => {
+        const double power: state.Item2 * -(twice * twice);
+        return (state.Item1 + power / ((2 * k + 3) as double), power);
+    }).Item1;
+    const double reduced: 4.0 * series;
+    const double magnitude: a > 1.0 ? PI / 2.0 - reduced : reduced;
+    return x < 0.0 ? -magnitude : magnitude;
+}
+
+/// <lang name="fr">
+/// <summary>L'angle du point de coordonnées (x, y) par rapport à l'axe des x.</summary>
+/// <param name="y">L'ordonnée du point.</param>
+/// <param name="x">L'abscisse du point.</param>
+/// <returns>L'angle en radians, entre -PI et PI ; 0 pour l'origine.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The angle of the point (x, y) relative to the x axis.</summary>
+/// <param name="y">The point's y coordinate.</param>
+/// <param name="x">The point's x coordinate.</param>
+/// <returns>The angle in radians, between -PI and PI; 0 at the origin.</returns>
+/// </lang>
+gear pure atan2(double y, double x): double {
+    if (x > 0.0) { return atan(y / x); }
+    if (x < 0.0) { return y < 0.0 ? atan(y / x) - PI : atan(y / x) + PI; }
+    return y > 0.0 ? PI / 2.0 : (y < 0.0 ? -PI / 2.0 : 0.0);
+}
+
+/// <lang name="fr">
+/// <summary>L'arc sinus (résultat approché).</summary>
+/// <param name="x">Le nombre, entre -1 et 1.</param>
+/// <returns>L'angle en radians dont le sinus est `x`, entre -PI/2 et PI/2, ou null si `x` est hors de -1 à 1.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The arcsine (approximate result).</summary>
+/// <param name="x">The number, between -1 and 1.</param>
+/// <returns>The angle in radians whose sine is `x`, between -PI/2 and PI/2, or null if `x` is outside -1 to 1.</returns>
+/// </lang>
+gear pure asin(double x): double? {
+    if (x < -1.0 or x > 1.0) { return null; }
+    if (x eq 1.0) { return PI / 2.0; }
+    if (x eq -1.0) { return -PI / 2.0; }
+    return atan(x / (sqrt(1.0 - x * x) ?? 1.0));
+}
+
+/// <lang name="fr">
+/// <summary>L'arc cosinus (résultat approché).</summary>
+/// <param name="x">Le nombre, entre -1 et 1.</param>
+/// <returns>L'angle en radians dont le cosinus est `x`, entre 0 et PI, ou null si `x` est hors de -1 à 1.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The arccosine (approximate result).</summary>
+/// <param name="x">The number, between -1 and 1.</param>
+/// <returns>The angle in radians whose cosine is `x`, between 0 and PI, or null if `x` is outside -1 to 1.</returns>
+/// </lang>
+gear pure acos(double x): double? {
+    const double angle: asin(x) ?? 0.0;
+    return asin(x) eq null ? null : PI / 2.0 - angle;
+}

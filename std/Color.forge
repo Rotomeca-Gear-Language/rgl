@@ -1,0 +1,348 @@
+forge: gears
+description: "Couleurs RGB et RGBA : construction, lecture hexadécimale et conversions"
+
+use <Math> only {percent, min, max, abs, clamp, floor, lerp};
+
+/// <lang name="fr">
+/// <summary>Une composante de couleur : un entier de 0 à 255.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A color component: an integer from 0 to 255.</summary>
+/// </lang>
+ingot colorUnit: uint<0..255>;
+
+/// <lang name="fr">
+/// <summary>Une couleur opaque, par ses trois composantes.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An opaque color defined by its three components.</summary>
+/// </lang>
+mold Color {
+    /// <lang name="fr">
+    /// <summary>Quantité de rouge, de 0 à 255.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The amount of red, from 0 to 255.</summary>
+    /// </lang>
+    colorUnit r;
+
+    /// <lang name="fr">
+    /// <summary>Quantité de vert, de 0 à 255.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The amount of green, from 0 to 255.</summary>
+    /// </lang>
+    colorUnit g;
+
+    /// <lang name="fr">
+    /// <summary>Quantité de bleu, de 0 à 255.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The amount of blue, from 0 to 255.</summary>
+    /// </lang>
+    colorUnit b;
+}
+
+/// <lang name="fr">
+/// <summary>Une couleur avec sa transparence.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A color with transparency.</summary>
+/// </lang>
+mold ColorAlpha {
+    ...Color;
+
+    /// <lang name="fr">
+    /// <summary>Opacité, en pourcentage : 0 est transparent, 100 est opaque.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Opacity as a percentage: 0 is transparent, 100 is opaque.</summary>
+    /// </lang>
+    percent a;
+}
+
+/// <lang name="fr">
+/// <summary>Lit deux chiffres hexadécimaux (usage interne).</summary>
+/// <param name="pair">Les deux chiffres.</param>
+/// <returns>Leur valeur, `null` si l'un n'en est pas un.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads two hexadecimal digits (internal use).</summary>
+/// <param name="pair">The two digits.</param>
+/// <returns>Their value, `null` when one of them is not a digit.</returns>
+/// </lang>
+gear pure _hexByte(string pair): int? {
+    const string digits: '0123456789abcdef';
+    const string lower: pair.toLower();
+    const long high: digits.indexOf(lower.substring(0, 1)) ?? -1;
+    const long low: digits.indexOf(lower.substring(1, 2)) ?? -1;
+    return (high < 0 or low < 0) ? null : (high * 16 + low) as int;
+}
+
+/// <lang name="fr">
+/// <summary>Une fraction de 0 à 1 ramenée à un octet de 0 à 255 (usage interne).</summary>
+/// <param name="fraction">La fraction.</param>
+/// <returns>L'octet.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A fraction from 0 to 1 brought to a byte from 0 to 255 (internal use).</summary>
+/// <param name="fraction">The fraction.</param>
+/// <returns>The byte.</returns>
+/// </lang>
+gear pure _colorByte(double fraction): uint => clamp(floor(fraction * 255.0 + 0.5), 0, 255) as uint;
+
+/// <lang name="fr">
+/// <summary>Constantes et opérations sur les couleurs.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Constants and operations on colors.</summary>
+/// </lang>
+extend Color {
+    /// <lang name="fr">
+    /// <summary>Noir.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Black.</summary>
+    /// </lang>
+    const Color BLACK: {r: 0, g: 0, b: 0};
+
+    /// <lang name="fr">
+    /// <summary>Blanc.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>White.</summary>
+    /// </lang>
+    const Color WHITE: {r: 255, g: 255, b: 255};
+
+    /// <lang name="fr">
+    /// <summary>Rouge.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Red.</summary>
+    /// </lang>
+    const Color RED: {r: 255, g: 0, b: 0};
+
+    /// <lang name="fr">
+    /// <summary>Vert.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Green.</summary>
+    /// </lang>
+    const Color GREEN: {r: 0, g: 255, b: 0};
+
+    /// <lang name="fr">
+    /// <summary>Bleu.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Blue.</summary>
+    /// </lang>
+    const Color BLUE: {r: 0, g: 0, b: 255};
+
+    /// <lang name="fr">
+    /// <summary>Jaune.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Yellow.</summary>
+    /// </lang>
+    const Color YELLOW: {r: 255, g: 255, b: 0};
+
+    /// <lang name="fr">
+    /// <summary>Cyan.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Cyan.</summary>
+    /// </lang>
+    const Color CYAN: {r: 0, g: 255, b: 255};
+
+    /// <lang name="fr">
+    /// <summary>Magenta.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Magenta.</summary>
+    /// </lang>
+    const Color MAGENTA: {r: 255, g: 0, b: 255};
+
+    /// <lang name="fr">
+    /// <summary>Une couleur à partir de ses trois composantes (au-delà de 255, ramenées à 255).</summary>
+    /// <param name="r">Le rouge.</param>
+    /// <param name="g">Le vert.</param>
+    /// <param name="b">Le bleu.</param>
+    /// <returns>La couleur.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A color from its three components (anything above 255 is brought down to 255).</summary>
+    /// <param name="r">Red.</param>
+    /// <param name="g">Green.</param>
+    /// <param name="b">Blue.</param>
+    /// <returns>The color.</returns>
+    /// </lang>
+    gear pure rgb(uint r, uint g, uint b): Color => {r: colorUnit(min(r, 255)), g: colorUnit(min(g, 255)), b: colorUnit(min(b, 255))};
+
+    /// <lang name="fr">
+    /// <summary>Lit une couleur écrite `#rrggbb`, `rrggbb`, `#rgb` ou `rgb` (hexadécimal, majuscules ou minuscules).</summary>
+    /// <param name="text">Le texte de la couleur.</param>
+    /// <returns>La couleur, `null` si le texte n'en est pas une.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads a color written `#rrggbb`, `rrggbb`, `#rgb` or `rgb` (hexadecimal, upper or lower case).</summary>
+    /// <param name="text">The color text.</param>
+    /// <returns>The color, `null` when the text is not one.</returns>
+    /// </lang>
+    gear pure fromHex(string text): Color? {
+        const string digits: text.startsWith('#') ? text.substring(1, text.length as long) : text;
+        const string full: digits.length eq 3 ? digits.substring(0, 1).repeat(2) + digits.substring(1, 2).repeat(2) + digits.substring(2, 3).repeat(2) : digits;
+        if (full.length not eq 6) { return null; }
+        const int? r: _hexByte(full.substring(0, 2));
+        const int? g: _hexByte(full.substring(2, 4));
+        const int? b: _hexByte(full.substring(4, 6));
+        if (r eq null or g eq null or b eq null) { return null; }
+        return Color.rgb((r ?? 0) as uint, (g ?? 0) as uint, (b ?? 0) as uint);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Une couleur à partir de sa teinte, sa saturation et sa luminosité.</summary>
+    /// <param name="hue">La teinte en degrés (0 rouge, 120 vert, 240 bleu ; le tour complet est ramené dans 0 à 360).</param>
+    /// <param name="saturation">La saturation, de 0 à 1.</param>
+    /// <param name="lightness">La luminosité, de 0 (noir) à 1 (blanc).</param>
+    /// <returns>La couleur.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A color from its hue, saturation and lightness.</summary>
+    /// <param name="hue">The hue in degrees (0 red, 120 green, 240 blue; full turns are brought back into 0 to 360).</param>
+    /// <param name="saturation">The saturation, from 0 to 1.</param>
+    /// <param name="lightness">The lightness, from 0 (black) to 1 (white).</param>
+    /// <returns>The color.</returns>
+    /// </lang>
+    gear pure fromHsl(double hue, double saturation, double lightness): Color {
+        const double h: (hue - 360.0 * (floor(hue / 360.0) as double)) / 60.0;
+        const double chroma: (1.0 - abs(2.0 * lightness - 1.0)) * saturation;
+        const double x: chroma * (1.0 - abs(h - 2.0 * (floor(h / 2.0) as double) - 1.0));
+        const double m: lightness - chroma / 2.0;
+        const long sector: floor(h);
+        const (double, double, double) base: sector eq 0 ? (chroma, x, 0.0) : (sector eq 1 ? (x, chroma, 0.0) : (sector eq 2 ? (0.0, chroma, x) : (sector eq 3 ? (0.0, x, chroma) : (sector eq 4 ? (x, 0.0, chroma) : (chroma, 0.0, x)))));
+        return Color.rgb(_colorByte(base.Item1 + m), _colorByte(base.Item2 + m), _colorByte(base.Item3 + m));
+    }
+
+    /// <lang name="fr">
+    /// <summary>Écrit la couleur `#rrggbb` en minuscules.</summary>
+    /// <param name="c">La couleur.</param>
+    /// <returns>Le texte.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the color as lowercase `#rrggbb`.</summary>
+    /// <param name="c">The color.</param>
+    /// <returns>The text.</returns>
+    /// </lang>
+    gear pure toHex(this Color c): string =>
+        '#' + (c.r° as uint).toRadix(16).padStart(2, '0') + (c.g° as uint).toRadix(16).padStart(2, '0') + (c.b° as uint).toRadix(16).padStart(2, '0');
+
+    /// <lang name="fr">
+    /// <summary>La teinte (0 à 360), la saturation et la luminosité (0 à 1) de la couleur.</summary>
+    /// <param name="c">La couleur.</param>
+    /// <returns>Les trois valeurs.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The hue (0 to 360), saturation and lightness (0 to 1) of the color.</summary>
+    /// <param name="c">The color.</param>
+    /// <returns>The three values.</returns>
+    /// </lang>
+    gear pure toHsl(this Color c): (double hue, double saturation, double lightness) {
+        const double r: (c.r° as double) / 255.0;
+        const double g: (c.g° as double) / 255.0;
+        const double b: (c.b° as double) / 255.0;
+        const double high: max(r, max(g, b));
+        const double low: min(r, min(g, b));
+        const double l: (high + low) / 2.0;
+        const double d: high - low;
+        if (d eq 0.0) { return (hue: 0.0, saturation: 0.0, lightness: l); }
+        const double s: l > 0.5 ? d / (2.0 - high - low) : d / (high + low);
+        const double sector: high eq r ? (g - b) / d + (g < b ? 6.0 : 0.0) : (high eq g ? (b - r) / d + 2.0 : (r - g) / d + 4.0);
+        return (hue: sector * 60.0, saturation: s, lightness: l);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Mélange deux couleurs : 0 donne `a`, 1 donne `b`.</summary>
+    /// <param name="a">La première couleur.</param>
+    /// <param name="b">La seconde couleur.</param>
+    /// <param name="amount">La part de `b`, de 0 à 1.</param>
+    /// <returns>La couleur obtenue.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Mixes two colors: 0 gives `a`, 1 gives `b`.</summary>
+    /// <param name="a">The first color.</param>
+    /// <param name="b">The second color.</param>
+    /// <param name="amount">The share of `b`, from 0 to 1.</param>
+    /// <returns>The resulting color.</returns>
+    /// </lang>
+    gear pure mix(this Color a, Color b, double amount): Color {
+        const double t: clamp(amount, 0.0, 1.0);
+        return Color.rgb(_colorByte(lerp(a.r° as double, b.r° as double, t) / 255.0), _colorByte(lerp(a.g° as double, b.g° as double, t) / 255.0), _colorByte(lerp(a.b° as double, b.b° as double, t) / 255.0));
+    }
+
+    /// <lang name="fr">
+    /// <summary>Éclaircit la couleur en la mélangeant avec du blanc.</summary>
+    /// <param name="c">La couleur.</param>
+    /// <param name="amount">La part de blanc, de 0 à 1.</param>
+    /// <returns>La couleur éclaircie.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Lightens the color by mixing it with white.</summary>
+    /// <param name="c">The color.</param>
+    /// <param name="amount">The share of white, from 0 to 1.</param>
+    /// <returns>The lightened color.</returns>
+    /// </lang>
+    gear pure lighten(this Color c, double amount): Color => c.mix(Color.WHITE, amount);
+
+    /// <lang name="fr">
+    /// <summary>Assombrit la couleur en la mélangeant avec du noir.</summary>
+    /// <param name="c">La couleur.</param>
+    /// <param name="amount">La part de noir, de 0 à 1.</param>
+    /// <returns>La couleur assombrie.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Darkens the color by mixing it with black.</summary>
+    /// <param name="c">The color.</param>
+    /// <param name="amount">The share of black, from 0 to 1.</param>
+    /// <returns>The darkened color.</returns>
+    /// </lang>
+    gear pure darken(this Color c, double amount): Color => c.mix(Color.BLACK, amount);
+
+    /// <lang name="fr">
+    /// <summary>La couleur complémentaire à 255 : chaque composante devient son reste à 255.</summary>
+    /// <param name="c">La couleur.</param>
+    /// <returns>La couleur inversée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The color inverted against 255: each component becomes its complement to 255.</summary>
+    /// <param name="c">The color.</param>
+    /// <returns>The inverted color.</returns>
+    /// </lang>
+    gear pure inverted(this Color c): Color => Color.rgb(255 - (c.r° as uint), 255 - (c.g° as uint), 255 - (c.b° as uint));
+
+    /// <lang name="fr">
+    /// <summary>La luminance perçue, de 0 (noir) à 1 (blanc) (pondération de la recommandation Rec. 709, sans correction gamma).</summary>
+    /// <param name="c">La couleur.</param>
+    /// <returns>La luminance.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The perceived luminance, from 0 (black) to 1 (white) (Rec. 709 weights, without gamma correction).</summary>
+    /// <param name="c">The color.</param>
+    /// <returns>The luminance.</returns>
+    /// </lang>
+    gear pure luminance(this Color c): double => (0.2126 * (c.r° as double) + 0.7152 * (c.g° as double) + 0.0722 * (c.b° as double)) / 255.0;
+
+    /// <lang name="fr">
+    /// <summary>La couleur en niveaux de gris, d'après sa luminance.</summary>
+    /// <param name="c">La couleur.</param>
+    /// <returns>Le gris.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The color in shades of gray, from its luminance.</summary>
+    /// <param name="c">The color.</param>
+    /// <returns>The gray.</returns>
+    /// </lang>
+    gear pure grayscale(this Color c): Color {
+        const uint level: _colorByte(c.luminance());
+        return Color.rgb(level, level, level);
+    }
+}

@@ -1,0 +1,26 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=test pure=false parameters=1
+    Parameter 2:11 name=notes
+      ArrayType 2:11
+        PrimitiveType 2:12 type=int
+    PrimitiveType 2:25 type=void
+    BlockStatement 2:30
+      VarDeclaration 3:5 keyword=var name=total
+        FoldExpression 3:16
+          NameExpression 3:16 name=notes
+          LiteralExpression 3:26 kind=IntegerLiteral text=0
+          EachTarget 3:28
+            LambdaExpression 3:28 parameters=2
+              LambdaParameter 3:29 name=acc
+              LambdaParameter 3:34 name=x
+              BinaryExpression 3:40 op=+
+                NameExpression 3:40 name=acc
+                NameExpression 3:46 name=x
+      VarDeclaration 4:5 keyword=var name=r
+        RangeExpression 4:12 exclusive=false
+          LiteralExpression 4:13 kind=IntegerLiteral text=0
+          LiteralExpression 4:16 kind=IntegerLiteral text=10
+          LiteralExpression 4:22 kind=IntegerLiteral text=2
+  TrainDeclaration 6:1 unguarded=false parameters=none
+    Pipeline 6:7
+      DoneStep 6:10

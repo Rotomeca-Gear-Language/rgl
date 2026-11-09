@@ -1,0 +1,136 @@
+forge: gears
+description: "Nombres décimaux exacts : somme, produit, quotient, comparaison, arrondi, lecture et écriture, sans erreur d'arrondi binaire"
+
+/// <lang name="fr">
+/// <summary>Un nombre décimal exact : `units` divisé par dix puissance `scale` (`12.34` est `1234` avec une échelle de 2). Les opérateurs `+ - * /`, le `-` unaire et les comparaisons s'écrivent comme sur des nombres. Les calculs sont faits sur des entiers de 64 bits et s'arrêtent sur un débordement (environ 18 chiffres) ; `/` garde dix chiffres de plus que le plus précis des deux opérandes (pour une autre précision, voir `divide`).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An exact decimal number: `units` divided by ten to the power `scale` (`12.34` is `1234` with a scale of 2). The `+ - * /` operators, unary `-` and comparisons are written as on numbers. Computations use 64-bit integers and stop on overflow (about 18 digits); `/` keeps ten more digits than the more precise operand (for another precision, see `divide`).</summary>
+/// </lang>
+mold Decimal {
+    /// <lang name="fr"><summary>Le nombre sans sa virgule.</summary></lang>
+    /// <lang name="en"><summary>The number without its decimal point.</summary></lang>
+    long units;
+    /// <lang name="fr"><summary>Le nombre de chiffres après la virgule.</summary></lang>
+    /// <lang name="en"><summary>The number of digits after the decimal point.</summary></lang>
+    long scale;
+
+    /// <lang name="fr"><summary>La somme de deux décimaux.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>La somme.</returns></lang>
+    /// <lang name="en"><summary>The sum of two decimals.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>The sum.</returns></lang>
+    pure Decimal +(Decimal a, Decimal b) {
+        const long scale: a.scale > b.scale ? a.scale : b.scale;
+        return {units: a.units * _pow10(scale - a.scale) + b.units * _pow10(scale - b.scale), scale};
+    }
+
+    /// <lang name="fr"><summary>La différence de deux décimaux.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>La différence.</returns></lang>
+    /// <lang name="en"><summary>The difference of two decimals.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>The difference.</returns></lang>
+    pure Decimal -(Decimal a, Decimal b) {
+        const long scale: a.scale > b.scale ? a.scale : b.scale;
+        return {units: a.units * _pow10(scale - a.scale) - b.units * _pow10(scale - b.scale), scale};
+    }
+
+    /// <lang name="fr"><summary>L'opposé d'un décimal.</summary><param name="a">Le décimal.</param><returns>Son opposé.</returns></lang>
+    /// <lang name="en"><summary>The opposite of a decimal.</summary><param name="a">The decimal.</param><returns>Its opposite.</returns></lang>
+    pure Decimal -(Decimal a) { return {units: -a.units, scale: a.scale}; }
+
+    /// <lang name="fr"><summary>Le produit de deux décimaux (l'échelle est la somme des deux).</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>Le produit.</returns></lang>
+    /// <lang name="en"><summary>The product of two decimals (the scale is the sum of both).</summary><param name="a">The first.</param><param name="b">The second.</param><returns>The product.</returns></lang>
+    pure Decimal *(Decimal a, Decimal b) { return {units: a.units * b.units, scale: a.scale + b.scale}; }
+
+    /// <lang name="fr"><summary>Le quotient de deux décimaux, avec dix chiffres de plus que le plus précis des deux (arrondi vers zéro).</summary><param name="a">Le dividende.</param><param name="b">Le diviseur.</param><returns>Le quotient.</returns></lang>
+    /// <lang name="en"><summary>The quotient of two decimals, with ten more digits than the more precise one (rounded toward zero).</summary><param name="a">The dividend.</param><param name="b">The divisor.</param><returns>The quotient.</returns></lang>
+    pure Decimal /(Decimal a, Decimal b) {
+        const long target: (a.scale > b.scale ? a.scale : b.scale) + 10;
+        return {units: a.units * _pow10(target - a.scale + b.scale) / b.units, scale: target};
+    }
+
+    /// <lang name="fr"><summary>Dit si deux décimaux valent la même chose (`1.50` et `1.5` sont égaux).</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>Vrai s'ils sont égaux.</returns></lang>
+    /// <lang name="en"><summary>Tells whether two decimals have the same value (`1.50` and `1.5` are equal).</summary><param name="a">The first.</param><param name="b">The second.</param><returns>True when equal.</returns></lang>
+    pure bool eq(Decimal a, Decimal b) { return _compareDecimal(a, b) eq 0; }
+
+    /// <lang name="fr"><summary>Dit si le premier décimal est plus petit.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>Vrai si `a` est plus petit que `b`.</returns></lang>
+    /// <lang name="en"><summary>Tells whether the first decimal is smaller.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>True when `a` is smaller than `b`.</returns></lang>
+    pure bool <(Decimal a, Decimal b) { return _compareDecimal(a, b) < 0; }
+
+    /// <lang name="fr"><summary>Dit si le premier décimal est plus grand.</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>Vrai si `a` est plus grand que `b`.</returns></lang>
+    /// <lang name="en"><summary>Tells whether the first decimal is larger.</summary><param name="a">The first.</param><param name="b">The second.</param><returns>True when `a` is larger than `b`.</returns></lang>
+    pure bool >(Decimal a, Decimal b) { return _compareDecimal(a, b) > 0; }
+}
+
+/// <lang name="fr"><summary>Dix puissance `n` (usage interne).</summary><param name="n">L'exposant, de 0 à 18.</param><returns>Le nombre.</returns></lang>
+/// <lang name="en"><summary>Ten to the power `n` (internal use).</summary><param name="n">The exponent, from 0 to 18.</param><returns>The number.</returns></lang>
+gear pure _pow10(long n): long {
+    if (n <= 0) { return 1; }
+    const long start: 1;
+    return [1..n] |+> start with (acc, i) => acc * 10;
+}
+
+/// <lang name="fr"><summary>Compare deux décimaux (usage interne).</summary><param name="a">Le premier.</param><param name="b">Le second.</param><returns>Un nombre négatif si `a` est plus petit, positif s'il est plus grand, nul s'ils sont égaux.</returns></lang>
+/// <lang name="en"><summary>Compares two decimals (internal use).</summary><param name="a">The first.</param><param name="b">The second.</param><returns>A negative number when `a` is smaller, positive when larger, zero when equal.</returns></lang>
+gear pure _compareDecimal(Decimal a, Decimal b): int {
+    const long scale: a.scale > b.scale ? a.scale : b.scale;
+    const long left: a.units * _pow10(scale - a.scale);
+    const long right: b.units * _pow10(scale - b.scale);
+    return left < right ? -1 : (left > right ? 1 : 0);
+}
+
+/// <lang name="fr"><summary>Construit un décimal.</summary><param name="units">Le nombre sans sa virgule.</param><param name="scale">Le nombre de chiffres après la virgule (de 0 à 18).</param><returns>Le décimal `units / 10^scale`.</returns></lang>
+/// <lang name="en"><summary>Builds a decimal.</summary><param name="units">The number without its decimal point.</param><param name="scale">The number of digits after the decimal point (0 to 18).</param><returns>The decimal `units / 10^scale`.</returns></lang>
+gear pure newDecimal(long units, long scale: 0): Decimal => {units, scale: scale < 0 ? 0 : (scale > 18 ? 18 : scale)};
+
+/// <lang name="fr"><summary>Lit un décimal écrit `-12.345` (un signe facultatif, des chiffres, une virgule facultative).</summary><param name="text">Le texte.</param><returns>Le décimal, `null` si le texte n'en est pas un ou s'il est trop grand.</returns></lang>
+/// <lang name="en"><summary>Reads a decimal written `-12.345` (an optional sign, digits, an optional decimal point).</summary><param name="text">The text.</param><returns>The decimal, or `null` when the text is not one or is too large.</returns></lang>
+gear pure parseDecimal(string text): Decimal? {
+    const bool negative: text.startsWith('-');
+    const string body: negative or text.startsWith('+') ? text.substring(1, text.length) : text;
+    const (string before, string after, bool found) parts: body.splitOnce('.');
+    const string digits: `{parts.before}{parts.after}`;
+    if (digits.length < 1 or digits.length > 18 or (parts.before.length < 1 and parts.after.length < 1)) { return null; }
+    const bool allDigits: [0..<digits.length] |+> true with (acc, i) => acc and digits[i].isDigit();
+    if (not allDigits) { return null; }
+    const long? units: digits as? long;
+    if (units eq null) { return null; }
+    const long value: units ?? 0;
+    return {units: negative ? -value : value, scale: parts.after.length as long};
+}
+
+/// <lang name="fr"><summary>Écrit un décimal avec tous ses chiffres : `-12.340`.</summary><param name="value">Le décimal.</param><returns>Le texte.</returns></lang>
+/// <lang name="en"><summary>Writes a decimal with all its digits: `-12.340`.</summary><param name="value">The decimal.</param><returns>The text.</returns></lang>
+gear pure decimalText(Decimal value): string {
+    const long absolute: value.units < 0 ? -value.units : value.units;
+    const string sign: value.units < 0 ? '-' : '';
+    if (value.scale eq 0) { return `{sign}{absolute}`; }
+    const string digits: `{absolute}`.padStart((value.scale + 1) as uint, '0');
+    const long cut: (digits.length as long) - value.scale;
+    return `{sign}{digits.substring(0, cut)}.{digits.substring(cut, digits.length)}`;
+}
+
+/// <lang name="fr"><summary>Le décimal sans ses zéros inutiles à droite : `1.500` devient `1.5`.</summary><param name="value">Le décimal.</param><returns>Le même nombre, avec l'échelle la plus petite.</returns></lang>
+/// <lang name="en"><summary>The decimal without its useless trailing zeros: `1.500` becomes `1.5`.</summary><param name="value">The decimal.</param><returns>The same number, with the smallest scale.</returns></lang>
+gear pure normalizeDecimal(Decimal value): Decimal {
+    if (value.scale > 0 and value.units % 10 eq 0) { return normalizeDecimal({units: value.units / 10, scale: value.scale - 1}); }
+    return value;
+}
+
+/// <lang name="fr"><summary>Arrondit un décimal à un nombre de chiffres après la virgule : la moitié s'arrondit en s'éloignant de zéro (`2.5` donne `3`, `-2.5` donne `-3`).</summary><param name="value">Le décimal.</param><param name="scale">Le nombre de chiffres à garder.</param><returns>Le décimal arrondi (avec des zéros ajoutés si `scale` est plus grand que le sien).</returns></lang>
+/// <lang name="en"><summary>Rounds a decimal to a number of digits after the decimal point: halves round away from zero (`2.5` gives `3`, `-2.5` gives `-3`).</summary><param name="value">The decimal.</param><param name="scale">The number of digits to keep.</param><returns>The rounded decimal (with zeros added if `scale` is larger than its own).</returns></lang>
+gear pure roundDecimal(Decimal value, long scale): Decimal {
+    if (scale >= value.scale) { return {units: value.units * _pow10(scale - value.scale), scale}; }
+    const long divisor: _pow10(value.scale - scale);
+    const long quotient: value.units / divisor;
+    const long remainder: value.units % divisor;
+    const long magnitude: remainder < 0 ? -remainder : remainder;
+    const long step: value.units < 0 ? -1 : 1;
+    return {units: magnitude * 2 >= divisor ? quotient + step : quotient, scale};
+}
+
+/// <lang name="fr"><summary>Divise avec une précision donnée (arrondi vers zéro).</summary><param name="a">Le dividende.</param><param name="b">Le diviseur.</param><param name="scale">Le nombre de chiffres après la virgule du quotient.</param><returns>Le quotient.</returns></lang>
+/// <lang name="en"><summary>Divides with a given precision (rounded toward zero).</summary><param name="a">The dividend.</param><param name="b">The divisor.</param><param name="scale">The number of digits after the decimal point of the quotient.</param><returns>The quotient.</returns></lang>
+gear pure divide(Decimal a, Decimal b, long scale): Decimal {
+    const long shift: scale - a.scale + b.scale;
+    return {units: shift >= 0 ? a.units * _pow10(shift) / b.units : a.units / (b.units * _pow10(0 - shift)), scale};
+}
+
+/// <lang name="fr"><summary>Le décimal sous forme de flottant (peut perdre de la précision).</summary><param name="value">Le décimal.</param><returns>Le flottant le plus proche.</returns></lang>
+/// <lang name="en"><summary>The decimal as a float (may lose precision).</summary><param name="value">The decimal.</param><returns>The closest float.</returns></lang>
+gear pure decimalToDouble(Decimal value): double => ((value.units as double) / (_pow10(value.scale) as double));

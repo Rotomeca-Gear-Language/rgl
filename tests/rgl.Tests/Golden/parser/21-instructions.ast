@@ -1,0 +1,20 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=none name=score
+    PrimitiveType 2:1 type=int
+    LiteralExpression 2:12 kind=IntegerLiteral text=0
+  AssignmentStatement 3:1 target=score
+    LiteralExpression 3:10 kind=IntegerLiteral text=5
+  AssignmentStatement 4:1 target=score
+    PrimitiveType 4:8 type=int
+    BinaryExpression 4:15 op=+
+      NameExpression 4:15 name=score
+      LiteralExpression 4:23 kind=IntegerLiteral text=1
+  BlockStatement 5:1
+    VarDeclaration 6:5 keyword=var name=a
+      NameExpression 6:12 name=score
+    BlockStatement 7:5
+      UndefineStatement 8:9 name=a
+  TrainDeclaration 11:1 unguarded=true parameters=none
+    Pipeline 11:8
+      ExitCodeStep 11:11
+        LiteralExpression 11:13 kind=IntegerLiteral text=0

@@ -1,0 +1,4 @@
+// Un template dans une interpolation, et un accent grave dans une chaîne interpolée.
+var a: 1;
+var t: `dehors {`dedans {a + 1}`} et {"`"} fin`;
+train |> done;

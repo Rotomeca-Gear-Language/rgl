@@ -1,0 +1,72 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=guard name=positif pure=false parameters=1
+    Parameter 2:15 name=n
+      PrimitiveType 2:15 type=int
+    PrimitiveType 2:23 type=int
+    BlockStatement 2:27
+      IfStatement 3:5
+        BinaryExpression 3:9 op=<
+          NameExpression 3:9 name=n
+          LiteralExpression 3:13 kind=IntegerLiteral text=0
+        BlockStatement 3:16
+          FailStatement 4:9
+            LiteralExpression 4:14 kind=StringLiteral text="négatif"
+      DoneStatement 6:5
+  GearDeclaration 9:1 kind=guard name=nombre pure=false parameters=1
+    Parameter 9:14 name=texte
+      PrimitiveType 9:14 type=string
+    PrimitiveType 9:29 type=int
+    CastExpression 9:36 kind=Forced
+      NameExpression 9:36 name=texte
+      PrimitiveType 9:46 type=int
+  GearDeclaration 11:1 kind=gear name=demander pure=false parameters=1
+    Parameter 11:15 name=question
+      PrimitiveType 11:15 type=string
+    PrimitiveType 11:33 type=string
+    BlockStatement 11:40
+      WriteStatement 12:5 target=console
+        NameExpression 12:5 name=question
+      VarDeclaration 13:5 keyword=var name=reponse
+        ReadExpression 13:20 source=console
+      AssignmentStatement 14:5 target=reponse
+        ReadExpression 14:16 source=console
+      WriteStatement 15:5 target=console
+        TemplateExpression 15:5
+          TemplateInterpolation 15:6
+            NameExpression 15:7 name=reponse
+          TemplateText 15:15 text=\n
+      ReturnStatement 16:5
+        NameExpression 16:12 name=reponse
+  GearDeclaration 19:1 kind=guard name=verifier pure=false parameters=0
+    PrimitiveType 19:19 type=void
+    BlockStatement 19:24
+      FailStatement 20:5
+  GearDeclaration 23:1 kind=emit name=afficher pure=false parameters=1
+    Parameter 23:15 name=n
+      PrimitiveType 23:15 type=int
+    PrimitiveType 23:23 type=void
+    BlockStatement 23:28
+      WriteStatement 24:5 target=console
+        BinaryExpression 24:5 op=*
+          NameExpression 24:5 name=n
+          LiteralExpression 24:9 kind=IntegerLiteral text=2
+  GearDeclaration 27:1 kind=emit name=signaler pure=false parameters=1
+    Parameter 27:15 name=e
+      NamedType 27:15 name=Exception
+    PrimitiveType 27:29 type=uint
+    BlockStatement 27:34
+      WriteStatement 28:5 target=console
+        TemplateExpression 28:5
+          TemplateText 28:6 text=Erreur : 
+          TemplateInterpolation 28:15
+            NameExpression 28:16 name=e
+      ReturnStatement 29:5
+        LiteralExpression 29:12 kind=IntegerLiteral text=2
+  TrainDeclaration 32:1 unguarded=false parameters=none
+    LiteralExpression 32:7 kind=StringLiteral text="42"
+    Pipeline 32:12
+      CallStep 32:15 gear=nombre
+      CallStep 32:25 gear=positif
+        Rail 32:33
+          CallStep 32:37 gear=signaler
+      CallStep 32:50 gear=afficher

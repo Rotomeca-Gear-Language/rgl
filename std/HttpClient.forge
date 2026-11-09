@@ -1,0 +1,249 @@
+forge: gears
+description: "Client HTTP/HTTPS synchrone : requêtes, redirections et lecture des en-têtes de la réponse"
+
+use <Compression> only {gzipDecompress};
+use <Http> only {_headerFields, HttpError};
+
+/// <lang name="fr"><summary>Configuration d'un client HTTP synchrone.</summary></lang>
+/// <lang name="en"><summary>Configuration for a synchronous HTTP client.</summary></lang>
+mold HttpClient {
+    /// <lang name="fr"><summary>En-têtes bruts ajoutés à chaque requête.</summary></lang>
+    /// <lang name="en"><summary>Raw headers added to every request.</summary></lang>
+    string headers: '';
+    /// <lang name="fr"><summary>Délai maximal des entrées-sorties, en millisecondes.</summary></lang>
+    /// <lang name="en"><summary>Maximum I/O timeout, in milliseconds.</summary></lang>
+    uint timeout: 30000;
+
+    /// <lang name="fr">
+    /// <summary>Le nombre maximal de redirections suivies (0 pour n'en suivre aucune).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The maximal number of redirections followed (0 to follow none).</summary>
+    /// </lang>
+    uint maxRedirects: 5;
+}
+
+/// <lang name="fr"><summary>Réponse reçue par le client HTTP.</summary></lang>
+/// <lang name="en"><summary>Response received by the HTTP client.</summary></lang>
+mold HttpClientResponse {
+    /// <lang name="fr"><summary>Le code de statut renvoyé par le serveur.</summary></lang>
+    /// <lang name="en"><summary>The status code returned by the server.</summary></lang>
+    uint status;
+    /// <lang name="fr"><summary>Les en-têtes bruts de la réponse.</summary></lang>
+    /// <lang name="en"><summary>The raw response headers.</summary></lang>
+    string headers;
+    /// <lang name="fr"><summary>Le corps de la réponse.</summary></lang>
+    /// <lang name="en"><summary>The response body.</summary></lang>
+    string body;
+}
+
+/// <lang name="fr"><summary>Exécute une requête HTTP dans le transport natif.</summary></lang>
+/// <lang name="en"><summary>Performs an HTTP request in the native transport.</summary></lang>
+@trusted
+gear _exchange(string method, string url, string headers, string body, uint timeout): string => cpp {
+    #include "rgl/standard/http.hpp"
+    rgl_return rgl(const rgl_arg_method& method, const rgl_arg_url& url, const rgl_arg_headers& headers, const rgl_arg_body& body, unsigned int timeout) {
+        return rgl::standard::http::exchange(method, url, headers, body, timeout);
+    }
+}(string method: method, string url: url, string headers: headers, string body: body, uint timeout: timeout): string;
+
+/// <lang name="fr"><summary>Exécute une requête HTTPS avec validation du certificat.</summary></lang>
+/// <lang name="en"><summary>Performs an HTTPS request with certificate validation.</summary></lang>
+@trusted
+gear _exchangeTls(string method, string url, string headers, string body, uint timeout): string => cpp {
+    #include "rgl/standard/http_tls.hpp"
+    rgl_return rgl(const rgl_arg_method& method, const rgl_arg_url& url, const rgl_arg_headers& headers, const rgl_arg_body& body, unsigned int timeout) {
+        return rgl::standard::http::exchange_tls(method, url, headers, body, timeout);
+    }
+}(string method: method, string url: url, string headers: headers, string body: body, uint timeout: timeout): string;
+
+/// <lang name="fr"><summary>Analyse la ligne de statut, les en-têtes et le corps d'une réponse brute.</summary></lang>
+/// <lang name="en"><summary>Parses the status line, headers, and body of a raw response.</summary></lang>
+gear pure _clientResponse(string raw): HttpClientResponse? {
+    const (string before, string after, bool found) head: raw.splitOnce("\r\n\r\n");
+    if (not head.found) { return null; }
+    const (string before, string after, bool found) first: head.before.splitOnce("\r\n");
+    const [string] statusParts: first.before.split(' ');
+    if (statusParts.length < 2) { return null; }
+    const int? status: statusParts[1].toInt();
+    return status eq null ? null : {status: (status ?? 0) as uint, headers: first.after, body: head.after};
+}
+
+/// <lang name="fr">
+/// <summary>Envoie une requête et suit les redirections (usage interne).</summary>
+/// <param name="client">Le client.</param>
+/// <param name="method">La méthode.</param>
+/// <param name="url">L'adresse.</param>
+/// <param name="body">Le corps.</param>
+/// <param name="redirects">Les redirections encore permises.</param>
+/// <returns>La réponse finale.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sends a request and follows redirections (internal use).</summary>
+/// <param name="client">The client.</param>
+/// <param name="method">The method.</param>
+/// <param name="url">The address.</param>
+/// <param name="body">The body.</param>
+/// <param name="redirects">The redirections still allowed.</param>
+/// <returns>The final response.</returns>
+/// </lang>
+guard _fetch(HttpClient client, string method, string url, string body, uint redirects): HttpClientResponse {
+    const string headers: client.headers.toLower().contains('accept-encoding') ? client.headers : (client.headers eq '' ? 'Accept-Encoding: gzip' : client.headers + "\r\nAccept-Encoding: gzip");
+    const string raw: url.startsWith('https://')
+        ? _exchangeTls(method, url, headers, body, client.timeout)
+        : _exchange(method, url, headers, body, client.timeout);
+    const HttpClientResponse? parsed: _clientResponse(raw);
+    if (parsed eq null) { fail new HttpError {message: 'la requête HTTP a échoué', code: -1, operation: 'request'}; }
+    const HttpClientResponse response: _decoded(parsed ?? {status: 0, headers: '', body: ''});
+    const string? location: response.header('location');
+    const bool redirects3: response.status eq 301 or response.status eq 302 or response.status eq 303 or response.status eq 307 or response.status eq 308;
+    if (redirects3 and redirects > 0 and location not eq null) {
+        const string target: _absolute(url, location ?? '');
+        const bool toGet: response.status eq 303 or ((response.status eq 301 or response.status eq 302) and method eq 'POST');
+        return _fetch(client, toGet ? 'GET' : method, target, toGet ? '' : body, redirects - 1);
+    }
+    return response;
+}
+
+/// <lang name="fr">
+/// <summary>L'adresse absolue d'un en-tête `Location` (usage interne).</summary>
+/// <param name="base">L'adresse demandée.</param>
+/// <param name="location">La valeur de `Location`.</param>
+/// <returns>L'adresse absolue.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The absolute address of a `Location` header (internal use).</summary>
+/// <param name="base">The requested address.</param>
+/// <param name="location">The `Location` value.</param>
+/// <returns>The absolute address.</returns>
+/// </lang>
+gear pure _absolute(string base, string location): string {
+    if (location.startsWith('http://') or location.startsWith('https://')) { return location; }
+    const long schemeEnd: (base.indexOf('://') ?? 0) + 3;
+    const string rest: base.substring(schemeEnd, base.length as long);
+    const long hostEnd: schemeEnd + (rest.indexOf('/') ?? (rest.length as long));
+    return location.startsWith('/') ? base.substring(0, hostEnd) + location : base.substring(0, hostEnd) + '/' + location;
+}
+
+/// <lang name="fr">
+/// <summary>La réponse dont le corps gzip est décompressé (usage interne).</summary>
+/// <param name="response">La réponse reçue.</param>
+/// <returns>La réponse décodée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The response with its gzip body decompressed (internal use).</summary>
+/// <param name="response">The response received.</param>
+/// <returns>The decoded response.</returns>
+/// </lang>
+gear pure _decoded(HttpClientResponse response): HttpClientResponse {
+    if ((response.header('content-encoding') ?? '').toLower() not eq 'gzip') { return response; }
+    const bytes? plain: gzipDecompress(response.body as bytes);
+    const string? text: plain eq null ? null : (plain ?? ('' as bytes)) as? string;
+    return text eq null ? response : {status: response.status, headers: response.headers, body: text ?? ''};
+}
+
+/// <lang name="fr">
+/// <summary>Lecture des en-têtes d'une réponse.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reading the headers of a response.</summary>
+/// </lang>
+extend HttpClientResponse {
+    /// <lang name="fr">
+    /// <summary>La valeur d'un en-tête de la réponse.</summary>
+    /// <param name="response">La réponse.</param>
+    /// <param name="name">Le nom de l'en-tête (la casse est ignorée).</param>
+    /// <returns>La valeur, `null` si l'en-tête est absent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The value of a response header.</summary>
+    /// <param name="response">The response.</param>
+    /// <param name="name">The header name (case is ignored).</param>
+    /// <returns>The value, `null` when the header is absent.</returns>
+    /// </lang>
+    gear pure header(this HttpClientResponse response, string name): string? {
+        const string wanted: name.toLower();
+        return _headerFields(response.headers).has(wanted) ? _headerFields(response.headers)[wanted] : null;
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Un pot à cookies : ce que les serveurs ont demandé de garder, par nom de machine. `sendWithJar` l'envoie avec chaque requête et le met à jour avec chaque réponse (un client qui garde sa session ouverte). Les attributs `Path`, `Domain`, `Secure` et `Expires` ne sont pas lus : un cookie est renvoyé à toute adresse de la même machine ; seul `Max-Age=0` (et un `Expires` dans le passé écrit comme `1970`) le supprime.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A cookie jar: what servers asked to be kept, by host name. `sendWithJar` sends it with each request and updates it with each response (a client that keeps its session open). The `Path`, `Domain`, `Secure` and `Expires` attributes are not read: a cookie is sent back to any address of the same host; only `Max-Age=0` (and an `Expires` in the past written as `1970`) removes it.</summary>
+/// </lang>
+mold CookieJar {
+    /// <lang name="fr"><summary>Les cookies, nom de machine puis nom du cookie.</summary></lang>
+    /// <lang name="en"><summary>The cookies, host name then cookie name.</summary></lang>
+    [string:[string:string]] hosts;
+}
+
+/// <lang name="fr"><summary>Crée un pot à cookies vide.</summary><returns>Un pot sans cookie.</returns></lang>
+/// <lang name="en"><summary>Creates an empty cookie jar.</summary><returns>A jar with no cookies.</returns></lang>
+gear pure newCookieJar(): CookieJar => {hosts: [:]};
+
+/// <lang name="fr"><summary>Le nom de machine d'une adresse (usage interne).</summary><param name="url">L'adresse.</param><returns>La machine, sans port.</returns></lang>
+/// <lang name="en"><summary>The host name of an address (internal use).</summary><param name="url">The address.</param><returns>The host, without port.</returns></lang>
+gear pure _cookieHost(string url): string {
+    const (string before, string after, bool found) scheme: url.splitOnce('://');
+    const string rest: scheme.found ? scheme.after : url;
+    const string authority: rest.splitOnce('/').before.splitOnce('?').before;
+    return authority.splitOnce(':').before.toLower();
+}
+
+/// <lang name="fr"><summary>Les cookies à envoyer à une adresse, écrits pour l'en-tête `Cookie`.</summary><param name="jar">Le pot.</param><param name="url">L'adresse.</param><returns>`a=1; b=2`, vide s'il n'y en a pas.</returns></lang>
+/// <lang name="en"><summary>The cookies to send to an address, written for the `Cookie` header.</summary><param name="jar">The jar.</param><param name="url">The address.</param><returns>`a=1; b=2`, empty when there are none.</returns></lang>
+gear pure jarHeader(CookieJar jar, string url): string {
+    const string host: _cookieHost(url);
+    if (not jar.hosts.has(host)) { return ''; }
+    const [string:string] cookies: jar.hosts[host];
+    return (cookies.keys() ||> (name) => `{name}={cookies[name]}`).join('; ');
+}
+
+/// <lang name="fr"><summary>Range dans le pot les cookies que la réponse a demandé de garder (lignes `Set-Cookie`).</summary><param name="jar">Le pot (variable `mut`).</param><param name="url">L'adresse qui a répondu.</param><param name="response">La réponse.</param></lang>
+/// <lang name="en"><summary>Stores in the jar the cookies that the response asked to keep (`Set-Cookie` lines).</summary><param name="jar">The jar (a `mut` variable).</param><param name="url">The address that answered.</param><param name="response">The response.</param></lang>
+gear jarStore(mut CookieJar jar, string url, HttpClientResponse response): void {
+    const string host: _cookieHost(url);
+    const [string:string] none: [:];
+    const [string] lines: response.headers.split("\r\n");
+    const [string:string] updated: lines |+> (jar.hosts.has(host) ? jar.hosts[host] : none) with (acc, line) => {
+        const (string before, string after, bool found) header: line.splitOnce(':');
+        if (not header.found or header.before.trim().toLower() not eq 'set-cookie') { return acc; }
+        const [string] parts: header.after.split(';');
+        const (string before, string after, bool found) pair: parts[0].trim().splitOnce('=');
+        if (not pair.found or pair.before.length < 1) { return acc; }
+        const string attributes: (parts.slice(1, parts.length as long) ||> (part) => part.trim().toLower()).join(';');
+        const bool expired: attributes.contains('max-age=0') or attributes.contains('1970');
+        return expired ? acc.without(pair.before) : acc.put(pair.before, pair.after);
+    };
+    jar.hosts <- jar.hosts.put(host, updated);
+}
+
+extend HttpClient {
+    /// <lang name="fr"><summary>Crée un client avec un délai de 30 secondes.</summary><returns>Le client configuré.</returns></lang>
+    /// <lang name="en"><summary>Creates a client with a 30-second timeout.</summary><returns>The configured client.</returns></lang>
+    gear pure create(): HttpClient => {headers: '', timeout: 30000, maxRedirects: 5};
+
+    /// <lang name="fr"><summary>Envoie une requête HTTP.</summary><param name="client">Configuration du client.</param><param name="method">Méthode HTTP.</param><param name="url">URL absolue commençant par `http://`.</param><param name="body">Corps à envoyer.</param><returns>La réponse reçue.</returns></lang>
+    /// <lang name="en"><summary>Sends an HTTP request.</summary><param name="client">Client configuration.</param><param name="method">HTTP method.</param><param name="url">Absolute URL beginning with `http://`.</param><param name="body">Body to send.</param><returns>The received response.</returns></lang>
+    guard send(this HttpClient client, string method, string url, string body: ''): HttpClientResponse => _fetch(client, method, url, body, client.maxRedirects);
+
+    /// <lang name="fr"><summary>Envoie une requête `GET`.</summary><param name="client">Configuration du client.</param><param name="url">L'adresse demandée.</param></lang>
+    /// <lang name="en"><summary>Sends a `GET` request.</summary><param name="client">Client configuration.</param><param name="url">The requested address.</param></lang>
+    guard get(this HttpClient client, string url): HttpClientResponse => client.send('GET', url);
+
+    /// <lang name="fr"><summary>Envoie une requête `POST`.</summary><param name="client">Configuration du client.</param><param name="url">URL absolue.</param><param name="body">Corps à envoyer.</param><returns>La réponse reçue.</returns></lang>
+    /// <lang name="en"><summary>Sends a `POST` request.</summary><param name="client">Client configuration.</param><param name="url">Absolute URL.</param><param name="body">Body to send.</param><returns>The received response.</returns></lang>
+    guard post(this HttpClient client, string url, string body): HttpClientResponse => client.send('POST', url, body);
+
+    /// <lang name="fr"><summary>Envoie une requête en joignant les cookies du pot, puis range ceux que la réponse demande de garder. Les cookies posés par une étape intermédiaire d'une redirection ne sont pas gardés.</summary><param name="client">Configuration du client.</param><param name="jar">Le pot (variable `mut`).</param><param name="method">Méthode HTTP.</param><param name="url">Adresse absolue.</param><param name="body">Corps de la requête.</param><returns>La réponse.</returns></lang>
+    /// <lang name="en"><summary>Sends a request with the jar's cookies attached, then stores those the response asks to keep. Cookies set by an intermediate step of a redirection are not kept.</summary><param name="client">Client configuration.</param><param name="jar">The jar (a `mut` variable).</param><param name="method">HTTP method.</param><param name="url">Absolute address.</param><param name="body">Request body.</param><returns>The response.</returns></lang>
+    guard sendWithJar(this HttpClient client, mut CookieJar jar, string method, string url, string body: ''): HttpClientResponse {
+        const string cookie: jarHeader(jar, url);
+        const HttpClient withCookies: {headers: cookie eq '' ? client.headers : `{client.headers}Cookie: {cookie}\r\n`, timeout: client.timeout, maxRedirects: client.maxRedirects};
+        const HttpClientResponse response: _fetch(withCookies, method, url, body, client.maxRedirects);
+        jarStore(jar, url, response);
+        return response;
+    }
+}

@@ -1,0 +1,9 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=sansParametres pure=false parameters=0
+    PrimitiveType 2:22 type=int
+    LiteralExpression 2:29 kind=IntegerLiteral text=1
+  GearDeclaration 3:1 kind=gear name=sansType pure=false parameters=0
+    MissingType 3:16
+    LiteralExpression 3:20 kind=IntegerLiteral text=1
+  GearDeclaration 4:1 kind=gear name=sansCorps pure=false parameters=0
+    PrimitiveType 4:19 type=int

@@ -1,0 +1,162 @@
+forge: gears
+description: "Formulaires HTTP : champs `application/x-www-form-urlencoded` et envois de fichiers `multipart/form-data`"
+
+use <Text> only {urlDecode};
+
+/// <lang name="fr">
+/// <summary>Une partie d'un formulaire `multipart/form-data` : un champ de texte ou un fichier envoyé.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A part of a `multipart/form-data` form: a text field or an uploaded file.</summary>
+/// </lang>
+mold FormPart {
+    /// <lang name="fr"><summary>Le nom du champ.</summary></lang>
+    /// <lang name="en"><summary>The field name.</summary></lang>
+    string name;
+    /// <lang name="fr"><summary>Le nom du fichier envoyé, `null` pour un champ de texte.</summary></lang>
+    /// <lang name="en"><summary>The name of the uploaded file, or `null` for a text field.</summary></lang>
+    string? fileName;
+    /// <lang name="fr"><summary>Le type de contenu de la partie (`image/png`…), `null` s'il n'est pas donné.</summary></lang>
+    /// <lang name="en"><summary>The content type of the part (`image/png`…), or `null` when not given.</summary></lang>
+    string? contentType;
+    /// <lang name="fr"><summary>Le contenu tel que reçu : du texte, ou les octets d'un fichier (voir `as bytes`).</summary></lang>
+    /// <lang name="en"><summary>The content as received: text, or the bytes of a file (see `as bytes`).</summary></lang>
+    string content;
+}
+
+/// <lang name="fr">
+/// <summary>Découpe un corps `multipart/form-data` en parties, aplaties : quatre textes par partie (nom, fichier, type, contenu), vides s'ils sont absents (usage interne).</summary>
+/// <param name="contentType">La valeur de l'en-tête `Content-Type`, qui donne la frontière (`boundary`).</param>
+/// <param name="body">Le corps de la requête.</param>
+/// <returns>Les textes à la suite, `null` si le corps ne suit pas le format.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Splits a `multipart/form-data` body into flattened parts: four texts per part (name, file, type, content), empty when absent (internal use).</summary>
+/// <param name="contentType">The value of the `Content-Type` header, which gives the `boundary`.</param>
+/// <param name="body">The request body.</param>
+/// <returns>The texts one after the other, or `null` when the body does not follow the format.</returns>
+/// </lang>
+@trusted
+gear pure _splitMultipart(string contentType, string body): [string]? => cpp {
+    #include <string>
+    #include <string_view>
+    #include <utility>
+    static std::string lowered(std::string_view text) {
+        std::string result(text);
+        for (char& c : result) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+        return result;
+    }
+    // La valeur entre guillemets de « ; clé="…" » dans une ligne d'en-tête.
+    static std::string quoted(std::string_view line, std::string_view key) {
+        const std::string marker = "; " + std::string(key) + "=\"";
+        const auto at = line.find(marker);
+        if (at == std::string_view::npos) return {};
+        const auto start = at + marker.size();
+        const auto end = line.find('"', start);
+        return std::string(line.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start));
+    }
+    rgl_return rgl(rgl_arg_contentType contentType, rgl_arg_body body) {
+        const std::string type(contentType.data(), contentType.size());
+        const auto at = lowered(type).find("boundary=");
+        if (at == std::string::npos) return rgl_return{};
+        std::string boundary = type.substr(at + 9);
+        if (!boundary.empty() && boundary.front() == '"') {
+            const auto close = boundary.find('"', 1);
+            boundary = boundary.substr(1, close == std::string::npos ? std::string::npos : close - 1);
+        } else {
+            const auto end = boundary.find(';');
+            if (end != std::string::npos) boundary.resize(end);
+            while (!boundary.empty() && boundary.back() == ' ') boundary.pop_back();
+        }
+        if (boundary.empty()) return rgl_return{};
+
+        const std::string delimiter = "--" + boundary;
+        const std::string_view text(body.data(), body.size());
+        auto position = text.find(delimiter);
+        if (position == std::string_view::npos) return rgl_return{};
+        rgl::standard::array<rgl::standard::string> parts;
+        for (;;) {
+            position += delimiter.size();
+            if (text.substr(position, 2) == "--") break;
+            if (text.substr(position, 2) != "\r\n") return rgl_return{};
+            position += 2;
+            const auto headerEnd = text.find("\r\n\r\n", position);
+            if (headerEnd == std::string_view::npos) return rgl_return{};
+            const std::string_view headers = text.substr(position, headerEnd - position);
+            const auto contentStart = headerEnd + 4;
+            const auto next = text.find("\r\n" + delimiter, contentStart);
+            if (next == std::string_view::npos) return rgl_return{};
+            const std::string_view content = text.substr(contentStart, next - contentStart);
+
+            std::string name, file, kind;
+            std::size_t line = 0;
+            while (line <= headers.size()) {
+                auto stop = headers.find("\r\n", line);
+                if (stop == std::string_view::npos) stop = headers.size();
+                const std::string_view current = headers.substr(line, stop - line);
+                const auto colon = current.find(':');
+                if (colon != std::string_view::npos) {
+                    const std::string header = lowered(current.substr(0, colon));
+                    if (header == "content-disposition") { name = quoted(current, "name"); file = quoted(current, "filename"); }
+                    else if (header == "content-type") {
+                        auto first = colon + 1;
+                        while (first < current.size() && current[first] == ' ') ++first;
+                        kind = std::string(current.substr(first));
+                    }
+                }
+                line = stop + 2;
+            }
+            parts.push(rgl::standard::string(name.c_str(), name.size()));
+            parts.push(rgl::standard::string(file.c_str(), file.size()));
+            parts.push(rgl::standard::string(kind.c_str(), kind.size()));
+            parts.push(rgl::standard::string(content.data(), content.size()));
+            position = next + 2;
+        }
+        return rgl_return(std::move(parts));
+    }
+}(string contentType: contentType, string body: body): [string]?;
+
+/// <lang name="fr">
+/// <summary>Lit un formulaire `multipart/form-data` (champs de texte et fichiers envoyés).</summary>
+/// <param name="contentType">La valeur de l'en-tête `Content-Type` de la requête (elle contient la frontière).</param>
+/// <param name="body">Le corps de la requête.</param>
+/// <returns>Les parties dans l'ordre, `null` si le corps n'est pas un formulaire multipart valide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads a `multipart/form-data` form (text fields and uploaded files).</summary>
+/// <param name="contentType">The value of the request's `Content-Type` header (it contains the boundary).</param>
+/// <param name="body">The request body.</param>
+/// <returns>The parts in order, or `null` when the body is not a valid multipart form.</returns>
+/// </lang>
+gear pure parseMultipart(string contentType, string body): [FormPart]? {
+    const [string]? flat: _splitMultipart(contentType, body);
+    if (flat eq null) { return null; }
+    const [string] items: flat;
+    const long count: (items.length as long) / 4;
+    return [0..<count] ||> (i) => {
+        const string file: items[i * 4 + 1];
+        const string kind: items[i * 4 + 2];
+        const FormPart part: {name: items[i * 4], fileName: file eq '' ? null : file, contentType: kind eq '' ? null : kind, content: items[i * 4 + 3]};
+        return part;
+    };
+}
+
+/// <lang name="fr">
+/// <summary>Lit un formulaire `application/x-www-form-urlencoded` (`nom=Ada&amp;age=36`), pourcentages et `+` décodés.</summary>
+/// <param name="body">Le corps de la requête.</param>
+/// <returns>Les champs, par nom (un nom répété garde sa dernière valeur).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads an `application/x-www-form-urlencoded` form (`name=Ada&amp;age=36`), with percent-encoding and `+` decoded.</summary>
+/// <param name="body">The request body.</param>
+/// <returns>The fields, by name (a repeated name keeps its last value).</returns>
+/// </lang>
+gear pure parseForm(string body): [string:string] {
+    const [string:string] none: [:];
+    if (body eq '') { return none; }
+    return body.split('&') |+> none with (acc, pair) => {
+        const (string before, string after, bool found) field: pair.splitOnce('=');
+        return acc.put(urlDecode(field.before) ?? field.before, field.found ? (urlDecode(field.after) ?? field.after) : '');
+    };
+}
+

@@ -1,0 +1,8 @@
+gear a(pure (int) f): void {
+}
+gear b(): void {
+    var g: () => ;
+    var h: (int x) => {x: 1};
+    var k: () v;
+}
+train |> done;

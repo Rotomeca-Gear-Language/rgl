@@ -1,0 +1,14 @@
+gear verifie(int n): int {
+    if (n > 5) { panic "trop grand"; }
+    if (n > 50) { panic; }
+    return n;
+}
+
+gear nom(int | string | bool v): string => match (v) {
+    int i |> "entier";
+    default reste |> "autre";
+};
+
+gear touche(Hero h): Hero => h with {hp: h.hp - 1, pos.x: 3, cells[0]: 1};
+
+!train |> done;

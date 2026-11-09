@@ -1,0 +1,18 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=g pure=false parameters=0
+    PrimitiveType 2:11 type=void
+    BlockStatement 2:16
+      VarDeclaration 3:5 keyword=const name=a mut=true
+        ArrayType 3:15
+          PrimitiveType 3:16 type=int
+        ArrayExpression 3:24
+          LiteralExpression 3:25 kind=IntegerLiteral text=1
+      VarDeclaration 4:5 keyword=none name=b
+        PrimitiveType 4:5 type=int
+        MissingExpression 4:10
+      VarDeclaration 5:5 keyword=var name=c mut=true
+        ArrayExpression 5:16
+          LiteralExpression 5:17 kind=IntegerLiteral text=1
+  TrainDeclaration 7:1 unguarded=true parameters=none
+    Pipeline 7:8
+      DoneStep 7:11

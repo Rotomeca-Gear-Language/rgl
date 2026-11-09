@@ -1,0 +1,2 @@
+// Limites mal formées et reprise sans numéro.
+train |> converge*<> |> lisser*<!> |> ^1<2 |> ^ |> done;

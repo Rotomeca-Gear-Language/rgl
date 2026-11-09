@@ -1,0 +1,58 @@
+CompilationUnit 1:1
+  MoldDeclaration 2:1 name=Profil
+    MoldField 2:15 name=nom
+      PrimitiveType 2:15 type=string
+    MoldField 2:27 name=age
+      NullableType 2:27
+        PrimitiveType 2:27 type=int
+      LiteralExpression 2:37 kind=NullKeyword text=null
+  GearDeclaration 4:1 kind=gear name=decrire pure=false parameters=2
+    Parameter 4:14 name=p
+      NullableType 4:14
+        NamedType 4:14 name=Profil
+    Parameter 4:25 name=titre
+      NullableType 4:25
+        PrimitiveType 4:25 type=string
+    PrimitiveType 4:41 type=string
+    BlockStatement 4:48
+      VarDeclaration 5:5 keyword=none name=n
+        NullableType 5:5
+          PrimitiveType 5:5 type=int
+        CastExpression 5:13 kind=Optional
+          LiteralExpression 5:13 kind=StringLiteral text="42"
+          PrimitiveType 5:22 type=int
+      VarDeclaration 6:5 keyword=var name=nom
+        BinaryExpression 6:14 op=??
+          MemberAccessExpression 6:14 member=nom safe=true
+            NameExpression 6:14 name=p
+          LiteralExpression 6:24 kind=StringLiteral text="inconnu"
+      VarDeclaration 7:5 keyword=var name=t
+        BinaryExpression 7:12 op=?°
+          NameExpression 7:12 name=titre
+          LiteralExpression 7:21 kind=StringLiteral text="sans titre"
+      IfStatement 8:5
+        BinaryExpression 8:9 op=and
+          UnaryExpression 8:9 op=not
+            BinaryExpression 8:9 op=eq
+              NameExpression 8:9 name=n
+              LiteralExpression 8:18 kind=NullKeyword text=null
+          BinaryExpression 8:27 op=>
+            NameExpression 8:27 name=n
+            LiteralExpression 8:31 kind=IntegerLiteral text=0
+        BlockStatement 8:34
+          ReturnStatement 9:9
+            TemplateExpression 9:16
+              TemplateInterpolation 9:17
+                NameExpression 9:18 name=nom
+              TemplateText 9:22 text= 
+              TemplateInterpolation 9:23
+                NameExpression 9:24 name=t
+              TemplateText 9:26 text= 
+              TemplateInterpolation 9:27
+                MemberAccessExpression 9:28 member=age safe=true
+                  NameExpression 9:28 name=p
+      ReturnStatement 11:5
+        NameExpression 11:12 name=nom
+  TrainDeclaration 14:1 unguarded=true parameters=none
+    Pipeline 14:8
+      DoneStep 14:11

@@ -1,0 +1,1026 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "RGL",
+  "scopeName": "source.rgl",
+  "patterns": [
+    {
+      "include": "#code"
+    }
+  ],
+  "repository": {
+    "code": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#embedded-cpp"
+        },
+        {
+          "include": "#declarations"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#symbols"
+        },
+        {
+          "include": "#loops"
+        },
+        {
+          "include": "#numbers"
+        },
+        {
+          "include": "#rails"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#members"
+        },
+        {
+          "include": "#calls"
+        },
+        {
+          "include": "#types"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.rgl",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.rgl"
+            }
+          }
+        },
+        {
+          "name": "comment.line.documentation.rgl",
+          "begin": "(?<!/)///(?!/)",
+          "end": "$",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "begin": "(</?)([A-Za-z_][A-Za-z0-9_.:-]*)(?=[\\s/>])",
+              "end": "/?>",
+              "beginCaptures": {
+                "1": {
+                  "name": "punctuation.definition.tag.rgl"
+                },
+                "2": {
+                  "name": "entity.name.tag.documentation.rgl"
+                }
+              },
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.definition.tag.rgl"
+                }
+              },
+              "patterns": [
+                {
+                  "match": "([A-Za-z_][A-Za-z0-9_.:-]*)(\\s*=\\s*)(\"[^\"]*\"|'[^']*')",
+                  "captures": {
+                    "1": {
+                      "name": "entity.other.attribute-name.documentation.rgl"
+                    },
+                    "2": {
+                      "name": "punctuation.separator.key-value.rgl"
+                    },
+                    "3": {
+                      "name": "string.quoted.documentation.rgl"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "comment.line.double-slash.rgl",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "begin": "\\b(gear|guard|emit|unsafe)\\b(?:\\s+(pure)\\b)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(<)",
+          "end": ">",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.function.rgl"
+            },
+            "2": {
+              "name": "storage.modifier.rgl"
+            },
+            "3": {
+              "name": "entity.name.function.rgl"
+            },
+            "4": {
+              "name": "punctuation.definition.typeparameters.begin.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.typeparameters.end.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#typeParameters"
+            }
+          ]
+        },
+        {
+          "begin": "\\b(mold|error)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(<)",
+          "end": ">",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "entity.name.type.rgl"
+            },
+            "3": {
+              "name": "punctuation.definition.typeparameters.begin.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.typeparameters.end.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#typeParameters"
+            }
+          ]
+        },
+        {
+          "match": "\\b(gear|guard|emit|unsafe)\\b(?:\\s+(pure)\\b)?\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.function.rgl"
+            },
+            "2": {
+              "name": "storage.modifier.rgl"
+            },
+            "3": {
+              "name": "entity.name.function.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(gear|guard|emit|unsafe)\\b",
+          "name": "storage.type.function.rgl"
+        },
+        {
+          "match": "\\bpure\\b",
+          "name": "storage.modifier.rgl"
+        },
+        {
+          "match": "\\b(annotation)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "entity.name.function.decorator.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(dataset)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(?:(from)\\s+(\"[^\"]*\"|'[^']*')\\s+)?(of|as)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "entity.name.type.enum.rgl"
+            },
+            "3": {
+              "name": "keyword.other.declaration.rgl"
+            },
+            "4": {
+              "name": "string.quoted.other.rgl"
+            },
+            "5": {
+              "name": "keyword.other.declaration.rgl"
+            },
+            "6": {
+              "name": "entity.name.type.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(mold)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(->)\\s*([A-Za-z_][A-Za-z0-9_.]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "entity.name.type.rgl"
+            },
+            "3": {
+              "name": "keyword.operator.arrow.rgl"
+            },
+            "4": {
+              "name": "entity.name.function.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(mold|enum)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "entity.name.type.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(ingot)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "storage.type.primitive.ingot.rgl"
+            }
+          }
+        },
+        {
+          "match": "^\\s*(use)\\s*<\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*>",
+          "captures": {
+            "1": {
+              "name": "keyword.other.declaration.rgl"
+            },
+            "2": {
+              "name": "entity.name.namespace.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(mold|enum|ingot)\\b",
+          "name": "storage.type.rgl"
+        },
+        {
+          "match": "\\b(error)\\s+([A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\{)",
+          "captures": {
+            "1": {
+              "name": "storage.type.rgl"
+            },
+            "2": {
+              "name": "entity.name.type.rgl"
+            }
+          }
+        },
+        {
+          "match": "(!)?\\b(train)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.unguarded.rgl"
+            },
+            "2": {
+              "name": "storage.type.train.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(var|const)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.variable.rgl"
+            },
+            "2": {
+              "name": "variable.other.declaration.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(namespace)\\s+([A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)(?=\\s*;)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.declaration.rgl"
+            },
+            "2": {
+              "name": "entity.name.namespace.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(extend)\\b(?=\\s*(?:<|[A-Za-z_\\[({]))",
+          "name": "keyword.other.declaration.rgl"
+        },
+        {
+          "match": "\\b(export)\\b(?=\\s*(?:\\{|gear|guard|emit|mold|error|enum|ingot|const|train|[A-Za-z_]))",
+          "name": "keyword.other.declaration.rgl"
+        },
+        {
+          "match": "\\b(this)\\b(?=\\s+(?:mut\\s+)?[A-Za-z_\\[({])",
+          "name": "storage.modifier.rgl"
+        },
+        {
+          "match": "(?<=\\.)(<)([A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)(>)",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.namespace.begin.rgl"
+            },
+            "2": {
+              "name": "entity.name.namespace.rgl"
+            },
+            "3": {
+              "name": "punctuation.definition.namespace.end.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(var|mut|const|undefine)\\b",
+          "name": "storage.type.variable.rgl"
+        },
+        {
+          "match": "^\\s*(use)(?=\\s*<)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.declaration.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(import)\\s+(box|tools|\\[\\.\\.\\])(?=\\s)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.declaration.rgl"
+            },
+            "2": {
+              "name": "keyword.other.declaration.rgl"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "include": "#template"
+        },
+        {
+          "name": "string.quoted.double.rgl",
+          "begin": "(m)?(\")",
+          "end": "\"",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.modifier.mutable.rgl"
+            },
+            "2": {
+              "name": "punctuation.definition.string.begin.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#escapes"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.raw.rgl",
+          "begin": "'",
+          "end": "'(?!')",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.rgl",
+              "match": "''"
+            }
+          ]
+        }
+      ]
+    },
+    "escapes": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.rgl",
+          "match": "\\\\(?:[ntr0abfv\\\\\"'`{}]|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]{1,6}\\})"
+        },
+        {
+          "name": "invalid.illegal.escape.rgl",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "template": {
+      "name": "string.template.rgl",
+      "begin": "`",
+      "end": "`",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.template.begin.rgl"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.template.end.rgl"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#escapes"
+        },
+        {
+          "name": "meta.embedded.interpolation.rgl",
+          "contentName": "source.rgl",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.begin.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.end.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#interpolation"
+            }
+          ]
+        }
+      ]
+    },
+    "interpolation": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.braces.begin.rgl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.braces.end.rgl"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#interpolation"
+            }
+          ]
+        },
+        {
+          "include": "#code"
+        }
+      ]
+    },
+    "symbols": {
+      "patterns": [
+        {
+          "name": "constant.other.symbol.rgl",
+          "match": "§[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.rgl",
+          "match": "\\b0[xX][0-9A-Fa-f_]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.rgl",
+          "match": "\\b0[bB][01_]+\\b"
+        },
+        {
+          "name": "constant.numeric.octal.rgl",
+          "match": "\\b0[oO][0-7_]+\\b"
+        },
+        {
+          "match": "\\b(\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(ms|min|s|h)?\\b",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.decimal.rgl"
+            },
+            "2": {
+              "name": "keyword.other.unit.duration.rgl"
+            }
+          }
+        }
+      ]
+    },
+    "rails": {
+      "patterns": [
+        {
+          "match": "(!>)\\s*(\\[)\\s*(?!(?:done|fail)\\b)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.rail.rgl"
+            },
+            "2": {
+              "name": "punctuation.section.rail.begin.rgl"
+            },
+            "3": {
+              "name": "entity.name.function.step.rgl"
+            }
+          }
+        },
+        {
+          "match": "(!>)\\s*(\\[)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.rail.rgl"
+            },
+            "2": {
+              "name": "punctuation.section.rail.begin.rgl"
+            }
+          }
+        },
+        {
+          "match": "(\\|>|\\|\\|>|\\|!\\|>)\\s*(?!(?:done|fail)\\b)([A-Za-z_][A-Za-z0-9_]*)\\b(?!\\s*\\.)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.pipe.rgl"
+            },
+            "2": {
+              "name": "entity.name.function.step.rgl"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "^(forge)\\s*(:)\\s*(train|mold|gears|extend|index|native|precast|descriptor)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.other.header.rgl"
+            },
+            "2": {
+              "name": "punctuation.separator.colon.rgl"
+            },
+            "3": {
+              "name": "support.constant.forge-kind.rgl"
+            }
+          }
+        },
+        {
+          "name": "keyword.control.rgl",
+          "match": "\\b(?:if|else|switch|case|default|break|goto|match|return|fail|panic|spawn|await|cancel(?=\\s+[A-Za-z_])|task(?=\\s+[A-Za-z_]))\\b"
+        },
+        {
+          "name": "keyword.control.done.rgl",
+          "match": "\\bdone\\b(?=\\s*(?:;|\\]|$))"
+        },
+        {
+          "match": "\\b(case)\\s+(eval)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.rgl"
+            },
+            "2": {
+              "name": "keyword.control.rgl"
+            }
+          }
+        },
+        {
+          "match": "\\b(break)\\s+(all)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.rgl"
+            },
+            "2": {
+              "name": "keyword.control.rgl"
+            }
+          }
+        },
+        {
+          "name": "keyword.other.header.rgl",
+          "match": "^(?:forge|description|metadata|header|link)(?=\\s*:)"
+        },
+        {
+          "name": "keyword.other.declaration.rgl",
+          "match": "\\bonly(?=\\s*\\{)"
+        },
+        {
+          "name": "keyword.other.declaration.rgl",
+          "match": "\\b(?:unsafe|soa|precast|dyn_enum|dyn|wrapper|descriptor|constructor|field|static|blueprint|import)\\b"
+        },
+        {
+          "name": "keyword.operator.word.rgl",
+          "match": "\\b(?:and|or|xor|not|eq|is|as|new|delete|invert|increment|decrement|post_increment|post_decrement|bitand|bitor|bitxor|shl|shr)\\b|\\baccept\\b(?=\\s+[A-Za-z_\\[({])"
+        },
+        {
+          "name": "constant.language.rgl",
+          "match": "\\b(?:true|false|null)\\b"
+        },
+        {
+          "name": "storage.type.primitive.rgl",
+          "match": "\\b(?:byte|ubyte|short|ushort|int|uint|long|ulong|float|double|bool|string|mstring|symbol|bytes|void|char|ptr|uptr)\\b"
+        },
+        {
+          "name": "support.function.result.rgl",
+          "match": "\\b(?:ok|err)\\b(?=\\s*(?:\\(|[A-Za-z_][A-Za-z0-9_]*\\s*\\|>))"
+        },
+        {
+          "name": "support.variable.format.rgl",
+          "match": "\\b(?:console|file|raw|json|xml|custom)\\b(?=\\s*;)"
+        },
+        {
+          "name": "support.variable.format.rgl",
+          "match": "(?<=<-)\\s*\\bconsole\\b"
+        },
+        {
+          "name": "invalid.illegal.reserved.rgl",
+          "match": "\\b(?:auto|class|friend|interface|override|private|protected|public|struct|template|typedef|virtual|try|catch|throw|for|while|do|continue|async|fn|func|function|yield|contract|let|frozen|undefined)\\b"
+        }
+      ]
+    },
+    "members": {
+      "patterns": [
+        {
+          "match": "(\\?\\.|\\.)(?!\\.)\\s*([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.rgl"
+            },
+            "2": {
+              "name": "variable.other.enummember.rgl"
+            }
+          }
+        },
+        {
+          "match": "(\\?\\.|\\.)(?!\\.)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.accessor.rgl"
+            },
+            "2": {
+              "name": "variable.other.property.rgl"
+            }
+          }
+        }
+      ]
+    },
+    "calls": {
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s*<[^<>()]*>\\s*\\()",
+          "name": "entity.name.function.call.rgl"
+        },
+        {
+          "match": "\\b([A-Z][A-Za-z0-9_]*)\\s*(?=\\()",
+          "name": "entity.name.type.rgl"
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "name": "entity.name.function.call.rgl"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.error.rgl",
+          "match": "\\b(?:Exception|CastError|LoopError|NativeError)\\b"
+        },
+        {
+          "name": "entity.name.type.rgl",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.pipe.rgl",
+          "match": "\\|!\\|>|\\|\\]>|\\|\\|>|\\|\\+>|\\|>"
+        },
+        {
+          "name": "keyword.operator.rail.rgl",
+          "match": "!>"
+        },
+        {
+          "name": "keyword.operator.arrow.rgl",
+          "match": "=>|->"
+        },
+        {
+          "name": "keyword.operator.assignment.rgl",
+          "match": "<-\\||::|°<-|\\+<-|-<-|\\*<-|/<-|<-"
+        },
+        {
+          "name": "keyword.operator.coalescing.rgl",
+          "match": "\\?\\?|\\?°"
+        },
+        {
+          "name": "keyword.operator.unbrand.rgl",
+          "match": "°"
+        },
+        {
+          "name": "keyword.operator.spread.rgl",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.range.rgl",
+          "match": "\\.\\.<?"
+        },
+        {
+          "name": "keyword.operator.comparison.rgl",
+          "match": "<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.arithmetic.rgl",
+          "match": "[+\\-*/%]"
+        },
+        {
+          "name": "keyword.operator.exit.rgl",
+          "match": "\\$"
+        },
+        {
+          "name": "keyword.operator.rgl",
+          "match": "[?!^@#&|=]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.statement.rgl",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.rgl",
+          "match": ","
+        },
+        {
+          "name": "punctuation.separator.colon.rgl",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.section.brackets.end.rgl",
+          "match": "]"
+        }
+      ]
+    },
+    "loops": {
+      "patterns": [
+        {
+          "comment": "Point de reprise devant une étape : ^1 lire",
+          "match": "(\\^)(\\d+)\\s+(?!(?:done|fail)\\b)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.checkpoint.rgl"
+            },
+            "2": {
+              "name": "constant.numeric.integer.rgl"
+            },
+            "3": {
+              "name": "entity.name.function.step.rgl"
+            }
+          }
+        },
+        {
+          "comment": "Reprise : ^1, ^1<3>, ^1<!3>",
+          "match": "(\\^)(\\d+)(?:(<)(!?)(\\d+)(>))?",
+          "captures": {
+            "1": {
+              "name": "keyword.control.checkpoint.rgl"
+            },
+            "2": {
+              "name": "constant.numeric.integer.rgl"
+            },
+            "3": {
+              "name": "punctuation.definition.limit.begin.rgl"
+            },
+            "4": {
+              "name": "keyword.operator.fail.rgl"
+            },
+            "5": {
+              "name": "constant.numeric.integer.rgl"
+            },
+            "6": {
+              "name": "punctuation.definition.limit.end.rgl"
+            }
+          }
+        },
+        {
+          "comment": "Boucle de guard : g*, g*<10>, g*<!10>, collée à l'étape",
+          "match": "(?<=[A-Za-z0-9_)])(\\*)(?:(<)(!?)(\\d+)(>))?(?=\\s*(?:\\|>|\\|\\|>|\\|!\\|>|!>|;|\\]))",
+          "captures": {
+            "1": {
+              "name": "keyword.control.loop.rgl"
+            },
+            "2": {
+              "name": "punctuation.definition.limit.begin.rgl"
+            },
+            "3": {
+              "name": "keyword.operator.fail.rgl"
+            },
+            "4": {
+              "name": "constant.numeric.integer.rgl"
+            },
+            "5": {
+              "name": "punctuation.definition.limit.end.rgl"
+            }
+          }
+        },
+        {
+          "comment": "Accumulation : |+> 0 with ajouter",
+          "match": "\\b(with)\\s+(?!\\()([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.with.rgl"
+            },
+            "2": {
+              "name": "entity.name.function.step.rgl"
+            }
+          }
+        },
+        {
+          "comment": "Mots contextuels des intervalles et accumulations : by, with",
+          "match": "\\b(?:by|with)\\b",
+          "name": "keyword.control.rgl"
+        }
+      ]
+    },
+    "typeParameters": {
+      "patterns": [
+        {
+          "name": "support.type.constraint.rgl",
+          "match": "\\b(?:number|error)\\b"
+        },
+        {
+          "name": "storage.type.primitive.rgl",
+          "match": "\\b(?:byte|ubyte|short|ushort|int|uint|long|ulong|float|double|bool|string|mstring|symbol|bytes|void|char|ptr|uptr)\\b"
+        },
+        {
+          "name": "entity.name.type.parameter.rgl",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "punctuation.separator.colon.rgl",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.separator.comma.rgl",
+          "match": ","
+        },
+        {
+          "name": "punctuation.section.braces.rgl",
+          "match": "[{}]"
+        }
+      ]
+    },
+    "embedded-cpp": {
+      "name": "meta.embedded.block.cpp",
+      "begin": "\\b(cpp)\\s*(\\{)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.cpp.rgl"
+        },
+        "2": {
+          "name": "punctuation.section.embedded.begin.rgl"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.embedded.end.rgl"
+        }
+      },
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.cpp",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.cpp",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "string.quoted.double.raw.cpp",
+          "begin": "R\"([^ ()\\\\\\t\\r\\n]{0,16})\\(",
+          "end": "\\)\\1\""
+        },
+        {
+          "name": "string.quoted.double.cpp",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.cpp"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.cpp",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.cpp"
+            }
+          ]
+        },
+        {
+          "include": "#cpp-braces"
+        },
+        {
+          "include": "source.cpp"
+        }
+      ]
+    },
+    "cpp-braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.cpp",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.cpp",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "string.quoted.double.raw.cpp",
+          "begin": "R\"([^ ()\\\\\\t\\r\\n]{0,16})\\(",
+          "end": "\\)\\1\""
+        },
+        {
+          "name": "string.quoted.double.cpp",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.cpp"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.cpp",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.cpp"
+            }
+          ]
+        },
+        {
+          "include": "#cpp-braces"
+        },
+        {
+          "include": "source.cpp"
+        }
+      ]
+    }
+  }
+}

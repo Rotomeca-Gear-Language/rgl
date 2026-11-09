@@ -1,0 +1,6 @@
+// with manquant, intervalle non fermé.
+gear test([int] notes): void {
+    var total: notes |+> 0 (acc, x) => acc + x;
+    var r: [0..10 by 2;
+}
+train |> done;

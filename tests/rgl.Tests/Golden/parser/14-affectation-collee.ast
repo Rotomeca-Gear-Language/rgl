@@ -1,0 +1,9 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    Pipeline 2:7
+      CallStep 2:10 gear=keep
+        BinaryExpression 2:15 op=<
+          NameExpression 2:15 name=a
+          UnaryExpression 2:17 op=-
+            LiteralExpression 2:18 kind=IntegerLiteral text=5
+      DoneStep 2:24

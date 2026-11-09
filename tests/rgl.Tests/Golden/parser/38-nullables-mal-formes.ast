@@ -1,0 +1,18 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=f pure=false parameters=1
+    Parameter 2:8 name=a
+      NullableType 2:8
+        PrimitiveType 2:8 type=int
+    PrimitiveType 2:18 type=int
+    BlockStatement 2:22
+      VarDeclaration 3:5 keyword=var name=b
+        NameExpression 3:12 name=a
+      ExpressionStatement 4:5
+        NameExpression 4:5 name=b
+      VarDeclaration 5:5 keyword=var name=c
+        NameExpression 5:14 name=b
+      ReturnStatement 6:5
+        NameExpression 6:14 name=c
+  TrainDeclaration 8:1 unguarded=true parameters=none
+    Pipeline 8:8
+      DoneStep 8:11

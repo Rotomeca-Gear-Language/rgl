@@ -1,0 +1,7 @@
+forge: precast
+description: ''
+
+precast {double x, double y} VEC2_ZERO {
+    x: 0.0;
+    y: 0.0;
+}

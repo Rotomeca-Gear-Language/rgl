@@ -1,0 +1,14 @@
+// Récursion terminale : 100 millions de tours d'un gear qui s'appelle lui-même en dernière position (limite de profondeur par défaut : 200).
+gear pure somme(long acc, int n): long {
+    if (n eq 0) {
+        return acc;
+    }
+    return somme(acc + n, n - 1);
+}
+
+emit fin(): uint {
+    `{somme(0, 100000000)}\n` -> console;
+    return 0;
+}
+
+!train |> fin;

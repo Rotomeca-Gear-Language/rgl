@@ -1,0 +1,3 @@
+42-enums-mal-formes.rgl:2:6: erreur[E030]: nom d'enum attendu
+42-enums-mal-formes.rgl:3:11: erreur[E030]: « } » attendu pour fermer l'enum
+42-enums-mal-formes.rgl:4:18: erreur[E032]: expression attendue

@@ -1,0 +1,213 @@
+forge: gears
+description: "Images PNG : lire (8 bits, niveaux de gris, RGB, palette, avec alpha, sans entrelacement) et écrire (RGBA 8 bits) en RGBA"
+
+use <Compression> only {deflateRaw, inflateRaw};
+use <Crypto> only {crc32};
+use <Data> only {_beBytes, _readBe};
+
+/// <lang name="fr"><summary>Une image : sa taille et ses pixels en RGBA, 8 bits par canal, ligne par ligne de haut en bas (4 octets par pixel : rouge, vert, bleu, opacité).</summary></lang>
+/// <lang name="en"><summary>An image: its size and its pixels as RGBA, 8 bits per channel, row by row from top to bottom (4 bytes per pixel: red, green, blue, opacity).</summary></lang>
+mold Image {
+    /// <lang name="fr"><summary>La largeur, en pixels.</summary></lang>
+    /// <lang name="en"><summary>The width, in pixels.</summary></lang>
+    uint width;
+    /// <lang name="fr"><summary>La hauteur, en pixels.</summary></lang>
+    /// <lang name="en"><summary>The height, in pixels.</summary></lang>
+    uint height;
+    /// <lang name="fr"><summary>Les pixels : `width × height × 4` octets.</summary></lang>
+    /// <lang name="en"><summary>The pixels: `width × height × 4` bytes.</summary></lang>
+    bytes pixels;
+}
+
+/// <lang name="fr"><summary>Crée une image transparente (tous les octets à zéro).</summary><param name="width">La largeur.</param><param name="height">La hauteur.</param><returns>L'image.</returns></lang>
+/// <lang name="en"><summary>Creates a transparent image (all bytes zero).</summary><param name="width">The width.</param><param name="height">The height.</param><returns>The image.</returns></lang>
+gear pure newImage(uint width, uint height): Image => {width, height, pixels: [0..<((width as long) * (height as long) * 4)] ||> (i) => 0 as ubyte};
+
+/// <lang name="fr"><summary>Crée une image avec des pixels donnés.</summary><param name="width">La largeur.</param><param name="height">La hauteur.</param><param name="pixels">Les pixels RGBA, `width × height × 4` octets.</param><returns>L'image, `null` si le nombre d'octets ne correspond pas.</returns></lang>
+/// <lang name="en"><summary>Creates an image with given pixels.</summary><param name="width">The width.</param><param name="height">The height.</param><param name="pixels">The RGBA pixels, `width × height × 4` bytes.</param><returns>The image, or `null` when the number of bytes does not match.</returns></lang>
+gear pure imageFromRgba(uint width, uint height, bytes pixels): Image? => (pixels.length as long) eq (width as long) * (height as long) * 4 ? {width, height, pixels} : null;
+
+/// <lang name="fr"><summary>Lit un pixel.</summary><param name="image">L'image.</param><param name="x">La colonne, à partir de 0.</param><param name="y">La ligne, à partir de 0.</param><returns>Les quatre octets rouge, vert, bleu, opacité ; `null` si le pixel est hors de l'image.</returns></lang>
+/// <lang name="en"><summary>Reads a pixel.</summary><param name="image">The image.</param><param name="x">The column, from 0.</param><param name="y">The row, from 0.</param><returns>The four bytes red, green, blue, opacity; `null` when the pixel is outside the image.</returns></lang>
+gear pure pixelAt(Image image, uint x, uint y): bytes? {
+    if (x >= image.width or y >= image.height) { return null; }
+    const long start: (((y as long) * (image.width as long)) + (x as long)) * 4;
+    return image.pixels.slice(start, start + 4);
+}
+
+/// <lang name="fr"><summary>Le total de contrôle Adler-32 d'octets (usage interne de zlib).</summary><param name="data">Les octets.</param><returns>Le total de contrôle.</returns></lang>
+/// <lang name="en"><summary>The Adler-32 checksum of bytes (internal use of zlib).</summary><param name="data">The bytes.</param><returns>The checksum.</returns></lang>
+gear pure _adler32(bytes data): ulong {
+    const (long, long) start: (1, 0);
+    const (long, long) sums: data |+> start with (acc, value) => {
+        const long a: (acc.Item1 + (value as long)) % 65521;
+        return (a, (acc.Item2 + a) % 65521);
+    };
+    return ((sums.Item2 as ulong) shl 16) bitor (sums.Item1 as ulong);
+}
+
+/// <lang name="fr"><summary>Un bloc PNG : sa taille, son type, ses données et leur total de contrôle CRC-32 (usage interne).</summary><param name="type">Le type sur quatre lettres.</param><param name="data">Les données.</param><returns>Les octets du bloc.</returns></lang>
+/// <lang name="en"><summary>A PNG chunk: its size, type, data and their CRC-32 checksum (internal use).</summary><param name="type">The four-letter type.</param><param name="data">The data.</param><returns>The bytes of the chunk.</returns></lang>
+gear pure _pngChunk(string type, bytes data): bytes {
+    const bytes body: [...(type as bytes), ...data];
+    return [..._beBytes(data.length as ulong, 4), ...body, ..._beBytes(crc32(body) as ulong, 4)];
+}
+
+/// <lang name="fr"><summary>Écrit une image en PNG (RGBA 8 bits, sans filtre, compressée par deflate).</summary><param name="image">L'image.</param><returns>Les octets du fichier PNG.</returns></lang>
+/// <lang name="en"><summary>Writes an image as PNG (8-bit RGBA, no filter, deflate-compressed).</summary><param name="image">The image.</param><returns>The bytes of the PNG file.</returns></lang>
+gear pure encodePng(Image image): bytes {
+    const long width: image.width as long;
+    const long height: image.height as long;
+    const long stride: width * 4;
+    mut [ubyte] raw: [0..<(height * (stride + 1))] ||> (i) => 0 as ubyte;
+    [0..<height] ||> (y) => {
+        [0..<stride] ||> (x) => { raw[y * (stride + 1) + 1 + x] <- image.pixels[y * stride + x]; };
+    };
+    const bytes compressed: [0x78, 0x9c, ...deflateRaw(raw), ..._beBytes(_adler32(raw), 4)];
+    const bytes header: [..._beBytes(width as ulong, 4), ..._beBytes(height as ulong, 4), 8, 6, 0, 0, 0];
+    return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ..._pngChunk('IHDR', header), ..._pngChunk('IDAT', compressed), ..._pngChunk('IEND', '' as bytes)];
+}
+
+/// <lang name="fr"><summary>Ce que la lecture des blocs d'un PNG a trouvé (usage interne).</summary></lang>
+/// <lang name="en"><summary>What reading the chunks of a PNG has found (internal use).</summary></lang>
+mold _PngChunks {
+    /// <lang name="fr"><summary>Faux dès qu'un bloc est invalide.</summary></lang>
+    /// <lang name="en"><summary>False as soon as a chunk is invalid.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>Vrai une fois le bloc IEND lu.</summary></lang>
+    /// <lang name="en"><summary>True once the IEND chunk has been read.</summary></lang>
+    bool finished;
+    /// <lang name="fr"><summary>La position du prochain bloc.</summary></lang>
+    /// <lang name="en"><summary>The position of the next chunk.</summary></lang>
+    long at;
+    /// <lang name="fr"><summary>Vrai une fois l'en-tête IHDR lu.</summary></lang>
+    /// <lang name="en"><summary>True once the IHDR header has been read.</summary></lang>
+    bool header;
+    /// <lang name="fr"><summary>La largeur.</summary></lang>
+    /// <lang name="en"><summary>The width.</summary></lang>
+    long width;
+    /// <lang name="fr"><summary>La hauteur.</summary></lang>
+    /// <lang name="en"><summary>The height.</summary></lang>
+    long height;
+    /// <lang name="fr"><summary>Le nombre de bits par canal.</summary></lang>
+    /// <lang name="en"><summary>The number of bits per channel.</summary></lang>
+    long depth;
+    /// <lang name="fr"><summary>Le type de couleur : 0 gris, 2 RGB, 3 palette, 4 gris et alpha, 6 RGBA.</summary></lang>
+    /// <lang name="en"><summary>The colour type: 0 gray, 2 RGB, 3 palette, 4 gray and alpha, 6 RGBA.</summary></lang>
+    long colorType;
+    /// <lang name="fr"><summary>La méthode d'entrelacement (0 : aucune).</summary></lang>
+    /// <lang name="en"><summary>The interlace method (0: none).</summary></lang>
+    long interlace;
+    /// <lang name="fr"><summary>La palette (bloc PLTE).</summary></lang>
+    /// <lang name="en"><summary>The palette (PLTE chunk).</summary></lang>
+    bytes palette;
+    /// <lang name="fr"><summary>La transparence de la palette (bloc tRNS).</summary></lang>
+    /// <lang name="en"><summary>The palette transparency (tRNS chunk).</summary></lang>
+    bytes alpha;
+    /// <lang name="fr"><summary>Les données de l'image compressées, mises bout à bout (blocs IDAT).</summary></lang>
+    /// <lang name="en"><summary>The compressed image data, end to end (IDAT chunks).</summary></lang>
+    bytes data;
+}
+
+/// <lang name="fr"><summary>Lit un bloc PNG et l'ajoute à ce qu'on a trouvé (usage interne).</summary><param name="file">Les octets du fichier.</param><param name="state">Ce qu'on a trouvé jusqu'ici.</param><returns>Le nouvel état.</returns></lang>
+/// <lang name="en"><summary>Reads a PNG chunk and adds it to what was found (internal use).</summary><param name="file">The bytes of the file.</param><param name="state">What was found so far.</param><returns>The new state.</returns></lang>
+gear pure _pngReadChunk(bytes file, _PngChunks state): _PngChunks {
+    const long total: file.length as long;
+    if (state.at + 12 > total) { return {...state, ok: false}; }
+    const long size: _readBe(file, state.at, 4) as long;
+    if (size < 0 or state.at + 12 + size > total) { return {...state, ok: false}; }
+    const bytes body: file.slice(state.at + 4, state.at + 8 + size);
+    if ((crc32(body) as ulong) not eq _readBe(file, state.at + 8 + size, 4)) { return {...state, ok: false}; }
+    const string? kind: body.slice(0, 4) as? string;
+    const bytes payload: file.slice(state.at + 8, state.at + 8 + size);
+    const _PngChunks next: {...state, at: state.at + 12 + size};
+    if (kind eq 'IHDR' and size eq 13) {
+        return {...next, header: true, width: _readBe(payload, 0, 4) as long, height: _readBe(payload, 4, 4) as long, depth: payload[8] as long, colorType: payload[9] as long, interlace: payload[12] as long};
+    }
+    if (kind eq 'PLTE') { return {...next, palette: payload}; }
+    if (kind eq 'tRNS') { return {...next, alpha: payload}; }
+    if (kind eq 'IDAT') { return {...next, data: [...next.data, ...payload]}; }
+    if (kind eq 'IEND') { return {...next, finished: true}; }
+    return next;
+}
+
+/// <lang name="fr"><summary>Le prédicteur de Paeth du filtre PNG 4 (usage interne).</summary><param name="a">L'octet à gauche.</param><param name="b">L'octet au-dessus.</param><param name="c">L'octet en haut à gauche.</param><returns>Celui des trois qui est le plus proche de `a + b - c`.</returns></lang>
+/// <lang name="en"><summary>The Paeth predictor of PNG filter 4 (internal use).</summary><param name="a">The byte on the left.</param><param name="b">The byte above.</param><param name="c">The byte on the upper left.</param><returns>The one of the three that is closest to `a + b - c`.</returns></lang>
+gear pure _paeth(long a, long b, long c): long {
+    const long p: a + b - c;
+    const long pa: p > a ? p - a : a - p;
+    const long pb: p > b ? p - b : b - p;
+    const long pc: p > c ? p - c : c - p;
+    if (pa <= pb and pa <= pc) { return a; }
+    return pb <= pc ? b : c;
+}
+
+/// <lang name="fr">
+/// <summary>Lit un fichier PNG. Sont pris en charge : 8 bits par canal, les types de couleur gris, gris et alpha, RGB, RGBA et palette (avec sa transparence), tous les filtres, sans entrelacement. Le reste (autres profondeurs, entrelacement) est refusé.</summary>
+/// <param name="data">Les octets du fichier.</param>
+/// <returns>L'image en RGBA, `null` si le fichier n'est pas un PNG valide ou n'est pas pris en charge.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads a PNG file. Supported: 8 bits per channel, the colour types gray, gray and alpha, RGB, RGBA and palette (with its transparency), all filters, no interlacing. The rest (other depths, interlacing) is refused.</summary>
+/// <param name="data">The bytes of the file.</param>
+/// <returns>The image as RGBA, or `null` when the file is not a valid PNG or is not supported.</returns>
+/// </lang>
+gear pure decodePng(bytes data): Image? {
+    const bytes signature: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    if (data.length < 8 or data.slice(0, 8) not eq signature) { return null; }
+    const bytes none: '' as bytes;
+    const _PngChunks start: {ok: true, finished: false, at: 8, header: false, width: 0, height: 0, depth: 0, colorType: 0, interlace: 0, palette: none, alpha: none, data: none};
+    const _PngChunks read: [0..<((data.length as long) / 12 + 1)] |+> start with (acc, i) => {
+        if (not acc.ok or acc.finished) { done acc; }
+        return _pngReadChunk(data, acc);
+    };
+    if (not read.ok or not read.header or not read.finished) { return null; }
+    const long width: read.width;
+    const long height: read.height;
+    if (read.depth not eq 8 or read.interlace not eq 0 or width < 1 or height < 1 or width > 16384 or height > 16384) { return null; }
+    const long channels: read.colorType eq 0 ? 1 : (read.colorType eq 2 ? 3 : (read.colorType eq 3 ? 1 : (read.colorType eq 4 ? 2 : (read.colorType eq 6 ? 4 : 0))));
+    if (channels eq 0 or (read.colorType eq 3 and read.palette.length < 3)) { return null; }
+    if ((read.data.length as long) < 6) { return null; }
+    const bytes? inflated: inflateRaw(read.data.slice(2, (read.data.length as long) - 4));
+    if (inflated eq null) { return null; }
+    const bytes raw: inflated ?? none;
+    const long stride: width * channels;
+    if ((raw.length as long) not eq height * (stride + 1)) { return null; }
+    const bool filtersValid: [0..<height] |+> true with (acc, y) => acc and (raw[y * (stride + 1)] as long) <= 4;
+    if (not filtersValid) { return null; }
+
+    mut [ubyte] out: [0..<(height * stride)] ||> (i) => 0 as ubyte;
+    [0..<height] ||> (y) => {
+        const long filter: raw[y * (stride + 1)] as long;
+        [0..<stride] ||> (x) => {
+            const long x0: raw[y * (stride + 1) + 1 + x] as long;
+            const long a: x >= channels ? (out[y * stride + x - channels] as long) : 0;
+            const long b: y > 0 ? (out[(y - 1) * stride + x] as long) : 0;
+            const long c: x >= channels and y > 0 ? (out[(y - 1) * stride + x - channels] as long) : 0;
+            const long predicted: filter eq 0 ? 0 : (filter eq 1 ? a : (filter eq 2 ? b : (filter eq 3 ? (a + b) / 2 : _paeth(a, b, c))));
+            out[y * stride + x] <- ((x0 + predicted) % 256) as ubyte;
+        };
+    };
+
+    mut [ubyte] rgba: [0..<(width * height * 4)] ||> (i) => 255 as ubyte;
+    [0..<(width * height)] ||> (p) => {
+        const long at: p * channels;
+        const long kind: read.colorType;
+        if (kind eq 6) {
+            rgba[p * 4] <- out[at]; rgba[p * 4 + 1] <- out[at + 1]; rgba[p * 4 + 2] <- out[at + 2]; rgba[p * 4 + 3] <- out[at + 3];
+        } else if (kind eq 2) {
+            rgba[p * 4] <- out[at]; rgba[p * 4 + 1] <- out[at + 1]; rgba[p * 4 + 2] <- out[at + 2];
+        } else if (kind eq 0) {
+            rgba[p * 4] <- out[at]; rgba[p * 4 + 1] <- out[at]; rgba[p * 4 + 2] <- out[at];
+        } else if (kind eq 4) {
+            rgba[p * 4] <- out[at]; rgba[p * 4 + 1] <- out[at]; rgba[p * 4 + 2] <- out[at]; rgba[p * 4 + 3] <- out[at + 1];
+        } else {
+            const long index: out[at] as long;
+            if (index * 3 + 2 < (read.palette.length as long)) {
+                rgba[p * 4] <- read.palette[index * 3]; rgba[p * 4 + 1] <- read.palette[index * 3 + 1]; rgba[p * 4 + 2] <- read.palette[index * 3 + 2];
+            }
+            if (index < (read.alpha.length as long)) { rgba[p * 4 + 3] <- read.alpha[index]; }
+        }
+    };
+    return {width: width as uint, height: height as uint, pixels: rgba};
+}

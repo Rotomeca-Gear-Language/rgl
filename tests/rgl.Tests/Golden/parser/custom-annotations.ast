@@ -1,0 +1,42 @@
+CompilationUnit 1:1
+  EnumDeclaration 1:1 name=Role
+    EnumVariant 1:13 name=Admin
+    EnumVariant 1:20 name=Reader
+  AnnotationDeclaration 3:1 name=exigeRole
+    Parameter 3:22 name=roles
+      ArrayType 3:29
+        NamedType 3:30 name=Role
+    BeforeAnnotation 3:45
+      CallExpression 3:53
+        NameExpression 3:53 name=refuseSauf
+        NameExpression 3:64 name=roleCourant
+        NameExpression 3:77 name=roles
+  AnnotationDeclaration 4:1 name=sans
+    Parameter 4:17 name=n
+      PrimitiveType 4:17 type=int
+    BeforeAnnotation 4:26
+      NameExpression 4:34 name=controle
+  GearDeclaration 8:1 kind=gear name=page pure=false parameters=1
+    DeclarationNotes 6:1
+      CustomAnnotation 6:1 name=exigeRole
+        MemberAccessExpression 6:12 member=Admin
+          NameExpression 6:12 name=Role
+        MemberAccessExpression 6:24 member=Reader
+          NameExpression 6:24 name=Role
+      BeforeAnnotation 7:1
+        NameExpression 7:9 name=controle
+    Parameter 8:11 name=r
+      PrimitiveType 8:11 type=string
+    PrimitiveType 8:22 type=string
+    NameExpression 8:32 name=r
+  GearDeclaration 11:1 kind=gear name=nu pure=false parameters=0
+    DeclarationNotes 10:1
+      CustomAnnotation 10:1 name=exigeRole
+    PrimitiveType 11:12 type=void
+    BlockStatement 11:17
+  AnnotationDeclaration 13:1 name=casse
+    Parameter 13:18 name=n
+      PrimitiveType 13:18 type=int
+  TrainDeclaration 14:1 unguarded=false parameters=none
+    Pipeline 14:7
+      DoneStep 14:10

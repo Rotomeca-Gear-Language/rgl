@@ -1,0 +1,14 @@
+// Récursion double et arithmétique contrôlée : un appel de gear par nœud de l'arbre (fib(37) ≈ 78 millions d'appels).
+gear pure fib(int n): long {
+    if (n < 2) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+emit fin(): uint {
+    `{fib(37)}\n` -> console;
+    return 0;
+}
+
+!train |> fin;

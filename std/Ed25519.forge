@@ -1,0 +1,369 @@
+forge: gears
+description: "Signatures numériques Ed25519 : clé publique, signature et vérification"
+
+use <Crypto> only {sha512, randomBytes};
+use <Text> only {hexDecode};
+
+/// <lang name="fr">
+/// <summary>Les calculs sur la courbe Ed25519 (usage interne) : l'arithmétique de champ et de point, d'après la petite bibliothèque TweetNaCl, écrite à la main sans bibliothèque. Les empreintes SHA-512 se font côté RGL. Opérations : `base` (le point de base multiplié par un scalaire de 32 octets, écrit sur 32 octets), `reduce` (64 octets réduits modulo l'ordre du groupe, sur 32 octets), `muladd` (`r + h·d` modulo l'ordre, avec `a = r`, `b = h`, `c = d`) et `verify` (la signature `b` de la clé publique `a`, avec `c` le scalaire `H(R ‖ A ‖ M)` réduit).</summary>
+/// <param name="operation">`base`, `reduce`, `muladd` ou `verify`.</param>
+/// <param name="a">Le premier opérande.</param>
+/// <param name="b">Le deuxième opérande.</param>
+/// <param name="c">Le troisième opérande.</param>
+/// <returns>Un octet 1 suivi du résultat, ou un seul octet 0 si l'opération échoue (opérande trop court, clé publique invalide, signature fausse).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Computations on the Ed25519 curve (internal use): field and point arithmetic, after the small TweetNaCl library, hand-written with no library. SHA-512 digests are done on the RGL side. Operations: `base` (the base point multiplied by a 32-byte scalar, written on 32 bytes), `reduce` (64 bytes reduced modulo the group order, on 32 bytes), `muladd` (`r + h·d` modulo the order, with `a = r`, `b = h`, `c = d`) and `verify` (the signature `b` of the public key `a`, with `c` the reduced scalar `H(R ‖ A ‖ M)`).</summary>
+/// <param name="operation">`base`, `reduce`, `muladd` or `verify`.</param>
+/// <param name="a">The first operand.</param>
+/// <param name="b">The second operand.</param>
+/// <param name="c">The third operand.</param>
+/// <returns>A byte 1 followed by the result, or a single byte 0 when the operation fails (operand too short, invalid public key, wrong signature).</returns>
+/// </lang>
+@trusted
+gear pure _ed(string operation, bytes a, bytes b, bytes c): bytes => cpp {
+    #include <cstdint>
+    #include <cstring>
+    #include <string>
+    #include <vector>
+    typedef std::int64_t i64;
+    typedef std::uint64_t u64;
+    typedef std::uint8_t u8;
+    typedef i64 gf[16];
+    typedef std::vector<u8> Bytes;
+
+    static Bytes to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        Bytes bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+
+    static void set25519(gf r, const gf a) { for (int i = 0; i < 16; ++i) r[i] = a[i]; }
+    static void car25519(gf o) {
+        for (int i = 0; i < 16; ++i) {
+            o[i] += (1LL << 16);
+            const i64 c = o[i] >> 16;
+            o[(i + 1) * (i < 15)] += c - 1 + 37 * (c - 1) * (i == 15);
+            o[i] -= c << 16;
+        }
+    }
+    static void sel25519(gf p, gf q, int b) {
+        const i64 c = ~(static_cast<i64>(b) - 1);
+        for (int i = 0; i < 16; ++i) {
+            const i64 t = c & (p[i] ^ q[i]);
+            p[i] ^= t;
+            q[i] ^= t;
+        }
+    }
+    static void pack25519(u8* o, const gf n) {
+        gf m, t;
+        for (int i = 0; i < 16; ++i) t[i] = n[i];
+        car25519(t); car25519(t); car25519(t);
+        for (int j = 0; j < 2; ++j) {
+            m[0] = t[0] - 0xffed;
+            for (int i = 1; i < 15; ++i) {
+                m[i] = t[i] - 0xffff - ((m[i - 1] >> 16) & 1);
+                m[i - 1] &= 0xffff;
+            }
+            m[15] = t[15] - 0x7fff - ((m[14] >> 16) & 1);
+            const int b = static_cast<int>((m[15] >> 16) & 1);
+            m[14] &= 0xffff;
+            sel25519(t, m, 1 - b);
+        }
+        for (int i = 0; i < 16; ++i) {
+            o[2 * i] = static_cast<u8>(t[i] & 0xff);
+            o[2 * i + 1] = static_cast<u8>(t[i] >> 8);
+        }
+    }
+    static bool different(const u8* x, const u8* y) {
+        u8 d = 0;
+        for (int i = 0; i < 32; ++i) d |= static_cast<u8>(x[i] ^ y[i]);
+        return d != 0;
+    }
+    static bool neq25519(const gf a, const gf b) {
+        u8 c[32], d[32];
+        pack25519(c, a);
+        pack25519(d, b);
+        return different(c, d);
+    }
+    static u8 par25519(const gf a) {
+        u8 d[32];
+        pack25519(d, a);
+        return d[0] & 1;
+    }
+    static void unpack25519(gf o, const u8* n) {
+        for (int i = 0; i < 16; ++i) o[i] = n[2 * i] + (static_cast<i64>(n[2 * i + 1]) << 8);
+        o[15] &= 0x7fff;
+    }
+    static void A(gf o, const gf a, const gf b) { for (int i = 0; i < 16; ++i) o[i] = a[i] + b[i]; }
+    static void Z(gf o, const gf a, const gf b) { for (int i = 0; i < 16; ++i) o[i] = a[i] - b[i]; }
+    static void M(gf o, const gf a, const gf b) {
+        i64 t[31];
+        for (int i = 0; i < 31; ++i) t[i] = 0;
+        for (int i = 0; i < 16; ++i)
+            for (int j = 0; j < 16; ++j) t[i + j] += a[i] * b[j];
+        for (int i = 0; i < 15; ++i) t[i] += 38 * t[i + 16];
+        for (int i = 0; i < 16; ++i) o[i] = t[i];
+        car25519(o);
+        car25519(o);
+    }
+    static void S(gf o, const gf a) { M(o, a, a); }
+    static void inv25519(gf o, const gf i) {
+        gf c;
+        for (int a = 0; a < 16; ++a) c[a] = i[a];
+        for (int a = 253; a >= 0; --a) {
+            S(c, c);
+            if (a != 2 && a != 4) M(c, c, i);
+        }
+        for (int a = 0; a < 16; ++a) o[a] = c[a];
+    }
+    static void pow2523(gf o, const gf i) {
+        gf c;
+        for (int a = 0; a < 16; ++a) c[a] = i[a];
+        for (int a = 250; a >= 0; --a) {
+            S(c, c);
+            if (a != 1) M(c, c, i);
+        }
+        for (int a = 0; a < 16; ++a) o[a] = c[a];
+    }
+
+    static gf gf0, gf1, D, D2, X, Y, I;
+    static bool ready = false;
+
+    static void add(gf p[4], gf q[4]) {
+        gf a, b, c, d, t, e, f, g, h;
+        Z(a, p[1], p[0]); Z(t, q[1], q[0]); M(a, a, t);
+        A(b, p[0], p[1]); A(t, q[0], q[1]); M(b, b, t);
+        M(c, p[3], q[3]); M(c, c, D2);
+        M(d, p[2], q[2]); A(d, d, d);
+        Z(e, b, a); Z(f, d, c); A(g, d, c); A(h, b, a);
+        M(p[0], e, f); M(p[1], h, g); M(p[2], g, f); M(p[3], e, h);
+    }
+    static void cswap(gf p[4], gf q[4], u8 b) { for (int i = 0; i < 4; ++i) sel25519(p[i], q[i], b); }
+    static void pack(u8* r, gf p[4]) {
+        gf tx, ty, zi;
+        inv25519(zi, p[2]);
+        M(tx, p[0], zi);
+        M(ty, p[1], zi);
+        pack25519(r, ty);
+        r[31] ^= static_cast<u8>(par25519(tx) << 7);
+    }
+    static void scalarmult(gf p[4], gf q[4], const u8* s) {
+        set25519(p[0], gf0); set25519(p[1], gf1); set25519(p[2], gf1); set25519(p[3], gf0);
+        for (int i = 255; i >= 0; --i) {
+            const u8 b = static_cast<u8>((s[i / 8] >> (i & 7)) & 1);
+            cswap(p, q, b);
+            add(q, p);
+            add(p, p);
+            cswap(p, q, b);
+        }
+    }
+    static void scalarbase(gf p[4], const u8* s) {
+        gf q[4];
+        set25519(q[0], X); set25519(q[1], Y); set25519(q[2], gf1); M(q[3], X, Y);
+        scalarmult(p, q, s);
+    }
+
+    static const u64 L[32] = {0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10};
+    static void modL(u8* r, i64 x[64]) {
+        i64 carry;
+        int i, j;
+        for (i = 63; i >= 32; --i) {
+            carry = 0;
+            for (j = i - 32; j < i - 12; ++j) {
+                x[j] += carry - 16 * x[i] * static_cast<i64>(L[j - (i - 32)]);
+                carry = (x[j] + 128) >> 8;
+                x[j] -= carry << 8;
+            }
+            x[j] += carry;
+            x[i] = 0;
+        }
+        carry = 0;
+        for (j = 0; j < 32; ++j) {
+            x[j] += carry - (x[31] >> 4) * static_cast<i64>(L[j]);
+            carry = x[j] >> 8;
+            x[j] &= 255;
+        }
+        for (j = 0; j < 32; ++j) x[j] -= carry * static_cast<i64>(L[j]);
+        for (i = 0; i < 32; ++i) {
+            x[i + 1] += x[i] >> 8;
+            r[i] = static_cast<u8>(x[i] & 255);
+        }
+    }
+    static void reduce(u8* r) {
+        i64 x[64];
+        for (int i = 0; i < 64; ++i) x[i] = static_cast<i64>(r[i]);
+        for (int i = 0; i < 64; ++i) r[i] = 0;
+        modL(r, x);
+    }
+
+    static int unpackneg(gf r[4], const u8 p[32]) {
+        gf t, chk, num, den, den2, den4, den6;
+        set25519(r[2], gf1);
+        unpack25519(r[1], p);
+        S(num, r[1]);
+        M(den, num, D);
+        Z(num, num, r[2]);
+        A(den, r[2], den);
+        S(den2, den);
+        S(den4, den2);
+        M(den6, den4, den2);
+        M(t, den6, num);
+        M(t, t, den);
+        pow2523(t, t);
+        M(t, t, num);
+        M(t, t, den);
+        M(t, t, den);
+        M(r[0], t, den);
+        S(chk, r[0]);
+        M(chk, chk, den);
+        if (neq25519(chk, num)) M(r[0], r[0], I);
+        S(chk, r[0]);
+        M(chk, chk, den);
+        if (neq25519(chk, num)) return -1;
+        if (par25519(r[0]) == (p[31] >> 7)) Z(r[0], gf0, r[0]);
+        M(r[3], r[0], r[1]);
+        return 0;
+    }
+
+    // Les constantes de la courbe sont calculées, pas recopiées : d = -121665 / 121666, y = 4 / 5, i = racine de -1, x pair.
+    static void init() {
+        if (ready) return;
+        for (int i = 0; i < 16; ++i) gf0[i] = gf1[i] = D[i] = D2[i] = X[i] = Y[i] = I[i] = 0;
+        gf1[0] = 1;
+        gf a = {121665}, b = {121666}, five = {5}, four = {4};
+        gf inverse;
+        inv25519(inverse, b);
+        M(D, a, inverse);
+        Z(D, gf0, D);
+        A(D2, D, D);
+        inv25519(inverse, five);
+        M(Y, four, inverse);
+        // i = 2^((p-1)/4) : (p-1)/4 = 2^253 - 5, c'est-à-dire 253 uns dont le bit 2 est effacé.
+        gf c;
+        set25519(c, gf1);
+        gf two = {2};
+        for (int bit = 252; bit >= 0; --bit) {
+            S(c, c);
+            const bool one = bit != 2;
+            if (one) M(c, c, two);
+        }
+        set25519(I, c);
+        u8 encoded[32];
+        pack25519(encoded, Y);
+        gf point[4];
+        unpackneg(point, encoded);
+        Z(X, gf0, point[0]);
+        if (par25519(X) != 0) Z(X, gf0, X);
+        ready = true;
+    }
+
+    rgl_return rgl(rgl_arg_operation operation, rgl_arg_a a, rgl_arg_b b, rgl_arg_c c) {
+        init();
+        rgl_return result;
+        const auto refuse = [&]() { rgl_return failed; failed.push(0); return failed; };
+        const std::string name(operation.data(), operation.size());
+        const Bytes va = to_vector(a), vb = to_vector(b), vc = to_vector(c);
+        if (name == "base" && va.size() == 32) {
+            gf p[4];
+            scalarbase(p, va.data());
+            u8 out[32];
+            pack(out, p);
+            result.push(1);
+            for (const auto byte : out) result.push(byte);
+            return result;
+        }
+        if (name == "reduce" && va.size() == 64) {
+            u8 r[64];
+            std::memcpy(r, va.data(), 64);
+            reduce(r);
+            result.push(1);
+            for (int i = 0; i < 32; ++i) result.push(r[i]);
+            return result;
+        }
+        if (name == "muladd" && va.size() == 32 && vb.size() == 32 && vc.size() == 32) {
+            i64 x[64];
+            for (int i = 0; i < 64; ++i) x[i] = 0;
+            for (int i = 0; i < 32; ++i) x[i] = static_cast<i64>(va[i]);
+            for (int i = 0; i < 32; ++i)
+                for (int j = 0; j < 32; ++j) x[i + j] += static_cast<i64>(vb[i]) * static_cast<i64>(vc[j]);
+            u8 out[32];
+            modL(out, x);
+            result.push(1);
+            for (const auto byte : out) result.push(byte);
+            return result;
+        }
+        if (name == "verify" && va.size() == 32 && vb.size() == 64 && vc.size() == 32) {
+            gf q[4], p[4];
+            if (unpackneg(q, va.data()) != 0) return refuse();
+            scalarmult(p, q, vc.data());
+            gf s[4];
+            scalarbase(s, vb.data() + 32);
+            add(p, s);
+            u8 packed[32];
+            pack(packed, p);
+            if (different(vb.data(), packed)) return refuse();
+            result.push(1);
+            return result;
+        }
+        return refuse();
+    }
+}(string operation: operation, bytes a: a, bytes b: b, bytes c: c): bytes;
+
+/// <lang name="fr"><summary>Le SHA-512 d'octets, en octets (usage interne).</summary><param name="data">Les octets.</param><returns>Les 64 octets de l'empreinte.</returns></lang>
+/// <lang name="en"><summary>The SHA-512 of bytes, as bytes (internal use).</summary><param name="data">The bytes.</param><returns>The 64 bytes of the digest.</returns></lang>
+gear pure _hash(bytes data): bytes => hexDecode(sha512(data)) ?? ('' as bytes);
+
+/// <lang name="fr"><summary>Lance une opération de `_ed` et rend son résultat sans l'octet d'état (usage interne).</summary><param name="operation">L'opération.</param><param name="a">Le premier opérande.</param><param name="b">Le deuxième.</param><param name="c">Le troisième.</param><returns>Le résultat, `null` en cas d'échec.</returns></lang>
+/// <lang name="en"><summary>Runs an operation of `_ed` and returns its result without the status byte (internal use).</summary><param name="operation">The operation.</param><param name="a">The first operand.</param><param name="b">The second.</param><param name="c">The third.</param><returns>The result, or `null` on failure.</returns></lang>
+gear pure _edRun(string operation, bytes a, bytes b, bytes c): bytes? {
+    const bytes raw: _ed(operation, a, b, c);
+    if (raw.length < 1 or raw[0] eq 0) { return null; }
+    return raw.slice(1, raw.length);
+}
+
+/// <lang name="fr"><summary>Le scalaire secret d'Ed25519 : les 32 premiers octets de l'empreinte de la graine, avec les bits 0 à 2 et 255 effacés et le bit 254 posé (usage interne).</summary><param name="digest">L'empreinte SHA-512 de la graine.</param><returns>Les 32 octets du scalaire.</returns></lang>
+/// <lang name="en"><summary>The Ed25519 secret scalar: the first 32 bytes of the seed's digest, with bits 0 to 2 and 255 cleared and bit 254 set (internal use).</summary><param name="digest">The SHA-512 digest of the seed.</param><returns>The 32 bytes of the scalar.</returns></lang>
+gear pure _clamp(bytes digest): bytes => [((digest[0] as int) bitand 248) as ubyte, ...digest.slice(1, 31), (((digest[31] as int) bitand 127) bitor 64) as ubyte];
+
+/// <lang name="fr"><summary>Une graine aléatoire de 32 octets, la clé secrète d'une signature Ed25519 (à garder secrète).</summary><returns>Les 32 octets.</returns></lang>
+/// <lang name="en"><summary>A random 32-byte seed, the secret key of an Ed25519 signature (to be kept secret).</summary><returns>The 32 bytes.</returns></lang>
+gear ed25519Seed(): bytes => randomBytes(32);
+
+/// <lang name="fr"><summary>La clé publique qui correspond à une graine.</summary><param name="seed">La graine secrète, 32 octets.</param><returns>La clé publique, 32 octets ; `null` si la graine n'a pas 32 octets.</returns></lang>
+/// <lang name="en"><summary>The public key that matches a seed.</summary><param name="seed">The secret seed, 32 bytes.</param><returns>The public key, 32 bytes; `null` when the seed is not 32 bytes long.</returns></lang>
+gear pure ed25519PublicKey(bytes seed): bytes? {
+    if (seed.length not eq 32) { return null; }
+    const bytes none: '' as bytes;
+    return _edRun('base', _clamp(_hash(seed)), none, none);
+}
+
+/// <lang name="fr"><summary>Signe un message.</summary><param name="seed">La graine secrète, 32 octets.</param><param name="message">Le message.</param><returns>La signature, 64 octets ; `null` si la graine n'a pas 32 octets.</returns></lang>
+/// <lang name="en"><summary>Signs a message.</summary><param name="seed">The secret seed, 32 bytes.</param><param name="message">The message.</param><returns>The signature, 64 bytes; `null` when the seed is not 32 bytes long.</returns></lang>
+gear pure ed25519Sign(bytes seed, bytes message): bytes? {
+    if (seed.length not eq 32) { return null; }
+    const bytes none: '' as bytes;
+    const bytes digest: _hash(seed);
+    const bytes secret: _clamp(digest);
+    const bytes? publicKey: _edRun('base', secret, none, none);
+    const bytes? r: _edRun('reduce', _hash([...digest.slice(32, 64), ...message]), none, none);
+    if (publicKey eq null or r eq null) { return null; }
+    const bytes? commitment: _edRun('base', r ?? none, none, none);
+    if (commitment eq null) { return null; }
+    const bytes? k: _edRun('reduce', _hash([...(commitment ?? none), ...(publicKey ?? none), ...message]), none, none);
+    if (k eq null) { return null; }
+    const bytes? s: _edRun('muladd', r ?? none, k ?? none, secret);
+    if (s eq null) { return null; }
+    return [...(commitment ?? none), ...(s ?? none)];
+}
+
+/// <lang name="fr"><summary>Vérifie la signature d'un message.</summary><param name="publicKey">La clé publique, 32 octets.</param><param name="message">Le message.</param><param name="signature">La signature, 64 octets.</param><returns>Vrai si la signature est celle de ce message pour cette clé.</returns></lang>
+/// <lang name="en"><summary>Checks the signature of a message.</summary><param name="publicKey">The public key, 32 bytes.</param><param name="message">The message.</param><param name="signature">The signature, 64 bytes.</param><returns>True when the signature is the one of this message for this key.</returns></lang>
+gear pure ed25519Verify(bytes publicKey, bytes message, bytes signature): bool {
+    if (publicKey.length not eq 32 or signature.length not eq 64) { return false; }
+    const bytes none: '' as bytes;
+    const bytes? k: _edRun('reduce', _hash([...signature.slice(0, 32), ...publicKey, ...message]), none, none);
+    if (k eq null) { return false; }
+    return _edRun('verify', publicKey, signature, k ?? none) not eq null;
+}

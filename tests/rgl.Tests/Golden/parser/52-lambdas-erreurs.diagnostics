@@ -1,0 +1,5 @@
+52-lambdas-erreurs.rgl:1:18: erreur[E030]: « => » attendu après les paramètres du type de lambda
+52-lambdas-erreurs.rgl:4:18: erreur[E032]: expression attendue
+52-lambdas-erreurs.rgl:5:23: erreur[E030]: après « => », une accolade ouvre le bloc de la lambda
+52-lambdas-erreurs.rgl:6:13: erreur[E032]: expression attendue
+52-lambdas-erreurs.rgl:6:14: erreur[E030]: « ; » attendu à la fin de la déclaration

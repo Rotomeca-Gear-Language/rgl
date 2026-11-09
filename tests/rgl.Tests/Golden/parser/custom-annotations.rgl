@@ -1,0 +1,14 @@
+enum Role { Admin, Reader }
+
+annotation exigeRole(params [Role] roles) = @before(refuseSauf(roleCourant, roles));
+annotation sans(int n) = @before(controle);
+
+@exigeRole(Role.Admin, Role.Reader)
+@before(controle)
+gear page(string r): string => r;
+
+@exigeRole
+gear nu(): void {}
+
+annotation casse(int n);
+train |> done;

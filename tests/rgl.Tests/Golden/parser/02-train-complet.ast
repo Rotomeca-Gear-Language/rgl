@@ -1,0 +1,22 @@
+CompilationUnit 1:1
+  TrainDeclaration 4:1 unguarded=true parameters=1
+    Parameter 4:8 name=args
+      ArrayType 4:8
+        PrimitiveType 4:9 type=string
+    NameExpression 4:23 name=args
+    Pipeline 5:5
+      CallStep 5:8 gear=parseArgs
+        Rail 5:18
+          CallStep 5:22 gear=printUsage
+          ExitCodeStep 5:36
+            LiteralExpression 5:38 kind=IntegerLiteral text=2
+      CallStep 6:8 gear=add
+        LiteralExpression 6:12 kind=IntegerLiteral text=1
+        CallExpression 6:15
+          NameExpression 6:15 name=f
+          NameExpression 6:17 name=x
+        Rail 7:5
+          FailStep 7:9
+            LiteralExpression 7:14 kind=StringLiteral text="oups"
+      ExitCodeStep 8:8
+        LiteralExpression 8:10 kind=IntegerLiteral text=0

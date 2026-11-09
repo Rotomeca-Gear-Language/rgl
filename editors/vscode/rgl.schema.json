@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Projet RGL",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "rgl"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "icon": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rgl": {
+      "const": "0"
+    },
+    "safe": {
+      "type": "boolean",
+      "default": false
+    },
+    "overflow": {
+      "enum": [
+        "checked",
+        "unchecked"
+      ],
+      "default": "checked"
+    },
+    "recursion": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "const": "infinite"
+        }
+      ]
+    },
+    "loop": {
+      "enum": [
+        "free",
+        "safe"
+      ]
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assets": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Fichiers et motifs relatifs copiés dans out/debug ou out/release en conservant leur chemin. Exemple : front/html/**."
+    },
+    "no-trust": {
+      "type": "boolean",
+      "default": false,
+      "description": "Interdit les appels et références @trusted hors std et cpp-trust."
+    },
+    "no-cpp": {
+      "type": "boolean",
+      "default": false,
+      "description": "Interdit les blocs cpp et les liaisons natives hors std et cpp-trust."
+    },
+    "cpp-trust": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "\\.forge$"
+      },
+      "description": "Fichiers .forge autorisés, par chemins relatifs à la racine, sans autorisation transitive des imports."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,4 @@
+CompilationUnit 1:1
+  TrainDeclaration 1:1 unguarded=false parameters=none
+    Pipeline 1:7
+      DoneStep 1:10

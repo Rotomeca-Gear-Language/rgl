@@ -1,0 +1,3 @@
+// Un fichier ne contient qu'un seul train.
+train |> done;
+train |> done;

@@ -1,0 +1,7 @@
+// Programme minimal : mesure le coût de lancement et la taille d'un exécutable qui n'utilise que la console.
+emit fin(): uint {
+    `ok\n` -> console;
+    return 0;
+}
+
+!train |> fin;

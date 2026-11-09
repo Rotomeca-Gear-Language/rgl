@@ -1,0 +1,60 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=const name=MAX
+    PrimitiveType 2:7 type=int
+    LiteralExpression 2:16 kind=IntegerLiteral text=10
+  GearDeclaration 4:1 kind=gear name=twice pure=false parameters=1
+    Parameter 4:12 name=n
+      PrimitiveType 4:12 type=int
+    PrimitiveType 4:20 type=int
+    BlockStatement 4:24
+      VarDeclaration 5:5 keyword=var name=x
+        BinaryExpression 5:12 op=*
+          NameExpression 5:12 name=n
+          LiteralExpression 5:16 kind=IntegerLiteral text=2
+      ReturnStatement 6:5
+        NameExpression 6:12 name=x
+  GearDeclaration 9:1 kind=gear name=add pure=true parameters=2
+    Parameter 9:15 name=a
+      PrimitiveType 9:15 type=int
+    Parameter 9:22 name=b
+      PrimitiveType 9:22 type=int
+    PrimitiveType 9:30 type=int
+    BinaryExpression 9:37 op=+
+      NameExpression 9:37 name=a
+      NameExpression 9:41 name=b
+  GearDeclaration 11:1 kind=gear name=log pure=false parameters=1
+    Parameter 11:10 name=message
+      PrimitiveType 11:10 type=string
+    PrimitiveType 11:27 type=void
+    BlockStatement 11:32
+      ReturnStatement 12:5
+  GearDeclaration 15:1 kind=gear name=calcul pure=false parameters=0
+    PrimitiveType 15:16 type=uint
+    BlockStatement 15:21
+      VarDeclaration 16:5 keyword=var name=v
+        PipeExpression 16:12 gear=add
+          PipeExpression 16:12 gear=twice
+            LiteralExpression 16:12 kind=IntegerLiteral text=3
+          LiteralExpression 16:30 kind=IntegerLiteral text=1
+      ExpressionStatement 17:5
+        CallExpression 17:5
+          NameExpression 17:5 name=log
+          TemplateExpression 17:9
+            TemplateText 17:10 text=v = 
+            TemplateInterpolation 17:14
+              NameExpression 17:15 name=v
+      ExpressionStatement 18:5
+        PipeExpression 18:5 gear=log2
+          PipeExpression 18:5 gear=twice
+            NameExpression 18:5 name=v
+      ReturnStatement 19:5
+        LiteralExpression 19:12 kind=IntegerLiteral text=0
+  TrainDeclaration 22:1 unguarded=false parameters=1
+    Parameter 22:7 name=args
+      ArrayType 22:7
+        PrimitiveType 22:8 type=string
+    NameExpression 22:22 name=args
+    Pipeline 22:27
+      CallStep 22:30 gear=calcul
+      ExitCodeStep 22:40
+        LiteralExpression 22:42 kind=IntegerLiteral text=0

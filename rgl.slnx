@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/analyzers/">
+    <Project Path="analyzers/Rgl.Analyzers/Rgl.Analyzers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/rgl.Tests/rgl.Tests.csproj" />
+  </Folder>
+  <Project Path="rgl.csproj" />
+</Solution>

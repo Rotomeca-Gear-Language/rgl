@@ -1,0 +1,13 @@
+// Parcours puis accumulation sur cent millions d'entiers : le motif `||>` / `|+>` sur lambdas pures.
+gear pure transformer(int i): int => (i * 7 + 3) % 1000;
+
+gear pure ajouter(long acc, int x): long => acc + x;
+
+emit fin(): uint {
+    long entiers: [0..<100000000] ||> transformer |+> 0 with ajouter;
+    double reels: [0..<100000000] ||> (i) => (i as double) * 0.5 |+> 0.0 with (acc, x) => acc + x;
+    `{entiers} {reels}\n` -> console;
+    return 0;
+}
+
+!train |> fin;

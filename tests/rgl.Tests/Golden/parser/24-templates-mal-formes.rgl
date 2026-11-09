@@ -1,0 +1,5 @@
+// Accolades mal formées, interpolation vide ou en trop.
+var a: `seule }`;
+var b: `vide {}`;
+var c: `deux {1 2}`;
+var d: `ouverte {a`;

@@ -1,0 +1,2 @@
+// Le premier paramètre n'a pas de type, le second pas de nom.
+train(, x) |> done;

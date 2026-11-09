@@ -1,0 +1,41 @@
+// JSON : un catalogue de 20 000 articles est écrit dans un fichier puis relu.
+use <Errors> only {IoError, ParseError};
+
+mold Article {
+    int id;
+    string nom;
+    double prix;
+    [int] tags;
+}
+
+mold Catalogue {
+    string titre;
+    [Article] articles;
+}
+
+gear pure fabriquer(int i): Article => new Article {id: i, nom: `article {i}`, prix: (i as double) * 1.5, tags: [i, i + 1, i + 2]};
+
+guard allerRetour(string chemin): string {
+    [Article] articles: [0..<100000] ||> fabriquer;
+    Catalogue ecrit: {titre: 'bench', articles: articles};
+    ecrit -> json chemin;
+    Catalogue relu <- json chemin;
+    bool identique: relu eq ecrit;
+    return `{relu.titre} {relu.articles.length} {identique} {relu.articles[99999].nom}`;
+}
+
+emit signaler(Exception | IoError | ParseError e): uint {
+    match (e) {
+        Exception x |> { `{x.message}
+` -> console; }
+        ParseError p |> { `{p.message}\n` -> console; }
+        IoError i |> { `{i.message}\n` -> console; }
+    }
+    return 1;
+}
+
+gear afficher(string s): void {
+    `{s}\n` -> console;
+}
+
+train 'catalogue.json' |> allerRetour !> [signaler] |> afficher |> done;

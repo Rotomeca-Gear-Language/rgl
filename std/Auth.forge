@@ -1,0 +1,182 @@
+forge: gears
+description: "Authentification : en-têtes Basic et Bearer, jetons JWT (HS256)"
+
+use <Text> only {base64Encode, base64Decode, hexDecode};
+use <Crypto> only {hmacSha256, constantTimeEquals};
+use <Time> only {now};
+
+/// <lang name="fr">
+/// <summary>Un identifiant et un mot de passe reçus par l'authentification Basic.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A user name and password received through Basic authentication.</summary>
+/// </lang>
+mold BasicCredentials {
+    /// <lang name="fr"><summary>L'identifiant.</summary></lang>
+    /// <lang name="en"><summary>The user name.</summary></lang>
+    string user;
+    /// <lang name="fr"><summary>Le mot de passe, en clair : à comparer avec `verifyPassword`, jamais à ranger.</summary></lang>
+    /// <lang name="en"><summary>The password, in clear: to compare with `verifyPassword`, never to store.</summary></lang>
+    string password;
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'un jeton JWT annonce de sa durée de vie (usage interne).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>What a JWT announces about its lifetime (internal use).</summary>
+/// </lang>
+mold _JwtClaims {
+    /// <lang name="fr"><summary>L'instant d'expiration, en secondes depuis 1970, ou `null` s'il n'expire pas.</summary></lang>
+    /// <lang name="en"><summary>The expiry instant, in seconds since 1970, or `null` when it does not expire.</summary></lang>
+    long? exp;
+}
+
+/// <lang name="fr">
+/// <summary>Lit un en-tête `Authorization: Basic …`.</summary>
+/// <param name="header">La valeur de l'en-tête `Authorization`.</param>
+/// <returns>L'identifiant et le mot de passe, `null` si l'en-tête n'est pas du Basic valide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads an `Authorization: Basic …` header.</summary>
+/// <param name="header">The value of the `Authorization` header.</param>
+/// <returns>The user name and password, or `null` when the header is not valid Basic.</returns>
+/// </lang>
+gear pure parseBasicAuthorization(string header): BasicCredentials? {
+    if (not header.toLower().startsWith('basic ')) { return null; }
+    const bytes? decoded: base64Decode(header.substring(6, header.length as long).trim());
+    const string? text: (decoded ?? ('' as bytes)) as? string;
+    if (decoded eq null or text eq null) { return null; }
+    const (string before, string after, bool found) pair: (text ?? '').splitOnce(':');
+    return pair.found ? {user: pair.before, password: pair.after} : null;
+}
+
+/// <lang name="fr">
+/// <summary>Lit un en-tête `Authorization: Bearer …`.</summary>
+/// <param name="header">La valeur de l'en-tête `Authorization`.</param>
+/// <returns>Le jeton, `null` si l'en-tête n'est pas du Bearer.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads an `Authorization: Bearer …` header.</summary>
+/// <param name="header">The value of the `Authorization` header.</param>
+/// <returns>The token, or `null` when the header is not Bearer.</returns>
+/// </lang>
+gear pure parseBearerAuthorization(string header): string? {
+    if (not header.toLower().startsWith('bearer ')) { return null; }
+    const string token: header.substring(7, header.length as long).trim();
+    return token eq '' ? null : token;
+}
+
+/// <lang name="fr">
+/// <summary>Écrit l'en-tête `Authorization` d'une requête Basic (côté client).</summary>
+/// <param name="user">L'identifiant.</param>
+/// <param name="password">Le mot de passe.</param>
+/// <returns>La valeur `Basic …`, à mettre dans l'en-tête.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes the `Authorization` header of a Basic request (client side).</summary>
+/// <param name="user">The user name.</param>
+/// <param name="password">The password.</param>
+/// <returns>The `Basic …` value, to put in the header.</returns>
+/// </lang>
+gear pure basicAuthorization(string user, string password): string => `Basic {base64Encode(`{user}:{password}` as bytes)}`;
+
+/// <lang name="fr">
+/// <summary>Écrit l'en-tête `Authorization` d'une requête Bearer (côté client).</summary>
+/// <param name="token">Le jeton.</param>
+/// <returns>La valeur `Bearer …`, à mettre dans l'en-tête.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes the `Authorization` header of a Bearer request (client side).</summary>
+/// <param name="token">The token.</param>
+/// <returns>The `Bearer …` value, to put in the header.</returns>
+/// </lang>
+gear pure bearerAuthorization(string token): string => `Bearer {token}`;
+
+/// <lang name="fr">
+/// <summary>Encode des octets en base64 « URL » (sans `=`, avec `-` et `_`), comme les jetons JWT (usage interne).</summary>
+/// <param name="data">Les octets.</param>
+/// <returns>Le texte encodé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Encodes bytes as "URL" base64 (no `=`, with `-` and `_`), as JWT tokens do (internal use).</summary>
+/// <param name="data">The bytes.</param>
+/// <returns>The encoded text.</returns>
+/// </lang>
+gear pure _base64Url(bytes data): string => base64Encode(data).replace('+', '-').replace('/', '_').replace('=', '');
+
+/// <lang name="fr">
+/// <summary>Décode du base64 « URL » (usage interne).</summary>
+/// <param name="text">Le texte encodé, avec ou sans `=` de fin.</param>
+/// <returns>Les octets, `null` si le texte n'est pas du base64.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Decodes "URL" base64 (internal use).</summary>
+/// <param name="text">The encoded text, with or without trailing `=`.</param>
+/// <returns>The bytes, or `null` when the text is not base64.</returns>
+/// </lang>
+gear pure _fromBase64Url(string text): bytes? {
+    const string standard: text.replace('-', '+').replace('_', '/');
+    const long missing: (4 - (standard.length as long) % 4) % 4;
+    return base64Decode(`{standard}{'='.repeat(missing as uint)}`);
+}
+
+/// <lang name="fr">
+/// <summary>La signature HMAC-SHA256 brute d'un texte (usage interne).</summary>
+/// <param name="secret">Le secret.</param>
+/// <param name="data">Le texte à signer.</param>
+/// <returns>Les 32 octets de la signature.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The raw HMAC-SHA256 signature of a text (internal use).</summary>
+/// <param name="secret">The secret.</param>
+/// <param name="data">The text to sign.</param>
+/// <returns>The 32 bytes of the signature.</returns>
+/// </lang>
+gear pure _rawHmac(string secret, string data): bytes => hexDecode(hmacSha256(secret as bytes, data as bytes)) ?? ('' as bytes);
+
+/// <lang name="fr">
+/// <summary>Fabrique un jeton JWT signé en HS256 (en-tête `{"alg":"HS256","typ":"JWT"}`).</summary>
+/// <param name="payload">Les revendications, en JSON (`{"sub":"alice","exp":1800000000}` ; `exp` est un instant en secondes depuis 1970).</param>
+/// <param name="secret">Le secret qui signe.</param>
+/// <returns>Le jeton `en-tête.charge.signature`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Builds a JWT signed with HS256 (header `{"alg":"HS256","typ":"JWT"}`).</summary>
+/// <param name="payload">The claims, as JSON (`{"sub":"alice","exp":1800000000}`; `exp` is an instant in seconds since 1970).</param>
+/// <param name="secret">The secret that signs.</param>
+/// <returns>The token `header.payload.signature`.</returns>
+/// </lang>
+gear pure signJwt(string payload, string secret): string {
+    const string signing: `{_base64Url('{"alg":"HS256","typ":"JWT"}' as bytes)}.{_base64Url(payload as bytes)}`;
+    return `{signing}.{_base64Url(_rawHmac(secret, signing))}`;
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie un jeton JWT HS256 : bonne forme, signature correcte (comparée en temps constant) et, s'il a une revendication `exp`, pas expiré.</summary>
+/// <param name="token">Le jeton.</param>
+/// <param name="secret">Le secret qui a signé.</param>
+/// <returns>Les revendications en JSON, `null` si le jeton est refusé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks an HS256 JWT: well formed, correct signature (compared in constant time) and, if it has an `exp` claim, not expired.</summary>
+/// <param name="token">The token.</param>
+/// <param name="secret">The secret that signed.</param>
+/// <returns>The claims as JSON, or `null` when the token is refused.</returns>
+/// </lang>
+gear verifyJwt(string token, string secret): string? {
+    const [string] parts: token.split('.');
+    if (parts.length not eq 3) { return null; }
+    const bytes? given: _fromBase64Url(parts[2]);
+    if (given eq null or not constantTimeEquals(_rawHmac(secret, `{parts[0]}.{parts[1]}`), given ?? ('' as bytes))) { return null; }
+    const bytes? payloadBytes: _fromBase64Url(parts[1]);
+    const string? payload: (payloadBytes ?? ('' as bytes)) as? string;
+    if (payloadBytes eq null or payload eq null) { return null; }
+    const long? expiry: match (parseJson<_JwtClaims>(payload ?? '')) {
+        ok claims |> claims.exp;
+        err failure |> null;
+    };
+    const long seconds: (now() as long) / 1000;
+    if (expiry not eq null and (expiry ?? 0) <= seconds) { return null; }
+    return payload;
+}

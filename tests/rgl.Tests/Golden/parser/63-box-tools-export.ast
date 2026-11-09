@@ -1,0 +1,10 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=index description="Index" metadata=false
+  ImportDeclaration 4:1 module=Util only=none kind=Outside alias=U
+  ImportDeclaration 5:1 module=Autre only=1 kind=Outside
+    ImportName 5:25 name=f alias=g
+  ImportDeclaration 6:1 module=Database only=none kind=Box alias=DB
+  ImportDeclaration 7:1 module=Vectors only=none kind=Tools
+  ImportDeclaration 8:1 module=Vectors.Vec2 only=1 kind=Tools
+    ImportName 8:33 name=Vec2
+  ExportDeclaration 9:1 names=ouvrir,Row

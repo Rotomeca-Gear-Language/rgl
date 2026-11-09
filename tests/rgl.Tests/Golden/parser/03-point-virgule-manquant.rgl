@@ -1,0 +1,2 @@
+// Le « ; » final manque : l'erreur pointe juste après « done ».
+train |> done

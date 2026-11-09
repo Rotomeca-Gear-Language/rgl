@@ -1,0 +1,7 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=none
+    Pipeline 2:7
+      CallStep 2:10 gear=add
+        LiteralExpression 2:14 kind=IntegerLiteral text=1
+        LiteralExpression 2:17 kind=IntegerLiteral text=2
+      DoneStep 2:22

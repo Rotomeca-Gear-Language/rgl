@@ -1,0 +1,208 @@
+forge: gears
+description: "Entrées et sorties de la console"
+
+export {write, writeLine, readLine, readInt, readAll, writeError, writeErrorLine, ANSI_RESET, ANSI_BOLD, ANSI_RED, ANSI_GREEN, ANSI_YELLOW, ANSI_BLUE, ANSI_MAGENTA, ANSI_CYAN, colorize};
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui remet le style par défaut.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that resets the default style.</summary>
+/// </lang>
+const string ANSI_RESET: "\x1b[0m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui met en gras.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that turns bold on.</summary>
+/// </lang>
+const string ANSI_BOLD: "\x1b[1m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui écrit en rouge.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that writes in red.</summary>
+/// </lang>
+const string ANSI_RED: "\x1b[31m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui écrit en vert.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that writes in green.</summary>
+/// </lang>
+const string ANSI_GREEN: "\x1b[32m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui écrit en jaune.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that writes in yellow.</summary>
+/// </lang>
+const string ANSI_YELLOW: "\x1b[33m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui écrit en bleu.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that writes in blue.</summary>
+/// </lang>
+const string ANSI_BLUE: "\x1b[34m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui écrit en magenta.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that writes in magenta.</summary>
+/// </lang>
+const string ANSI_MAGENTA: "\x1b[35m";
+
+/// <lang name="fr">
+/// <summary>La séquence ANSI qui écrit en cyan.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The ANSI sequence that writes in cyan.</summary>
+/// </lang>
+const string ANSI_CYAN: "\x1b[36m";
+
+
+/// <lang name="fr">
+/// <summary>Écrit la valeur sur la console, sans retour à la ligne.</summary>
+/// <typeparam name="T">Type de la valeur : tout ce qui s'écrit comme texte (nombre, bool, string, mold…).</typeparam>
+/// <param name="what">La valeur à écrire.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a value to the console without a newline.</summary>
+/// <typeparam name="T">The value type: anything that can be written as text (number, bool, string, mold, etc.).</typeparam>
+/// <param name="what">The value to write.</param>
+/// </lang>
+gear write<T>(T what): void {
+    `{what}` -> console;
+}
+
+/// <lang name="fr">
+/// <summary>Écrit la valeur sur la console, puis passe à la ligne.</summary>
+/// <typeparam name="T">Type de la valeur : tout ce qui s'écrit comme texte (nombre, bool, string, mold…).</typeparam>
+/// <param name="what">La valeur à écrire.</param>
+/// <example>
+/// <code language="rgl">
+/// std.writeLine("bonjour");
+/// </code>
+/// </example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a value to the console followed by a newline.</summary>
+/// <typeparam name="T">The value type: anything that can be written as text (number, bool, string, mold, etc.).</typeparam>
+/// <param name="what">The value to write.</param>
+/// <example>
+/// <code language="rgl">
+/// std.writeLine("bonjour");
+/// </code>
+/// </example>
+/// </lang>
+gear writeLine<T>(T what): void {
+    `{what}\n` -> console;
+}
+
+/// <lang name="fr">
+/// <summary>Lit une ligne de la console, sans son retour à la ligne.</summary>
+/// <returns>La ligne lue ; une chaîne vide à la fin de l'entrée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads a line from the console without its trailing newline.</summary>
+/// <returns>The line read; an empty string at the end of input.</returns>
+/// </lang>
+gear readLine(): string {
+    var line <- console;
+    return line;
+}
+
+/// <lang name="fr">
+/// <summary>Lit une ligne de la console et la lit comme un entier.</summary>
+/// <returns>L'entier lu ; `null` si la ligne n'en est pas un (ou à la fin de l'entrée).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads a line from the console and parses it as an integer.</summary>
+/// <returns>The parsed integer; `null` if the line is not an integer (or at the end of input).</returns>
+/// </lang>
+gear readInt(): int? {
+    var line <- console;
+    return line as? int;
+}
+
+/// <lang name="fr">
+/// <summary>Écrit le texte sur la sortie d'erreur, sans tampon (usage interne).</summary>
+/// <param name="text">Le texte.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes the text to the error output, unbuffered (internal use).</summary>
+/// <param name="text">The text.</param>
+/// </lang>
+@trusted
+gear _writeErrorText(string text): void => cpp {
+    #include <cstdio>
+    rgl_return rgl(rgl_arg_text text) {
+        std::fwrite(text.data(), 1, text.size(), stderr);
+        std::fflush(stderr);
+    }
+}(string text: text): void;
+
+/// <lang name="fr">
+/// <summary>Écrit la valeur sur la sortie d'erreur, sans retour à la ligne.</summary>
+/// <typeparam name="T">Type de la valeur : tout ce qui s'écrit comme texte.</typeparam>
+/// <param name="what">La valeur à écrire.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a value to the error output, without a newline.</summary>
+/// <typeparam name="T">The value type: anything that can be written as text.</typeparam>
+/// <param name="what">The value to write.</param>
+/// </lang>
+gear writeError<T>(T what): void {
+    _writeErrorText(`{what}`);
+}
+
+/// <lang name="fr">
+/// <summary>Écrit la valeur sur la sortie d'erreur, puis passe à la ligne.</summary>
+/// <typeparam name="T">Type de la valeur : tout ce qui s'écrit comme texte.</typeparam>
+/// <param name="what">La valeur à écrire.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a value to the error output, followed by a newline.</summary>
+/// <typeparam name="T">The value type: anything that can be written as text.</typeparam>
+/// <param name="what">The value to write.</param>
+/// </lang>
+gear writeErrorLine<T>(T what): void {
+    _writeErrorText(`{what}\n`);
+}
+
+/// <lang name="fr">
+/// <summary>Lit tout le reste de l'entrée standard.</summary>
+/// <returns>Le texte lu ; vide si l'entrée est déjà finie. Sur une vraie console Windows, la lecture s'arrête à la première ligne vide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads all the remaining standard input.</summary>
+/// <returns>The text read; empty when the input has already ended. On a real Windows console, reading stops at the first empty line.</returns>
+/// </lang>
+@trusted
+gear readAll(): string => cpp {
+    #include <rgl/standard/console.hpp>
+    rgl_return rgl() {
+        return rgl::standard::console::read_all();
+    }
+}(): string;
+
+/// <lang name="fr">
+/// <summary>Entoure un texte d'une séquence ANSI puis de la remise à zéro.</summary>
+/// <param name="text">Le texte à colorer.</param>
+/// <param name="style">La séquence de début, par exemple `ANSI_RED`.</param>
+/// <returns>Le texte coloré.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Wraps a text in an ANSI sequence followed by the reset.</summary>
+/// <param name="text">The text to color.</param>
+/// <param name="style">The opening sequence, for example `ANSI_RED`.</param>
+/// <returns>The colored text.</returns>
+/// </lang>
+gear pure colorize(string text, string style): string => `{style}{text}{ANSI_RESET}`;

@@ -1,0 +1,39 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=gears description="Extensions" metadata=false
+  IngotDeclaration 4:1 name=ProgramValue
+    PrimitiveType 4:21 type=uint
+  ExtendDeclaration 6:1
+    NamedType 6:8 name=ProgramValue
+    VarDeclaration 7:5 keyword=const name=Valid
+      NamedType 7:11 name=ProgramValue
+      LiteralExpression 7:31 kind=IntegerLiteral text=0
+    GearDeclaration 8:5 kind=gear name=plus pure=true parameters=2
+      Parameter 8:20 name=p this=true
+        NamedType 8:25 name=ProgramValue
+      Parameter 8:41 name=n
+        PrimitiveType 8:41 type=uint
+      NamedType 8:50 name=ProgramValue
+      CallExpression 8:66
+        NameExpression 8:66 name=ProgramValue
+        BinaryExpression 8:79 op=+
+          UnbrandExpression 8:79
+            NameExpression 8:79 name=p
+          NameExpression 8:84 name=n
+    GearDeclaration 9:5 kind=gear name=make pure=false parameters=1
+      Parameter 9:15 name=n
+        PrimitiveType 9:15 type=uint
+      NamedType 9:24 name=ProgramValue
+      CallExpression 9:40
+        NameExpression 9:40 name=ProgramValue
+        NameExpression 9:53 name=n
+  ExtendDeclaration 12:1
+    ArrayType 12:8
+      PrimitiveType 12:9 type=int
+    GearDeclaration 13:5 kind=gear name=premier pure=true parameters=1
+      Parameter 13:23 name=xs mut=true this=true
+        ArrayType 13:32
+          PrimitiveType 13:33 type=int
+      PrimitiveType 13:43 type=int
+      IndexExpression 13:50
+        NameExpression 13:50 name=xs
+        LiteralExpression 13:53 kind=IntegerLiteral text=0

@@ -1,0 +1,245 @@
+forge: gears
+description: "Piles, files, files à deux bouts, ensembles, files de priorité, tas et caches"
+
+/// <lang name="fr">
+/// <summary>Une pile : le dernier élément ajouté est le premier retiré.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A stack: the last element added is the first removed.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+mold Stack<T> {
+    /// <lang name="fr">
+    /// <summary>Les éléments, du plus ancien au plus récent.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements, oldest first.</summary>
+    /// </lang>
+    [T] items;
+}
+
+/// <lang name="fr">
+/// <summary>Une file : le premier élément ajouté est le premier retiré.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A queue: the first element added is the first removed.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+mold Queue<T> {
+    /// <lang name="fr">
+    /// <summary>Les éléments, dont les `head` premiers sont déjà retirés.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements, the first `head` of which are already removed.</summary>
+    /// </lang>
+    [T] items;
+    /// <lang name="fr">
+    /// <summary>Le rang du prochain élément à retirer.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The position of the next element to remove.</summary>
+    /// </lang>
+    uint head;
+}
+
+/// <lang name="fr">
+/// <summary>Un ensemble : des éléments sans doublon, rangés dans l'ordre de leurs clés.</summary>
+/// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A set: elements without duplicates, kept in key order.</summary>
+/// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+/// </lang>
+mold Set<K> {
+    /// <lang name="fr">
+    /// <summary>Les éléments présents, chacun associé à `true`.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The present elements, each mapped to `true`.</summary>
+    /// </lang>
+    [K:bool] items;
+}
+
+/// <lang name="fr">
+/// <summary>Une file de priorité : l'élément retiré est toujours le plus petit selon la comparaison donnée.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A priority queue: the removed element is always the smallest according to the given comparison.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+mold PriorityQueue<T> {
+    /// <lang name="fr">
+    /// <summary>Les éléments, déjà rangés du plus petit au plus grand.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements, already sorted from smallest to largest.</summary>
+    /// </lang>
+    [T] items;
+    /// <lang name="fr">
+    /// <summary>La comparaison : négative si le premier passe avant, positive s'il passe après, nulle sinon.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The comparison: negative if the first comes first, positive if it comes after, zero otherwise.</summary>
+    /// </lang>
+    (T, T) => int compare;
+}
+
+/// <lang name="fr">
+/// <summary>Crée une pile vide.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <returns>Une pile sans élément.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty stack.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <returns>A stack with no elements.</returns>
+/// </lang>
+gear pure newStack<T>(): Stack<T> => {items: []};
+
+/// <lang name="fr">
+/// <summary>Crée une file vide.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <returns>Une file sans élément.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty queue.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <returns>A queue with no elements.</returns>
+/// </lang>
+gear pure newQueue<T>(): Queue<T> => {items: [], head: 0};
+
+/// <lang name="fr">
+/// <summary>Crée un ensemble vide.</summary>
+/// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+/// <returns>Un ensemble sans élément.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty set.</summary>
+/// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+/// <returns>A set with no elements.</returns>
+/// </lang>
+gear pure newSet<K>(): Set<K> => {items: [:]};
+
+/// <lang name="fr">
+/// <summary>Crée une file de priorité vide.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <param name="compare">La comparaison : négative si le premier élément doit sortir avant le second.</param>
+/// <returns>Une file de priorité sans élément.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty priority queue.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <param name="compare">The comparison: negative when the first element must leave before the second.</param>
+/// <returns>A priority queue with no elements.</returns>
+/// </lang>
+gear pure newPriorityQueue<T>(pure (T, T) => int compare): PriorityQueue<T> => {items: [], compare: compare};
+
+/// <lang name="fr">
+/// <summary>Une file à deux bouts : on ajoute et on retire des deux côtés. Elle est faite de deux piles ; quand l'une se vide, la moitié de l'autre la remplit, donc chaque opération coûte en moyenne un temps constant.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A double-ended queue: elements are added and removed on both sides. It is made of two stacks; when one runs empty, half of the other fills it, so each operation costs a constant time on average.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+mold Deque<T> {
+    /// <lang name="fr"><summary>Le début de la file, à l'envers : le premier élément est le dernier valide.</summary></lang>
+    /// <lang name="en"><summary>The start of the queue, reversed: the first element is the last valid one.</summary></lang>
+    [T] front;
+    /// <lang name="fr"><summary>Le nombre d'éléments valides de `front` (le reste est périmé).</summary></lang>
+    /// <lang name="en"><summary>The number of valid elements of `front` (the rest is stale).</summary></lang>
+    uint frontSize;
+    /// <lang name="fr"><summary>La fin de la file, dans l'ordre.</summary></lang>
+    /// <lang name="en"><summary>The end of the queue, in order.</summary></lang>
+    [T] back;
+    /// <lang name="fr"><summary>Le nombre d'éléments valides de `back` (le reste est périmé).</summary></lang>
+    /// <lang name="en"><summary>The number of valid elements of `back` (the rest is stale).</summary></lang>
+    uint backSize;
+}
+
+/// <lang name="fr">
+/// <summary>Crée une file à deux bouts vide.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <returns>Une file sans élément.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty double-ended queue.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <returns>A queue with no elements.</returns>
+/// </lang>
+gear pure newDeque<T>(): Deque<T> => {front: [], frontSize: 0, back: [], backSize: 0};
+
+/// <lang name="fr">
+/// <summary>Un cache à éviction du moins récemment utilisé : il garde au plus `capacity` entrées, et quand il est plein, ajouter une nouvelle clé retire celle qui n'a pas servi depuis le plus longtemps. Lire (`get`) ou écrire (`put`) une clé la rend la plus récente.</summary>
+/// <typeparam name="K">Type des clés (un type permis comme clé de dictionnaire).</typeparam>
+/// <typeparam name="V">Type des valeurs.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A least-recently-used cache: it keeps at most `capacity` entries, and when it is full, adding a new key removes the one that has not been used for the longest time. Reading (`get`) or writing (`put`) a key makes it the most recent.</summary>
+/// <typeparam name="K">The key type (a type allowed as a dictionary key).</typeparam>
+/// <typeparam name="V">The value type.</typeparam>
+/// </lang>
+mold LruCache<K, V> {
+    /// <lang name="fr"><summary>Le nombre maximal d'entrées.</summary></lang>
+    /// <lang name="en"><summary>The maximum number of entries.</summary></lang>
+    uint capacity;
+    /// <lang name="fr"><summary>Les entrées.</summary></lang>
+    /// <lang name="en"><summary>The entries.</summary></lang>
+    [K:V] entries;
+    /// <lang name="fr"><summary>Les clés, de la moins récente à la plus récente.</summary></lang>
+    /// <lang name="en"><summary>The keys, from the least recent to the most recent.</summary></lang>
+    [K] order;
+}
+
+/// <lang name="fr">
+/// <summary>Crée un cache vide.</summary>
+/// <typeparam name="K">Type des clés.</typeparam>
+/// <typeparam name="V">Type des valeurs.</typeparam>
+/// <param name="capacity">Le nombre maximal d'entrées (au moins 1).</param>
+/// <returns>Un cache sans entrée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty cache.</summary>
+/// <typeparam name="K">The key type.</typeparam>
+/// <typeparam name="V">The value type.</typeparam>
+/// <param name="capacity">The maximum number of entries (at least 1).</param>
+/// <returns>A cache with no entries.</returns>
+/// </lang>
+gear pure newLruCache<K, V>(uint capacity): LruCache<K, V> => {capacity: capacity < 1 ? 1 : capacity, entries: [:], order: []};
+
+/// <lang name="fr">
+/// <summary>Un tas binaire : le plus petit élément (selon `compare`) sort en premier, en un temps proportionnel au logarithme de la taille pour `push` et `pop`. À préférer à une `PriorityQueue` quand il y a beaucoup d'éléments.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>A binary heap: the smallest element (according to `compare`) comes out first, in a time proportional to the logarithm of the size for `push` and `pop`. To be preferred over a `PriorityQueue` when there are many elements.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+mold Heap<T> {
+    /// <lang name="fr"><summary>Les éléments en tas ; ceux au-delà de `count` sont périmés.</summary></lang>
+    /// <lang name="en"><summary>The elements as a heap; those beyond `count` are stale.</summary></lang>
+    [T] items;
+    /// <lang name="fr"><summary>Le nombre d'éléments valides.</summary></lang>
+    /// <lang name="en"><summary>The number of valid elements.</summary></lang>
+    uint count;
+    /// <lang name="fr"><summary>L'ordre : négatif si le premier est plus petit, positif s'il est plus grand, nul s'ils sont égaux.</summary></lang>
+    /// <lang name="en"><summary>The order: negative when the first is smaller, positive when it is larger, zero when equal.</summary></lang>
+    pure (T, T) => int compare;
+}
+
+/// <lang name="fr">
+/// <summary>Crée un tas vide.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <param name="compare">L'ordre : négatif si le premier est plus petit.</param>
+/// <returns>Un tas sans élément.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Creates an empty heap.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <param name="compare">The order: negative when the first is smaller.</param>
+/// <returns>A heap with no elements.</returns>
+/// </lang>
+gear pure newHeap<T>(pure (T, T) => int compare): Heap<T> => {items: [], count: 0, compare: compare};

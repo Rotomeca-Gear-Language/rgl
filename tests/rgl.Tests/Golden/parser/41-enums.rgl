@@ -1,0 +1,14 @@
+// Enums : sans type, avec type et valeurs, accès qualifié, case court.
+enum Direction { North, South, }
+enum Status: int { Idle: 0, Error: -1 }
+
+gear nom(Direction d): string {
+    switch (d) {
+        case North:
+            return "nord";
+        case Direction.South:
+            return "sud";
+    }
+}
+
+!train |> done;

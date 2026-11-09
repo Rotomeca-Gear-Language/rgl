@@ -1,0 +1,24 @@
+CompilationUnit 1:1
+  IngotDeclaration 2:1 name=<manquant>
+    PrimitiveType 2:9 type=int
+  IngotDeclaration 3:1 name=A
+    PrimitiveType 3:9 type=int
+  GearDeclaration 4:1 kind=gear name=g pure=false parameters=0
+    PrimitiveType 4:11 type=uint
+    BlockStatement 4:16
+      VarDeclaration 5:5 keyword=none name=<manquant>
+        PrimitiveType 5:5 type=int
+        MissingExpression 5:8
+      VarDeclaration 6:5 keyword=none name=b
+        BoundedType 6:5
+          PrimitiveType 6:5 type=int
+          LiteralExpression 6:9 kind=IntegerLiteral text=0
+          LiteralExpression 6:12 kind=IntegerLiteral text=100
+        LiteralExpression 6:19 kind=IntegerLiteral text=1
+      ReturnStatement 7:5
+        LiteralExpression 7:12 kind=IntegerLiteral text=0
+  TrainDeclaration 9:1 unguarded=true parameters=none
+    Pipeline 9:8
+      ExitCodeStep 9:11
+        CallExpression 9:13
+          NameExpression 9:13 name=g

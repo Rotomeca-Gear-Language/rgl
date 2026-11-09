@@ -1,0 +1,258 @@
+forge: gears
+description: "Fuseaux horaires : décalage, heure d'été et conversions, sans rien demander au système"
+
+export {TimeZone, LocalTime, timeZone, utcZone, fixedOffset, zoneNames, utcOffset, isDaylightSaving, localTime, inZone, fromZone, formatIso};
+
+const [string] _zoneTable: [
+    'Africa/Accra|0|none', 'Africa/Algiers|60|none', 'Africa/Johannesburg|120|none', 'Africa/Lagos|60|none', 'Africa/Nairobi|180|none', 'Africa/Tunis|60|none',
+    'America/Anchorage|-540|US', 'America/Argentina/Buenos_Aires|-180|none', 'America/Bogota|-300|none', 'America/Caracas|-240|none', 'America/Chicago|-360|US',
+    'America/Denver|-420|US', 'America/Halifax|-240|US', 'America/Lima|-300|none', 'America/Los_Angeles|-480|US', 'America/Mexico_City|-360|none',
+    'America/New_York|-300|US', 'America/Phoenix|-420|none', 'America/Sao_Paulo|-180|none', 'America/St_Johns|-210|US', 'America/Toronto|-300|US',
+    'America/Vancouver|-480|US',
+    'Asia/Baghdad|180|none', 'Asia/Bangkok|420|none', 'Asia/Colombo|330|none', 'Asia/Dhaka|360|none', 'Asia/Dubai|240|none', 'Asia/Ho_Chi_Minh|420|none',
+    'Asia/Hong_Kong|480|none', 'Asia/Jakarta|420|none', 'Asia/Kabul|270|none', 'Asia/Karachi|300|none', 'Asia/Kathmandu|345|none', 'Asia/Kolkata|330|none',
+    'Asia/Manila|480|none', 'Asia/Riyadh|180|none', 'Asia/Seoul|540|none', 'Asia/Shanghai|480|none', 'Asia/Singapore|480|none', 'Asia/Taipei|480|none',
+    'Asia/Tashkent|300|none', 'Asia/Tehran|210|none', 'Asia/Tokyo|540|none',
+    'Atlantic/Reykjavik|0|none',
+    'Australia/Adelaide|570|AU', 'Australia/Brisbane|600|none', 'Australia/Darwin|570|none', 'Australia/Hobart|600|AU', 'Australia/Melbourne|600|AU',
+    'Australia/Perth|480|none', 'Australia/Sydney|600|AU',
+    'Europe/Amsterdam|60|EU', 'Europe/Athens|120|EU', 'Europe/Belgrade|60|EU', 'Europe/Berlin|60|EU', 'Europe/Brussels|60|EU', 'Europe/Bucharest|120|EU',
+    'Europe/Budapest|60|EU', 'Europe/Copenhagen|60|EU', 'Europe/Dublin|0|EU', 'Europe/Helsinki|120|EU', 'Europe/Istanbul|180|none', 'Europe/Kyiv|120|EU',
+    'Europe/Lisbon|0|EU', 'Europe/London|0|EU', 'Europe/Madrid|60|EU', 'Europe/Minsk|180|none', 'Europe/Moscow|180|none', 'Europe/Oslo|60|EU',
+    'Europe/Paris|60|EU', 'Europe/Prague|60|EU', 'Europe/Riga|120|EU', 'Europe/Rome|60|EU', 'Europe/Sofia|120|EU', 'Europe/Stockholm|60|EU',
+    'Europe/Tallinn|120|EU', 'Europe/Vienna|60|EU', 'Europe/Vilnius|120|EU', 'Europe/Warsaw|60|EU', 'Europe/Zurich|60|EU',
+    'Pacific/Auckland|720|NZ', 'Pacific/Honolulu|-600|none'
+];
+
+/// <lang name="fr">
+/// <summary>Un fuseau horaire : un nom, son décalage hors heure d'été, et la règle de son heure d'été. Les règles sont celles d'aujourd'hui (Europe depuis 1996, États-Unis et Canada depuis 2007, Australie, Nouvelle-Zélande) : une date plus ancienne peut avoir eu un autre décalage.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A time zone: a name, its offset outside daylight saving time, and its daylight saving rule. The rules are today's (Europe since 1996, the United States and Canada since 2007, Australia, New Zealand): an older date may have had another offset.</summary>
+/// </lang>
+mold TimeZone {
+    /// <lang name="fr"><summary>Le nom du fuseau (`Europe/Paris`, `UTC`, `+05:30`).</summary></lang>
+    /// <lang name="en"><summary>The zone name (`Europe/Paris`, `UTC`, `+05:30`).</summary></lang>
+    string name;
+    /// <lang name="fr"><summary>Le décalage avec UTC hors heure d'été, en minutes (positif à l'est).</summary></lang>
+    /// <lang name="en"><summary>The offset from UTC outside daylight saving time, in minutes (positive to the east).</summary></lang>
+    long offsetMinutes;
+    /// <lang name="fr"><summary>La règle de l'heure d'été : `none`, `EU`, `US`, `AU` ou `NZ`.</summary></lang>
+    /// <lang name="en"><summary>The daylight saving rule: `none`, `EU`, `US`, `AU` or `NZ`.</summary></lang>
+    string rule;
+}
+
+/// <lang name="fr"><summary>Un instant vu dans un fuseau : les composantes de la date et de l'heure locales.</summary></lang>
+/// <lang name="en"><summary>An instant seen in a zone: the components of the local date and time.</summary></lang>
+mold LocalTime {
+    /// <lang name="fr"><summary>L'année locale.</summary></lang>
+    /// <lang name="en"><summary>The local year.</summary></lang>
+    long year;
+    /// <lang name="fr"><summary>Le mois, de 1 à 12.</summary></lang>
+    /// <lang name="en"><summary>The month, from 1 to 12.</summary></lang>
+    long month;
+    /// <lang name="fr"><summary>Le jour du mois.</summary></lang>
+    /// <lang name="en"><summary>The day of the month.</summary></lang>
+    long day;
+    /// <lang name="fr"><summary>L'heure, de 0 à 23.</summary></lang>
+    /// <lang name="en"><summary>The hour, from 0 to 23.</summary></lang>
+    long hour;
+    /// <lang name="fr"><summary>La minute, de 0 à 59.</summary></lang>
+    /// <lang name="en"><summary>The minute, from 0 to 59.</summary></lang>
+    long minute;
+    /// <lang name="fr"><summary>La seconde, de 0 à 59.</summary></lang>
+    /// <lang name="en"><summary>The second, from 0 to 59.</summary></lang>
+    long second;
+    /// <lang name="fr"><summary>La milliseconde, de 0 à 999.</summary></lang>
+    /// <lang name="en"><summary>The millisecond, from 0 to 999.</summary></lang>
+    long millisecond;
+    /// <lang name="fr"><summary>Le jour de la semaine, de 1 (lundi) à 7 (dimanche).</summary></lang>
+    /// <lang name="en"><summary>The day of the week, from 1 (Monday) to 7 (Sunday).</summary></lang>
+    long dayOfWeek;
+    /// <lang name="fr"><summary>Le décalage avec UTC à cet instant, en minutes, heure d'été comprise.</summary></lang>
+    /// <lang name="en"><summary>The offset from UTC at that instant, in minutes, daylight saving included.</summary></lang>
+    long offsetMinutes;
+    /// <lang name="fr"><summary>Vrai si l'heure d'été est en vigueur.</summary></lang>
+    /// <lang name="en"><summary>True when daylight saving time is in effect.</summary></lang>
+    bool daylight;
+    /// <lang name="fr"><summary>Le nom du fuseau.</summary></lang>
+    /// <lang name="en"><summary>The zone name.</summary></lang>
+    string zone;
+}
+
+/// <lang name="fr"><summary>Le nombre de jours depuis le 1er janvier 1970 d'une date civile (usage interne).</summary><param name="year">L'année.</param><param name="month">Le mois.</param><param name="day">Le jour.</param><returns>Les jours.</returns></lang>
+/// <lang name="en"><summary>The number of days since January 1, 1970 of a civil date (internal use).</summary><param name="year">The year.</param><param name="month">The month.</param><param name="day">The day.</param><returns>The days.</returns></lang>
+gear pure _zoneDays(long year, long month, long day): long {
+    const long y: month <= 2 ? year - 1 : year;
+    const long era: (y >= 0 ? y : y - 399) / 400;
+    const long yoe: y - era * 400;
+    const long mp: month > 2 ? month - 3 : month + 9;
+    const long doy: (153 * mp + 2) / 5 + day - 1;
+    const long doe: yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + doe - 719468;
+}
+
+/// <lang name="fr"><summary>La date civile (année, mois, jour) d'un nombre de jours depuis 1970 (usage interne).</summary><param name="days">Les jours.</param><returns>L'année, le mois, le jour.</returns></lang>
+/// <lang name="en"><summary>The civil date (year, month, day) of a number of days since 1970 (internal use).</summary><param name="days">The days.</param><returns>The year, month, day.</returns></lang>
+gear pure _zoneCivil(long days): (long, long, long) {
+    const long z: days + 719468;
+    const long era: (z >= 0 ? z : z - 146096) / 146097;
+    const long doe: z - era * 146097;
+    const long yoe: (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const long doy: doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const long mp: (5 * doy + 2) / 153;
+    const long day: doy - (153 * mp + 2) / 5 + 1;
+    const long month: mp < 10 ? mp + 3 : mp - 9;
+    return (yoe + era * 400 + (month <= 2 ? 1 : 0), month, day);
+}
+
+/// <lang name="fr"><summary>Le jour de la semaine d'un nombre de jours depuis 1970 : 1 lundi à 7 dimanche (usage interne).</summary><param name="days">Les jours.</param><returns>Le jour de la semaine.</returns></lang>
+/// <lang name="en"><summary>The day of the week of a number of days since 1970: 1 Monday to 7 Sunday (internal use).</summary><param name="days">The days.</param><returns>The day of the week.</returns></lang>
+gear pure _zoneWeekday(long days): long => (days % 7 + 10) % 7 + 1;
+
+/// <lang name="fr"><summary>Le jour (depuis 1970) du n-ième dimanche d'un mois (usage interne).</summary><param name="year">L'année.</param><param name="month">Le mois.</param><param name="n">Le rang, à partir de 1.</param><returns>Les jours.</returns></lang>
+/// <lang name="en"><summary>The day (since 1970) of the n-th Sunday of a month (internal use).</summary><param name="year">The year.</param><param name="month">The month.</param><param name="n">The rank, from 1.</param><returns>The days.</returns></lang>
+gear pure _nthSunday(long year, long month, long n): long {
+    const long first: _zoneDays(year, month, 1);
+    return first + (7 - _zoneWeekday(first)) % 7 + (n - 1) * 7;
+}
+
+/// <lang name="fr"><summary>Le jour (depuis 1970) du dernier dimanche d'un mois (usage interne).</summary><param name="year">L'année.</param><param name="month">Le mois.</param><returns>Les jours.</returns></lang>
+/// <lang name="en"><summary>The day (since 1970) of the last Sunday of a month (internal use).</summary><param name="year">The year.</param><param name="month">The month.</param><returns>The days.</returns></lang>
+gear pure _lastSunday(long year, long month): long {
+    const long last: (month eq 12 ? _zoneDays(year + 1, 1, 1) : _zoneDays(year, month + 1, 1)) - 1;
+    return last - _zoneWeekday(last) % 7;
+}
+
+/// <lang name="fr"><summary>Les instants UTC (en millisecondes) où commence et finit l'heure d'été d'une année (usage interne).</summary><param name="rule">La règle.</param><param name="standardMs">Le décalage hors heure d'été, en millisecondes.</param><param name="year">L'année locale.</param><returns>Le début et la fin.</returns></lang>
+/// <lang name="en"><summary>The UTC instants (in milliseconds) where daylight saving starts and ends for a year (internal use).</summary><param name="rule">The rule.</param><param name="standardMs">The offset outside daylight saving, in milliseconds.</param><param name="year">The local year.</param><returns>The start and the end.</returns></lang>
+gear pure _transitions(string rule, long standardMs, long year): (long, long) {
+    const long hour: 3600000;
+    const long day: 86400000;
+    if (rule eq 'EU') { return (_lastSunday(year, 3) * day + hour, _lastSunday(year, 10) * day + hour); }
+    if (rule eq 'US') { return (_nthSunday(year, 3, 2) * day + 2 * hour - standardMs, _nthSunday(year, 11, 1) * day + 2 * hour - (standardMs + hour)); }
+    if (rule eq 'AU') { return (_nthSunday(year, 10, 1) * day + 2 * hour - standardMs, _nthSunday(year, 4, 1) * day + 3 * hour - (standardMs + hour)); }
+    return (_lastSunday(year, 9) * day + 2 * hour - standardMs, _nthSunday(year, 4, 1) * day + 3 * hour - (standardMs + hour));
+}
+
+/// <lang name="fr"><summary>Vrai si l'heure d'été est en vigueur à un instant (usage interne).</summary><param name="rule">La règle.</param><param name="standardMs">Le décalage hors heure d'été, en millisecondes.</param><param name="utcMs">L'instant, en millisecondes depuis 1970.</param><returns>Vrai en heure d'été.</returns></lang>
+/// <lang name="en"><summary>True when daylight saving time is in effect at an instant (internal use).</summary><param name="rule">The rule.</param><param name="standardMs">The offset outside daylight saving, in milliseconds.</param><param name="utcMs">The instant, in milliseconds since 1970.</param><returns>True during daylight saving.</returns></lang>
+gear pure _dstActive(string rule, long standardMs, long utcMs): bool {
+    if (rule eq 'none') { return false; }
+    const long local: utcMs + standardMs;
+    const long days: local >= 0 ? local / 86400000 : (local - 86399999) / 86400000;
+    const (long, long, long) civil: _zoneCivil(days);
+    const (long, long) edges: _transitions(rule, standardMs, civil.Item1);
+    if (rule eq 'EU' or rule eq 'US') { return utcMs >= edges.Item1 and utcMs < edges.Item2; }
+    return utcMs >= edges.Item1 or utcMs < edges.Item2;
+}
+
+/// <lang name="fr"><summary>Le fuseau UTC.</summary><returns>Le fuseau, sans décalage ni heure d'été.</returns></lang>
+/// <lang name="en"><summary>The UTC zone.</summary><returns>The zone, with no offset and no daylight saving.</returns></lang>
+gear pure utcZone(): TimeZone => {name: 'UTC', offsetMinutes: 0, rule: 'none'};
+
+/// <lang name="fr"><summary>Un fuseau à décalage fixe, sans heure d'été.</summary><param name="minutes">Le décalage avec UTC, en minutes (positif à l'est), entre -1439 et 1439.</param><returns>Le fuseau, nommé `+05:30` ; `null` si le décalage est hors limites.</returns></lang>
+/// <lang name="en"><summary>A fixed-offset zone, without daylight saving.</summary><param name="minutes">The offset from UTC, in minutes (positive to the east), between -1439 and 1439.</param><returns>The zone, named `+05:30`; `null` when the offset is out of range.</returns></lang>
+gear pure fixedOffset(long minutes): TimeZone? {
+    if (minutes <= -1440 or minutes >= 1440) { return null; }
+    const long absolute: minutes < 0 ? -minutes : minutes;
+    const string sign: minutes < 0 ? '-' : '+';
+    return {name: `{sign}{`{absolute / 60}`.padStart(2, '0')}:{`{absolute % 60}`.padStart(2, '0')}`, offsetMinutes: minutes, rule: 'none'};
+}
+
+/// <lang name="fr"><summary>Lit un décalage `+02:00`, `-0530` ou `+5` en minutes (usage interne).</summary><param name="text">Le texte, signe compris.</param><returns>Les minutes, `null` si le texte n'est pas un décalage.</returns></lang>
+/// <lang name="en"><summary>Reads an offset such as `+02:00`, `-0530` or `+5` as minutes (internal use).</summary><param name="text">The text, sign included.</param><returns>The minutes, or `null` when the text is not an offset.</returns></lang>
+gear pure _parseOffset(string text): long? {
+    if (text.length < 2) { return null; }
+    const string sign: text.substring(0, 1);
+    if (sign not eq '+' and sign not eq '-') { return null; }
+    const string digits: text.substring(1, text.length).replaceAll(':', '');
+    if (digits.length < 1 or digits.length > 4) { return null; }
+    const int? number: digits.toInt();
+    if (number eq null) { return null; }
+    const long value: (number ?? 0) as long;
+    const long minutes: digits.length <= 2 ? value * 60 : value / 100 * 60 + value % 100;
+    return sign eq '-' ? -minutes : minutes;
+}
+
+/// <lang name="fr">
+/// <summary>Cherche un fuseau par son nom : `UTC`, `Z`, un décalage (`+02:00`, `UTC+2`) ou un nom IANA connu (`Europe/Paris`, la casse est ignorée).</summary>
+/// <param name="name">Le nom.</param>
+/// <returns>Le fuseau, `null` si le nom n'est pas connu (la liste est `zoneNames()`).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Looks a zone up by name: `UTC`, `Z`, an offset (`+02:00`, `UTC+2`) or a known IANA name (`Europe/Paris`, case is ignored).</summary>
+/// <param name="name">The name.</param>
+/// <returns>The zone, or `null` when the name is unknown (the list is `zoneNames()`).</returns>
+/// </lang>
+gear pure timeZone(string name): TimeZone? {
+    const string wanted: name.trim().toLower();
+    if (wanted eq 'utc' or wanted eq 'z' or wanted eq 'gmt' or wanted eq 'etc/utc') { return utcZone(); }
+    const string offsetText: wanted.startsWith('utc') or wanted.startsWith('gmt') ? wanted.substring(3, wanted.length) : wanted;
+    const long? offset: _parseOffset(offsetText);
+    if (offset not eq null) { return fixedOffset(offset ?? 0); }
+
+    TimeZone? none: null;
+    return _zoneTable |+> none with (found, row) => {
+        if (found not eq null) { done found; }
+        const [string] parts: row.split('|');
+        if (parts[0].toLower() not eq wanted) { return found; }
+        const TimeZone zone: {name: parts[0], offsetMinutes: ((parts[1].toInt() ?? 0) as long), rule: parts[2]};
+        done zone;
+    };
+}
+
+/// <lang name="fr"><summary>Les noms de fuseaux connus.</summary><returns>Les noms IANA, dans l'ordre alphabétique.</returns></lang>
+/// <lang name="en"><summary>The known zone names.</summary><returns>The IANA names, in alphabetical order.</returns></lang>
+gear pure zoneNames(): [string] => _zoneTable ||> (row) => row.split('|')[0];
+
+/// <lang name="fr"><summary>Le décalage d'un fuseau avec UTC à un instant donné, heure d'été comprise.</summary><param name="zone">Le fuseau.</param><param name="instant">L'instant.</param><returns>Le décalage (+1h pour Paris en hiver, +2h en été).</returns></lang>
+/// <lang name="en"><summary>The offset of a zone from UTC at a given instant, daylight saving included.</summary><param name="zone">The zone.</param><param name="instant">The instant.</param><returns>The offset (+1h for Paris in winter, +2h in summer).</returns></lang>
+gear pure utcOffset(TimeZone zone, datetime instant): duration {
+    const long standardMs: zone.offsetMinutes * 60000;
+    const long extra: _dstActive(zone.rule, standardMs, instant as long) ? 3600000 : 0;
+    return (standardMs + extra) as duration;
+}
+
+/// <lang name="fr"><summary>Dit si l'heure d'été est en vigueur dans un fuseau à un instant donné.</summary><param name="zone">Le fuseau.</param><param name="instant">L'instant.</param><returns>Vrai en heure d'été.</returns></lang>
+/// <lang name="en"><summary>Tells whether daylight saving time is in effect in a zone at a given instant.</summary><param name="zone">The zone.</param><param name="instant">The instant.</param><returns>True during daylight saving.</returns></lang>
+gear pure isDaylightSaving(TimeZone zone, datetime instant): bool => _dstActive(zone.rule, zone.offsetMinutes * 60000, instant as long);
+
+/// <lang name="fr"><summary>Les composantes de la date et de l'heure locales d'un instant dans un fuseau.</summary><param name="zone">Le fuseau.</param><param name="instant">L'instant.</param><returns>L'année, le mois, le jour, l'heure…, le décalage et l'heure d'été.</returns></lang>
+/// <lang name="en"><summary>The components of the local date and time of an instant in a zone.</summary><param name="zone">The zone.</param><param name="instant">The instant.</param><returns>The year, month, day, hour…, the offset and daylight saving.</returns></lang>
+gear pure localTime(TimeZone zone, datetime instant): LocalTime {
+    const long offsetMs: (utcOffset(zone, instant) as long);
+    const long local: (instant as long) + offsetMs;
+    const long days: local >= 0 ? local / 86400000 : (local - 86399999) / 86400000;
+    const long ms: local - days * 86400000;
+    const (long, long, long) civil: _zoneCivil(days);
+    return {
+        year: civil.Item1, month: civil.Item2, day: civil.Item3,
+        hour: ms / 3600000, minute: ms / 60000 % 60, second: ms / 1000 % 60, millisecond: ms % 1000,
+        dayOfWeek: _zoneWeekday(days), offsetMinutes: offsetMs / 60000, daylight: offsetMs not eq zone.offsetMinutes * 60000, zone: zone.name
+    };
+}
+
+/// <lang name="fr"><summary>L'heure locale d'un instant dans un fuseau, écrite comme une date : les méthodes `year()`, `hour()` et `format(...)` la lisent comme l'heure du mur.</summary><param name="instant">L'instant.</param><param name="zone">Le fuseau.</param><returns>La date décalée du décalage du fuseau.</returns></lang>
+/// <lang name="en"><summary>The local time of an instant in a zone, written as a date: the `year()`, `hour()` and `format(...)` methods read it as wall-clock time.</summary><param name="instant">The instant.</param><param name="zone">The zone.</param><returns>The date shifted by the zone's offset.</returns></lang>
+gear pure inZone(datetime instant, TimeZone zone): datetime => instant + utcOffset(zone, instant);
+
+/// <lang name="fr"><summary>L'instant qui correspond à une heure du mur dans un fuseau (l'inverse de `inZone`). Quand l'heure existe deux fois (retour à l'heure d'hiver), la première est choisie ; quand elle n'existe pas (passage à l'heure d'été), elle est décalée d'une heure.</summary><param name="zone">Le fuseau.</param><param name="local">L'heure du mur, écrite comme une date.</param><returns>L'instant UTC.</returns></lang>
+/// <lang name="en"><summary>The instant that matches a wall-clock time in a zone (the inverse of `inZone`). When the time exists twice (clocks going back) the first one is chosen; when it does not exist (clocks going forward) it is moved forward by an hour.</summary><param name="zone">The zone.</param><param name="local">The wall-clock time, written as a date.</param><returns>The UTC instant.</returns></lang>
+gear pure fromZone(TimeZone zone, datetime local): datetime {
+    const long standardMs: zone.offsetMinutes * 60000;
+    const long wall: local as long;
+    const long viaSummer: wall - standardMs - 3600000;
+    if (_dstActive(zone.rule, standardMs, viaSummer)) { return viaSummer as datetime; }
+    return (wall - standardMs) as datetime;
+}
+
+/// <lang name="fr"><summary>Écrit un instant en ISO 8601 dans un fuseau : `2026-10-24T12:30:00+02:00` (`Z` à décalage nul, millisecondes si elles ne sont pas nulles).</summary><param name="instant">L'instant.</param><param name="zone">Le fuseau.</param><returns>Le texte.</returns></lang>
+/// <lang name="en"><summary>Writes an instant as ISO 8601 in a zone: `2026-10-24T12:30:00+02:00` (`Z` at a zero offset, milliseconds when not zero).</summary><param name="instant">The instant.</param><param name="zone">The zone.</param><returns>The text.</returns></lang>
+gear pure formatIso(datetime instant, TimeZone zone): string {
+    const LocalTime t: localTime(zone, instant);
+    const long absolute: t.offsetMinutes < 0 ? -t.offsetMinutes : t.offsetMinutes;
+    const string suffix: t.offsetMinutes eq 0 ? 'Z' : `{t.offsetMinutes < 0 ? '-' : '+'}{`{absolute / 60}`.padStart(2, '0')}:{`{absolute % 60}`.padStart(2, '0')}`;
+    const string milliseconds: t.millisecond eq 0 ? '' : `.{`{t.millisecond}`.padStart(3, '0')}`;
+    return `{`{t.year}`.padStart(4, '0')}-{`{t.month}`.padStart(2, '0')}-{`{t.day}`.padStart(2, '0')}T{`{t.hour}`.padStart(2, '0')}:{`{t.minute}`.padStart(2, '0')}:{`{t.second}`.padStart(2, '0')}{milliseconds}{suffix}`;
+}

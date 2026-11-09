@@ -1,0 +1,13 @@
+// Chaînes : construction par gabarits, jonction, découpe, remplacement, majuscules, longueurs sur 2 000 lignes (avant la slice B.5 : 500 lignes, car les fonctions de chaînes de la std étaient plus que quadratiques).
+emit fin(): uint {
+    [string] lignes: [0..<2000] ||> (i) => `ligne {i} : valeur {i * 3}`;
+    string texte: lignes.join(`\n`);
+    [string] morceaux: texte.split(`\n`);
+    string majuscules: texte.toUpper();
+    string remplace: texte.replace('valeur', 'v');
+    uint total: morceaux |+> (0 as uint) with (uint acc, string s) => acc + s.length;
+    `{lignes.length} {texte.length} {morceaux.length} {majuscules.length} {remplace.length} {total}\n` -> console;
+    return 0;
+}
+
+!train |> fin;

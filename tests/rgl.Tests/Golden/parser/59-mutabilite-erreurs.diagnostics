@@ -1,0 +1,2 @@
+59-mutabilite-erreurs.rgl:3:5: erreur[E101]: une constante n'est jamais mut
+59-mutabilite-erreurs.rgl:4:10: erreur[E006]: variable déclarée sans valeur

@@ -1,0 +1,287 @@
+forge: gears
+description: "JSON dynamique : lire un texte JSON dont la forme n'est connue qu'à l'exécution en DataValue, et écrire une DataValue en JSON"
+
+use <Text> only {base64Encode};
+use <Data> only {DataKind, DataValue, dataNull, dataBool, dataInt, dataDouble, dataText, dataList, dataMap, _dateText};
+
+/// <lang name="fr"><summary>Ce qu'a donné la lecture d'une valeur JSON (usage interne).</summary></lang>
+/// <lang name="en"><summary>What reading a JSON value gave (internal use).</summary></lang>
+mold _JsonRead {
+    /// <lang name="fr"><summary>Faux si le texte n'est pas du JSON valide.</summary></lang>
+    /// <lang name="en"><summary>False when the text is not valid JSON.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>La valeur lue.</summary></lang>
+    /// <lang name="en"><summary>The value read.</summary></lang>
+    DataValue value;
+    /// <lang name="fr"><summary>La position qui suit la valeur.</summary></lang>
+    /// <lang name="en"><summary>The position that follows the value.</summary></lang>
+    long at;
+}
+
+/// <lang name="fr"><summary>Ce qu'a donné la lecture d'un texte JSON entre guillemets (usage interne).</summary></lang>
+/// <lang name="en"><summary>What reading a quoted JSON text gave (internal use).</summary></lang>
+mold _JsonString {
+    /// <lang name="fr"><summary>Faux si le texte est mal formé.</summary></lang>
+    /// <lang name="en"><summary>False when the text is malformed.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>Vrai quand le guillemet fermant a été lu.</summary></lang>
+    /// <lang name="en"><summary>True when the closing quote was read.</summary></lang>
+    bool finished;
+    /// <lang name="fr"><summary>Les octets du texte, décodés.</summary></lang>
+    /// <lang name="en"><summary>The bytes of the text, decoded.</summary></lang>
+    bytes out;
+    /// <lang name="fr"><summary>La position où reprendre.</summary></lang>
+    /// <lang name="en"><summary>Where to resume.</summary></lang>
+    long at;
+}
+
+/// <lang name="fr"><summary>Ce qu'a donné la lecture des éléments d'une liste ou d'un objet JSON (usage interne).</summary></lang>
+/// <lang name="en"><summary>What reading the elements of a JSON list or object gave (internal use).</summary></lang>
+mold _JsonMembers {
+    /// <lang name="fr"><summary>Faux si la lecture a échoué.</summary></lang>
+    /// <lang name="en"><summary>False when reading failed.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>Vrai quand le crochet ou l'accolade fermant a été lu.</summary></lang>
+    /// <lang name="en"><summary>True when the closing bracket or brace was read.</summary></lang>
+    bool finished;
+    /// <lang name="fr"><summary>La position où reprendre.</summary></lang>
+    /// <lang name="en"><summary>Where to resume.</summary></lang>
+    long at;
+    /// <lang name="fr"><summary>Les valeurs lues.</summary></lang>
+    /// <lang name="en"><summary>The values read.</summary></lang>
+    [DataValue] items;
+    /// <lang name="fr"><summary>Les clés lues (un objet).</summary></lang>
+    /// <lang name="en"><summary>The keys read (an object).</summary></lang>
+    [string] keys;
+}
+
+/// <lang name="fr"><summary>La profondeur maximale d'imbrication acceptée (usage interne).</summary></lang>
+/// <lang name="en"><summary>The maximal nesting depth accepted (internal use).</summary></lang>
+const long _maxJsonDepth: 40;
+
+/// <lang name="fr"><summary>Dit si un octet est un espace JSON (usage interne).</summary><param name="b">L'octet.</param><returns>Vrai pour espace, tabulation, saut de ligne, retour chariot.</returns></lang>
+/// <lang name="en"><summary>Tells whether a byte is a JSON whitespace (internal use).</summary><param name="b">The byte.</param><returns>True for space, tab, line feed, carriage return.</returns></lang>
+gear pure _jsonSpace(ubyte b): bool => b eq 32 or b eq 9 or b eq 10 or b eq 13;
+
+/// <lang name="fr"><summary>Saute les espaces à partir de `at` (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang de départ.</param><returns>Le rang du premier octet qui n'est pas un espace, ou la longueur.</returns></lang>
+/// <lang name="en"><summary>Skips whitespace from `at` (internal use).</summary><param name="data">The bytes.</param><param name="at">The start index.</param><returns>The index of the first non-whitespace byte, or the length.</returns></lang>
+gear pure _jsonSkip(bytes data, long at): long {
+    const long size: data.length as long;
+    if (at >= size) { return size; }
+    return [at..<size] |+> size with (acc, i) => {
+        if (not _jsonSpace(data[i])) { done i; }
+        return acc;
+    };
+}
+
+/// <lang name="fr"><summary>La valeur d'un chiffre hexadécimal, ou -1 (usage interne).</summary><param name="b">L'octet.</param><returns>De 0 à 15, ou -1.</returns></lang>
+/// <lang name="en"><summary>The value of a hexadecimal digit, or -1 (internal use).</summary><param name="b">The byte.</param><returns>From 0 to 15, or -1.</returns></lang>
+gear pure _hexDigit(ubyte b): long {
+    const long v: b as long;
+    if (v >= 48 and v <= 57) { return v - 48; }
+    if (v >= 97 and v <= 102) { return v - 87; }
+    if (v >= 65 and v <= 70) { return v - 55; }
+    return -1;
+}
+
+/// <lang name="fr"><summary>Lit quatre chiffres hexadécimaux (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang du premier.</param><returns>La valeur, ou -1.</returns></lang>
+/// <lang name="en"><summary>Reads four hexadecimal digits (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the first.</param><returns>The value, or -1.</returns></lang>
+gear pure _hex4(bytes data, long at): long {
+    if (at + 4 > (data.length as long)) { return -1; }
+    const long a: _hexDigit(data[at]);
+    const long b: _hexDigit(data[at + 1]);
+    const long c: _hexDigit(data[at + 2]);
+    const long d: _hexDigit(data[at + 3]);
+    return a < 0 or b < 0 or c < 0 or d < 0 ? -1 : a * 4096 + b * 256 + c * 16 + d;
+}
+
+/// <lang name="fr"><summary>Les octets UTF-8 d'un point de code (usage interne).</summary><param name="cp">Le point de code.</param><returns>De un à quatre octets.</returns></lang>
+/// <lang name="en"><summary>The UTF-8 bytes of a code point (internal use).</summary><param name="cp">The code point.</param><returns>From one to four bytes.</returns></lang>
+gear pure _utf8(long cp): bytes {
+    if (cp < 128) { return [cp as ubyte]; }
+    if (cp < 2048) { return [(192 + cp / 64) as ubyte, (128 + cp % 64) as ubyte]; }
+    if (cp < 65536) { return [(224 + cp / 4096) as ubyte, (128 + (cp / 64) % 64) as ubyte, (128 + cp % 64) as ubyte]; }
+    return [(240 + cp / 262144) as ubyte, (128 + (cp / 4096) % 64) as ubyte, (128 + (cp / 64) % 64) as ubyte, (128 + cp % 64) as ubyte];
+}
+
+/// <lang name="fr"><summary>Lit un texte JSON à partir du rang qui suit le guillemet ouvrant (usage interne).</summary><param name="data">Les octets.</param><param name="start">Le rang qui suit le guillemet ouvrant.</param><returns>Le texte décodé et le rang qui suit le guillemet fermant.</returns></lang>
+/// <lang name="en"><summary>Reads a JSON text from the index after the opening quote (internal use).</summary><param name="data">The bytes.</param><param name="start">The index after the opening quote.</param><returns>The decoded text and the index after the closing quote.</returns></lang>
+gear pure _jsonString(bytes data, long start): _JsonString {
+    const long size: data.length as long;
+    const bytes none: '' as bytes;
+    const _JsonString first: {ok: true, finished: false, out: none, at: start};
+    if (start >= size) { return {ok: false, finished: false, out: none, at: start}; }
+    const _JsonString end: [start..<size] |+> first with (state, i) => {
+        if (state.finished or not state.ok) { done state; }
+        if (i < state.at) { return state; }
+        const long b: data[i] as long;
+        if (b eq 34) { return {ok: true, finished: true, out: state.out, at: i + 1}; }
+        if (b < 32) { return {ok: false, finished: false, out: none, at: i}; }
+        if (b not eq 92) { return {ok: true, finished: false, out: [...state.out, b as ubyte], at: i + 1}; }
+        if (i + 1 >= size) { return {ok: false, finished: false, out: none, at: i}; }
+        const long e: data[i + 1] as long;
+        if (e eq 34) { return {ok: true, finished: false, out: [...state.out, 34], at: i + 2}; }
+        if (e eq 92) { return {ok: true, finished: false, out: [...state.out, 92], at: i + 2}; }
+        if (e eq 47) { return {ok: true, finished: false, out: [...state.out, 47], at: i + 2}; }
+        if (e eq 98) { return {ok: true, finished: false, out: [...state.out, 8], at: i + 2}; }
+        if (e eq 102) { return {ok: true, finished: false, out: [...state.out, 12], at: i + 2}; }
+        if (e eq 110) { return {ok: true, finished: false, out: [...state.out, 10], at: i + 2}; }
+        if (e eq 114) { return {ok: true, finished: false, out: [...state.out, 13], at: i + 2}; }
+        if (e eq 116) { return {ok: true, finished: false, out: [...state.out, 9], at: i + 2}; }
+        if (e not eq 117) { return {ok: false, finished: false, out: none, at: i}; }
+        const long unit: _hex4(data, i + 2);
+        if (unit < 0) { return {ok: false, finished: false, out: none, at: i}; }
+        if (unit >= 55296 and unit <= 56319) {
+            const bool paired: i + 11 < size and data[i + 6] eq 92 and data[i + 7] eq 117;
+            const long low: paired ? _hex4(data, i + 8) : -1;
+            if (low < 56320 or low > 57343) { return {ok: false, finished: false, out: none, at: i}; }
+            return {ok: true, finished: false, out: [...state.out, ..._utf8(65536 + (unit - 55296) * 1024 + (low - 56320))], at: i + 12};
+        }
+        if (unit >= 56320 and unit <= 57343) { return {ok: false, finished: false, out: none, at: i}; }
+        return {ok: true, finished: false, out: [...state.out, ..._utf8(unit)], at: i + 6};
+    };
+    return end.finished ? end : {ok: false, finished: false, out: none, at: start};
+}
+
+/// <lang name="fr"><summary>Dit si un octet peut faire partie d'un nombre JSON (usage interne).</summary><param name="b">L'octet.</param><returns>Vrai pour un chiffre, `+`, `-`, `.`, `e`, `E`.</returns></lang>
+/// <lang name="en"><summary>Tells whether a byte can be part of a JSON number (internal use).</summary><param name="b">The byte.</param><returns>True for a digit, `+`, `-`, `.`, `e`, `E`.</returns></lang>
+gear pure _numberByte(ubyte b): bool {
+    const long v: b as long;
+    return (v >= 48 and v <= 57) or v eq 43 or v eq 45 or v eq 46 or v eq 101 or v eq 69;
+}
+
+/// <lang name="fr"><summary>Lit un nombre JSON (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang du premier octet.</param><returns>La valeur (un entier s'il n'y a ni point ni exposant et qu'il tient dans 64 bits, sinon un flottant).</returns></lang>
+/// <lang name="en"><summary>Reads a JSON number (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the first byte.</param><returns>The value (an integer when there is no point or exponent and it fits in 64 bits, otherwise a float).</returns></lang>
+gear pure _jsonNumber(bytes data, long at): _JsonRead {
+    const long size: data.length as long;
+    const long stop: [at..<size] |+> size with (acc, i) => {
+        if (not _numberByte(data[i])) { done i; }
+        return acc;
+    };
+    const string? text: data.slice(at, stop) as? string;
+    const string word: text ?? '';
+    const bool integral: not word.contains('.') and not word.contains('e') and not word.contains('E');
+    const long? whole: integral ? word as? long : null;
+    const double? real: word as? double;
+    const _JsonRead failed: {ok: false, value: dataNull(), at: at};
+    if (word eq '' or word.startsWith('+') or word.startsWith('.') or word.endsWith('.')) { return failed; }
+    if (whole not eq null) { return {ok: true, value: dataInt(whole ?? 0), at: stop}; }
+    if (real eq null) { return failed; }
+    return {ok: true, value: dataDouble(real ?? 0.0), at: stop};
+}
+
+/// <lang name="fr"><summary>Lit les éléments d'une liste ou d'un objet JSON jusqu'au crochet ou à l'accolade fermant (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang qui suit le crochet ou l'accolade ouvrant.</param><param name="object">Vrai pour un objet.</param><param name="depth">La profondeur courante.</param><returns>Les éléments, et la position qui suit le crochet ou l'accolade fermant.</returns></lang>
+/// <lang name="en"><summary>Reads the elements of a JSON list or object up to the closing bracket or brace (internal use).</summary><param name="data">The bytes.</param><param name="at">The index after the opening bracket or brace.</param><param name="object">True for an object.</param><param name="depth">The current depth.</param><returns>The elements, and the position that follows the closing bracket or brace.</returns></lang>
+gear pure _jsonMembers(bytes data, long at, bool object, long depth): _JsonMembers {
+    const long size: data.length as long;
+    const long close: object ? 125 : 93;
+    const _JsonMembers first: {ok: true, finished: false, at, items: [], keys: []};
+    const _JsonMembers end: [0..<(size + 1)] |+> first with (state, round) => {
+        if (state.finished or not state.ok) { done state; }
+        const long here: _jsonSkip(data, state.at);
+        if (here >= size) { return {...state, ok: false}; }
+        if (state.items.length eq 0 and (data[here] as long) eq close) { return {...state, finished: true, at: here + 1}; }
+        const long valueAt: object ? _jsonSkip(data, here) : here;
+        const _JsonString key: object and (data[valueAt] as long) eq 34 ? _jsonString(data, valueAt + 1) : {ok: not object, finished: true, out: '' as bytes, at: valueAt};
+        if (not key.ok) { return {...state, ok: false}; }
+        const long colon: object ? _jsonSkip(data, key.at) : key.at;
+        if (object and (colon >= size or (data[colon] as long) not eq 58)) { return {...state, ok: false}; }
+        const _JsonRead item: _jsonValue(data, object ? colon + 1 : here, depth + 1);
+        if (not item.ok) { return {...state, ok: false}; }
+        const long after: _jsonSkip(data, item.at);
+        if (after >= size) { return {...state, ok: false}; }
+        const long mark: data[after] as long;
+        const string? name: key.out as? string;
+        const [DataValue] items: [...state.items, item.value];
+        const [string] keys: object ? [...state.keys, name ?? ''] : state.keys;
+        if (mark eq 44) { return {ok: true, finished: false, at: after + 1, items, keys}; }
+        if (mark eq close) { return {ok: true, finished: true, at: after + 1, items, keys}; }
+        return {...state, ok: false};
+    };
+    return end.finished ? end : {...end, ok: false};
+}
+
+/// <lang name="fr"><summary>Lit une valeur JSON à partir du rang `at` (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang de départ.</param><param name="depth">La profondeur courante.</param><returns>La valeur et la position qui suit.</returns></lang>
+/// <lang name="en"><summary>Reads a JSON value from index `at` (internal use).</summary><param name="data">The bytes.</param><param name="at">The start index.</param><param name="depth">The current depth.</param><returns>The value and the position that follows.</returns></lang>
+gear pure _jsonValue(bytes data, long at, long depth): _JsonRead {
+    const _JsonRead failed: {ok: false, value: dataNull(), at};
+    const long size: data.length as long;
+    const long here: _jsonSkip(data, at);
+    if (here >= size or depth > _maxJsonDepth) { return failed; }
+    const long b: data[here] as long;
+    if (b eq 34) {
+        const _JsonString text: _jsonString(data, here + 1);
+        const string? decoded: text.out as? string;
+        return text.ok and decoded not eq null ? {ok: true, value: dataText(decoded ?? ''), at: text.at} : failed;
+    }
+    if (b eq 123 or b eq 91) {
+        const _JsonMembers members: _jsonMembers(data, here + 1, b eq 123, depth);
+        if (not members.ok) { return failed; }
+        return {ok: true, value: b eq 123 ? dataMap(members.keys, members.items) : dataList(members.items), at: members.at};
+    }
+    const string? word: data.slice(here, here + 5 > size ? size : here + 5) as? string;
+    const string head: word ?? '';
+    if (head.startsWith('true')) { return {ok: true, value: dataBool(true), at: here + 4}; }
+    if (head.startsWith('false')) { return {ok: true, value: dataBool(false), at: here + 5}; }
+    if (head.startsWith('null')) { return {ok: true, value: dataNull(), at: here + 4}; }
+    if (b eq 45 or (b >= 48 and b <= 57)) { return _jsonNumber(data, here); }
+    return failed;
+}
+
+/// <lang name="fr">
+/// <summary>Lit un texte JSON dont la forme n'est connue qu'à l'exécution. Un entier sans point ni exposant qui tient dans 64 bits est un `Int`, tout autre nombre un `Double` ; les objets gardent l'ordre de leurs clés ; une date écrite en texte reste un `Text` (voir `dataToDate`). Les textes sont décodés, paires de substituts comprises. Pas de commentaires, pas de virgule finale. L'imbrication est limitée à 40 niveaux (la récursion du programme est limitée) et le texte lu en octets, donc la lecture ne ralentit pas sur un gros texte.</summary>
+/// <param name="text">Le texte JSON.</param>
+/// <returns>La valeur ; `null` si le texte n'est pas du JSON valide ou s'il y reste autre chose que des espaces.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads a JSON text whose shape is only known at run time. An integer with no point or exponent that fits in 64 bits is an `Int`, any other number a `Double`; objects keep the order of their keys; a date written as text stays a `Text` (see `dataToDate`). Texts are decoded, surrogate pairs included. No comments, no trailing comma. Nesting is limited to 40 levels (the program's recursion is limited) and the text is read as bytes, so reading does not slow down on a large text.</summary>
+/// <param name="text">The JSON text.</param>
+/// <returns>The value; `null` when the text is not valid JSON or when anything other than whitespace remains.</returns>
+/// </lang>
+gear pure parseDataJson(string text): DataValue? {
+    const bytes data: text as bytes;
+    const _JsonRead read: _jsonValue(data, 0, 0);
+    return read.ok and _jsonSkip(data, read.at) eq (data.length as long) ? read.value : null;
+}
+
+/// <lang name="fr"><summary>Écrit un texte entre guillemets, échappé comme JSON (usage interne).</summary><param name="text">Le texte.</param><returns>Le texte JSON, guillemets compris.</returns></lang>
+/// <lang name="en"><summary>Writes a text between quotes, escaped as JSON (internal use).</summary><param name="text">The text.</param><returns>The JSON text, quotes included.</returns></lang>
+gear pure _jsonQuote(string text): string {
+    const bytes raw: text as bytes;
+    const bytes none: '' as bytes;
+    const bytes escaped: raw |+> none with (acc, b) => {
+        const long v: b as long;
+        if (v eq 34) { return [...acc, 92, 34]; }
+        if (v eq 92) { return [...acc, 92, 92]; }
+        if (v eq 10) { return [...acc, 92, 110]; }
+        if (v eq 13) { return [...acc, 92, 114]; }
+        if (v eq 9) { return [...acc, 92, 116]; }
+        if (v < 32) { return [...acc, 92, 117, 48, 48, (48 + v / 16) as ubyte, (v % 16 < 10 ? 48 + v % 16 : 87 + v % 16) as ubyte]; }
+        return [...acc, b];
+    };
+    const string? body: escaped as? string;
+    return `"{body ?? ''}"`;
+}
+
+/// <lang name="fr">
+/// <summary>Écrit une valeur de données en JSON compact. Les octets s'écrivent en texte base64, une date en texte ISO 8601 (`2026-10-24T10:30:00Z`), un flottant qui n'est pas un nombre fini (NaN, infini) en `null`.</summary>
+/// <param name="value">La valeur.</param>
+/// <returns>Le texte JSON.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a data value as compact JSON. Bytes are written as base64 text, a date as ISO 8601 text (`2026-10-24T10:30:00Z`), a float that is not a finite number (NaN, infinity) as `null`.</summary>
+/// <param name="value">The value.</param>
+/// <returns>The JSON text.</returns>
+/// </lang>
+gear pure dataToJson(DataValue value): string {
+    if (value.kind eq DataKind.Null) { return 'null'; }
+    if (value.kind eq DataKind.Bool) { return value.flag ? 'true' : 'false'; }
+    if (value.kind eq DataKind.Int) { return `{value.number}`; }
+    if (value.kind eq DataKind.Double) { return value.real - value.real eq 0.0 ? `{value.real}` : 'null'; }
+    if (value.kind eq DataKind.Text) { return _jsonQuote(value.text); }
+    if (value.kind eq DataKind.Bytes) { return _jsonQuote(base64Encode(value.data)); }
+    if (value.kind eq DataKind.Date) { return _jsonQuote(_dateText(value)); }
+    if (value.kind eq DataKind.List) { return `[{(value.items ||> (item) => dataToJson(item)).join(',')}]`; }
+    const [string] pairs: value.items ||> (item, i) => `{_jsonQuote(value.keys[i])}:{dataToJson(item)}`;
+    return `\{{pairs.join(',')}\}`;
+}

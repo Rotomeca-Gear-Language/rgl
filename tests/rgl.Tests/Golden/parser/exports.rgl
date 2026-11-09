@@ -1,0 +1,13 @@
+forge: gears
+description: "Exports"
+
+export const uint LIMITE: 7;
+export mold Row { uint id; }
+export error Rate { string cause; }
+export enum Sens { Haut, Bas }
+export ingot Id: uint;
+export gear ouvrir(uint n): uint => n;
+export guard verifier(uint n): uint { done; }
+gear cache(): uint => 1;
+export {cache};
+export {ouvrir, Row,};

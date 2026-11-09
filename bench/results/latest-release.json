@@ -1,0 +1,75 @@
+{
+    "Context":  {
+                    "Date":  "2026-10-25 16:18",
+                    "Commit":  "a935fc9+modifié",
+                    "Mode":  "release",
+                    "Runs":  10,
+                    "Cpu":  "13th Gen Intel(R) Core(TM) i5-13600KF",
+                    "Coeurs":  20,
+                    "Os":  "Microsoft Windows NT 10.0.26200.0",
+                    "Zig":  "0.17.0"
+                },
+    "StartupMs":  12.3,
+    "Results":  [
+                    {
+                        "Name":  "demarrage",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "MedianMs":  12.3,
+                        "MinMs":  11.8,
+                        "MaxMs":  30.3,
+                        "SizeBytes":  102400,
+                        "CompileSeconds":  1.1
+                    },
+                    {
+                        "Name":  "chaines",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "MedianMs":  590,
+                        "MinMs":  583.9,
+                        "MaxMs":  609.2,
+                        "SizeBytes":  117248,
+                        "CompileSeconds":  1.3
+                    },
+                    {
+                        "Name":  "json",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "MedianMs":  266,
+                        "MinMs":  261.6,
+                        "MaxMs":  278.2,
+                        "SizeBytes":  455680,
+                        "CompileSeconds":  2
+                    },
+                    {
+                        "Name":  "parcours",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "MedianMs":  103,
+                        "MinMs":  101.8,
+                        "MaxMs":  116.8,
+                        "SizeBytes":  377856,
+                        "CompileSeconds":  1.2
+                    },
+                    {
+                        "Name":  "particules",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "MedianMs":  78.9,
+                        "MinMs":  77.8,
+                        "MaxMs":  97.2,
+                        "SizeBytes":  107520,
+                        "CompileSeconds":  1.2
+                    },
+                    {
+                        "Name":  "recursif",
+                        "Ok":  true,
+                        "Reason":  "",
+                        "MedianMs":  157,
+                        "MinMs":  155.2,
+                        "MaxMs":  174.1,
+                        "SizeBytes":  105984,
+                        "CompileSeconds":  1.1
+                    }
+                ]
+}

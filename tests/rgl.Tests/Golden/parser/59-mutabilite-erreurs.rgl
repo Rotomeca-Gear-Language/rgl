@@ -1,0 +1,7 @@
+// Erreurs de syntaxe de la mutabilité : mut devant const (E101), déclaration typée sans valeur (E006).
+gear g(): void {
+    mut const [int] a: [1];
+    int b;
+    mut var c: [1];
+}
+!train |> done;

@@ -1,0 +1,29 @@
+CompilationUnit 1:1
+  MoldDeclaration 1:1 name=Move
+    MoldField 2:5 name=name
+      PrimitiveType 2:5 type=string
+    MoldField 3:5 name=power
+      PrimitiveType 3:5 type=int
+  DatasetDeclaration 6:1 name=Moves of=Move
+    DatasetEntry 7:5 name=attaquer
+      MoldExpression 7:15
+        MoldFieldValue 7:16 name=name
+          LiteralExpression 7:22 kind=RawStringLiteral text='Attaquer'
+        MoldFieldValue 7:34 name=power
+          LiteralExpression 7:41 kind=IntegerLiteral text=5
+    DatasetEntry 8:5 name=soin
+      MoldExpression 8:11
+        MoldFieldValue 8:12 name=name
+          LiteralExpression 8:18 kind=RawStringLiteral text='Soin'
+        MoldFieldValue 8:26 name=power
+          UnaryExpression 8:33 op=-
+            LiteralExpression 8:34 kind=IntegerLiteral text=20
+  DatasetDeclaration 11:1 name=Classes as=Class
+    DatasetEntry 12:5 name=guerrier
+      MoldExpression 12:15
+        MoldFieldValue 12:16 name=atk
+          LiteralExpression 12:21 kind=IntegerLiteral text=50
+  DatasetDeclaration 15:1 name=Heros of=Hero from="heros.json"
+  TrainDeclaration 17:1 unguarded=true parameters=none
+    Pipeline 17:8
+      DoneStep 17:11

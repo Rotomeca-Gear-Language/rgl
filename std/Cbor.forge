@@ -1,0 +1,133 @@
+forge: gears
+description: "CBOR : écrire et lire une valeur de données dans le format binaire de l'IETF"
+
+use <Data> only {DataKind, DataValue, dataNull, dataBool, dataInt, dataDouble, dataDate, _dateText, _Read, _readOk, _readFail, _readSequence, _doubleBits, _bitsDouble, _bitsFloat, _asSigned, _beBytes, _readBe};
+use <MessagePack> only {_mpString, _mpBinary};
+use <Time> only {parseDateTime};
+
+/// <lang name="fr"><summary>Écrit l'en-tête d'un élément CBOR : le type majeur et son argument, sur le moins d'octets possible (usage interne).</summary><param name="major">Le type majeur, de 0 à 7.</param><param name="value">L'argument (une valeur ou une taille), positif ou nul.</param><returns>L'en-tête.</returns></lang>
+/// <lang name="en"><summary>Writes the header of a CBOR item: the major type and its argument, on as few bytes as possible (internal use).</summary><param name="major">The major type, from 0 to 7.</param><param name="value">The argument (a value or a size), zero or positive.</param><returns>The header.</returns></lang>
+gear pure _cborHead(long major, long value): bytes {
+    const long m: major * 32;
+    if (value < 24) { return [(m + value) as ubyte]; }
+    if (value <= 255) { return [(m + 24) as ubyte, value as ubyte]; }
+    if (value <= 65535) { return [(m + 25) as ubyte, ..._beBytes(value as ulong, 2)]; }
+    if (value <= 4294967295) { return [(m + 26) as ubyte, ..._beBytes(value as ulong, 4)]; }
+    return [(m + 27) as ubyte, ..._beBytes(value as ulong, 8)];
+}
+
+/// <lang name="fr"><summary>Écrit une valeur de données en CBOR (tailles définies, flottants sur 64 bits). Une valeur de sorte table s'écrit avec ses clés en texte, dans l'ordre.</summary><param name="value">La valeur.</param><returns>Les octets CBOR.</returns></lang>
+/// <lang name="en"><summary>Writes a data value as CBOR (definite sizes, 64-bit floats). A table value is written with its text keys, in order.</summary><param name="value">The value.</param><returns>The CBOR bytes.</returns></lang>
+gear pure toCbor(DataValue value): bytes {
+    if (value.kind eq DataKind.Null) { return [0xf6]; }
+    if (value.kind eq DataKind.Bool) { return [value.flag ? 0xf5 : 0xf4]; }
+    if (value.kind eq DataKind.Int) { return value.number >= 0 ? _cborHead(0, value.number) : _cborHead(1, -1 - value.number); }
+    if (value.kind eq DataKind.Double) { return [0xfb, ..._beBytes(_doubleBits(value.real), 8)]; }
+    if (value.kind eq DataKind.Text) {
+        const bytes raw: value.text as bytes;
+        return [..._cborHead(3, raw.length as long), ...raw];
+    }
+    if (value.kind eq DataKind.Date) {
+        const bytes raw: _dateText(value) as bytes;
+        return [0xc0, ..._cborHead(3, raw.length as long), ...raw];
+    }
+    if (value.kind eq DataKind.Bytes) { return [..._cborHead(2, value.data.length as long), ...value.data]; }
+    const bytes none: '' as bytes;
+    if (value.kind eq DataKind.List) {
+        return [..._cborHead(4, value.items.length as long), ...(value.items |+> none with (acc, item) => [...acc, ...toCbor(item)])];
+    }
+    return [..._cborHead(5, value.items.length as long), ...(value.items |+> none with (acc, item, i) => [...acc, ...toCbor({kind: DataKind.Text, flag: false, number: 0, real: 0.0, text: value.keys[i], data: none, items: [], keys: []}), ...toCbor(item)])];
+}
+
+/// <lang name="fr"><summary>L'argument d'un en-tête CBOR et la position qui suit (usage interne).</summary></lang>
+/// <lang name="en"><summary>The argument of a CBOR header and the position that follows (internal use).</summary></lang>
+mold _Argument {
+    /// <lang name="fr"><summary>Faux si l'en-tête est invalide ou tronqué.</summary></lang>
+    /// <lang name="en"><summary>False when the header is invalid or truncated.</summary></lang>
+    bool ok;
+    /// <lang name="fr"><summary>L'argument.</summary></lang>
+    /// <lang name="en"><summary>The argument.</summary></lang>
+    long value;
+    /// <lang name="fr"><summary>La position qui suit l'en-tête.</summary></lang>
+    /// <lang name="en"><summary>The position that follows the header.</summary></lang>
+    long at;
+}
+
+/// <lang name="fr"><summary>Lit l'argument d'un en-tête CBOR (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang qui suit l'octet de tête.</param><param name="info">Les 5 bits d'information de l'octet de tête.</param><returns>L'argument ; un échec pour les tailles indéfinies (28 à 31), les octets manquants ou un argument au-delà de 63 bits.</returns></lang>
+/// <lang name="en"><summary>Reads the argument of a CBOR header (internal use).</summary><param name="data">The bytes.</param><param name="at">The index that follows the head byte.</param><param name="info">The 5 information bits of the head byte.</param><returns>The argument; a failure for indefinite sizes (28 to 31), missing bytes or an argument beyond 63 bits.</returns></lang>
+gear pure _cborArgument(bytes data, long at, long info): _Argument {
+    if (info < 24) { return {ok: true, value: info, at}; }
+    if (info > 27) { return {ok: false, value: 0, at}; }
+    const long width: info eq 24 ? 1 : (info eq 25 ? 2 : (info eq 26 ? 4 : 8));
+    if (at + width > (data.length as long)) { return {ok: false, value: 0, at}; }
+    const ulong raw: _readBe(data, at, width);
+    const long value: width eq 8 ? _asSigned(raw) : (raw as long);
+    return {ok: value >= 0, value, at: at + width};
+}
+
+/// <lang name="fr"><summary>Deux puissance `k`, en flottant (usage interne).</summary><param name="k">L'exposant, entier relatif.</param><returns>Le flottant.</returns></lang>
+/// <lang name="en"><summary>Two to the power `k`, as a float (internal use).</summary><param name="k">The exponent, a signed integer.</param><returns>The float.</returns></lang>
+gear pure _pow2(long k): double {
+    if (k eq 0) { return 1.0; }
+    const long count: k < 0 ? -k : k;
+    const double start: 1.0;
+    const double result: [1..count] |+> start with (acc, i) => acc * 2.0;
+    return k < 0 ? 1.0 / result : result;
+}
+
+/// <lang name="fr"><summary>Le flottant 16 bits dont on donne le motif (usage interne).</summary><param name="bits">Le motif IEEE 754 sur 16 bits.</param><returns>Le flottant.</returns></lang>
+/// <lang name="en"><summary>The 16-bit float whose pattern is given (internal use).</summary><param name="bits">The 16-bit IEEE 754 pattern.</param><returns>The float.</returns></lang>
+gear pure _half(long bits): double {
+    const long exponent: bits / 1024 % 32;
+    const long mantissa: bits % 1024;
+    const double magnitude: exponent eq 31 ? (mantissa eq 0 ? _bitsDouble(0x7FF0000000000000) : _bitsDouble(0x7FF8000000000000))
+        : (exponent eq 0 ? (mantissa as double) * _pow2(-24) : (1.0 + (mantissa as double) / 1024.0) * _pow2(exponent - 15));
+    return bits >= 32768 ? -magnitude : magnitude;
+}
+
+/// <lang name="fr"><summary>Lit un élément CBOR à partir de `at` (usage interne).</summary><param name="data">Les octets.</param><param name="at">Où lire.</param><returns>La valeur et la position qui suit, ou un échec.</returns></lang>
+/// <lang name="en"><summary>Reads a CBOR item from `at` (internal use).</summary><param name="data">The bytes.</param><param name="at">Where to read.</param><returns>The value and the position that follows, or a failure.</returns></lang>
+gear pure _cborRead(bytes data, long at): _Read {
+    if (at >= (data.length as long)) { return _readFail(); }
+    const long head: data[at] as long;
+    const long major: head / 32;
+    const long info: head % 32;
+    if (major eq 7) {
+        if (info eq 20 or info eq 21) { return _readOk(dataBool(info eq 21), at + 1); }
+        if (info eq 22 or info eq 23) { return _readOk(dataNull(), at + 1); }
+        if (info eq 25) { return at + 3 > (data.length as long) ? _readFail() : _readOk(dataDouble(_half(_readBe(data, at + 1, 2) as long)), at + 3); }
+        if (info eq 26) { return at + 5 > (data.length as long) ? _readFail() : _readOk(dataDouble(_bitsFloat(_readBe(data, at + 1, 4))), at + 5); }
+        if (info eq 27) { return at + 9 > (data.length as long) ? _readFail() : _readOk(dataDouble(_bitsDouble(_readBe(data, at + 1, 8))), at + 9); }
+        return _readFail();
+    }
+    const _Argument argument: _cborArgument(data, at + 1, info);
+    if (not argument.ok) { return _readFail(); }
+    if (major eq 0) { return _readOk(dataInt(argument.value), argument.at); }
+    if (major eq 1) { return _readOk(dataInt(-1 - argument.value), argument.at); }
+    if (major eq 2) { return _mpBinary(data, argument.at, argument.value); }
+    if (major eq 3) { return _mpString(data, argument.at, argument.value); }
+    if (major eq 4) { return _readSequence(data, argument.at, argument.value, false, _cborRead); }
+    if (major eq 5) { return _readSequence(data, argument.at, argument.value, true, _cborRead); }
+    if (major eq 6) {
+        const _Read inner: _cborRead(data, argument.at);
+        if (not inner.ok) { return _readFail(); }
+        if (argument.value eq 0 and inner.value.kind eq DataKind.Text) {
+            const datetime? date: parseDateTime(inner.value.text);
+            return date eq null ? _readFail() : _readOk(dataDate(date ?? (0 as datetime)), inner.at);
+        }
+        if (argument.value eq 1 and (inner.value.kind eq DataKind.Int or inner.value.kind eq DataKind.Double)) {
+            const double seconds: inner.value.kind eq DataKind.Int ? (inner.value.number as double) : inner.value.real;
+            const long millis: (seconds * 1000.0) as long;
+            return _readOk(dataDate(millis as datetime), inner.at);
+        }
+        return _readOk(inner.value, inner.at);
+    }
+    return _readFail();
+}
+
+/// <lang name="fr"><summary>Lit une valeur de données écrite en CBOR (flottants de 16, 32 et 64 bits). Les tailles indéfinies, les étiquettes, les clés qui ne sont pas du texte et `undefined` (lu comme `null`) ne sont pas tous pris en charge : l'étiquette 0 (date en texte) et l'étiquette 1 (date en secondes) donnent une date, les autres étiquettes sont ignorées (la valeur qu'elles portent est rendue), les tailles indéfinies sont refusées.</summary><param name="data">Les octets CBOR (un seul élément, sans octet en trop).</param><returns>La valeur, `null` si les octets ne sont pas du CBOR valide ou en contiennent d'autres après la valeur.</returns></lang>
+/// <lang name="en"><summary>Reads a data value written as CBOR (16, 32 and 64-bit floats). Indefinite sizes, tags, keys that are not text and `undefined` (read as `null`) are not all supported: tag 0 (date as text) and tag 1 (date in seconds) give a date, other tags are ignored (the value they carry is returned), indefinite sizes are refused.</summary><param name="data">The CBOR bytes (a single item, with no extra byte).</param><returns>The value, or `null` when the bytes are not valid CBOR or contain others after the value.</returns></lang>
+gear pure fromCbor(bytes data): DataValue? {
+    const _Read read: _cborRead(data, 0);
+    return read.ok and read.at eq (data.length as long) ? read.value : null;
+}

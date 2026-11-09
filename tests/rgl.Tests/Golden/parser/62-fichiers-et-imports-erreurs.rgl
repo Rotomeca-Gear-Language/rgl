@@ -1,0 +1,11 @@
+forge: train
+forge: mold
+description: 3
+import ;
+import Commandes only ajouter;
+import Commandes only {ajouter as};
+import file config;
+train a {
+    train |> done;
+    train |> done;
+}

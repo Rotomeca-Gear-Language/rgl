@@ -1,0 +1,2 @@
+# Tests golden : fins de ligne LF partout, pour que positions et contenus attendus soient identiques sur toutes les machines.
+tests/rgl.Tests/Golden/** text eol=lf

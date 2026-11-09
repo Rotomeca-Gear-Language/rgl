@@ -1,0 +1,101 @@
+forge: gears
+description: "Limitation de débit des requêtes HTTP : un intergiciel qui répond 429 au-delà d'un nombre de requêtes par fenêtre de temps"
+
+use <Http> only {HttpRequest, HttpResponse};
+
+/// <lang name="fr">
+/// <summary>Compte une requête pour une clé dans une fenêtre de temps (usage interne). L'état est partagé par tous les threads du serveur et protégé par un verrou ; les clés dont la fenêtre est finie sont oubliées de temps en temps.</summary>
+/// <param name="key">Ce qui identifie l'appelant.</param>
+/// <param name="limit">Le nombre de requêtes permises par fenêtre.</param>
+/// <param name="windowMs">La durée de la fenêtre, en millisecondes.</param>
+/// <returns>0 si la requête passe, sinon les millisecondes à attendre avant que la fenêtre se rouvre.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Counts a request for a key in a time window (internal use). The state is shared by all the server's threads and protected by a lock; keys whose window has ended are forgotten from time to time.</summary>
+/// <param name="key">What identifies the caller.</param>
+/// <param name="limit">The number of requests allowed per window.</param>
+/// <param name="windowMs">The window length, in milliseconds.</param>
+/// <returns>0 when the request passes, otherwise the milliseconds to wait before the window reopens.</returns>
+/// </lang>
+@trusted
+gear _rateHit(string key, uint limit, long windowMs): long => cpp {
+    #include <chrono>
+    #include <cstdint>
+    #include <mutex>
+    #include <string>
+    #include <unordered_map>
+    struct slot { std::int64_t start; std::uint64_t count; };
+    static std::mutex table_lock;
+    static std::unordered_map<std::string, slot> table;
+    rgl_return rgl(rgl_arg_key key, rgl_arg_limit limit, rgl_arg_windowMs windowMs) {
+        const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        const std::lock_guard<std::mutex> guard(table_lock);
+        if (table.size() > 10000) {
+            for (auto it = table.begin(); it != table.end();) {
+                if (now - it->second.start >= windowMs) it = table.erase(it); else ++it;
+            }
+        }
+        slot& entry = table[std::string(key.data(), key.size())];
+        if (entry.count == 0 || now - entry.start >= windowMs) { entry.start = now; entry.count = 0; }
+        if (entry.count >= limit) {
+            const std::int64_t wait = entry.start + windowMs - now;
+            return rgl_return(wait > 0 ? wait : 1);
+        }
+        ++entry.count;
+        return rgl_return(0);
+    }
+}(string key: key, uint limit: limit, long windowMs: windowMs): long;
+
+/// <lang name="fr">
+/// <summary>La réponse 429 « trop de requêtes », avec l'en-tête `Retry-After` en secondes.</summary>
+/// <param name="waitMs">Les millisecondes à attendre.</param>
+/// <returns>La réponse.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The 429 "too many requests" response, with the `Retry-After` header in seconds.</summary>
+/// <param name="waitMs">The milliseconds to wait.</param>
+/// <returns>The response.</returns>
+/// </lang>
+gear pure tooManyRequests(long waitMs): HttpResponse {
+    const long seconds: (waitMs + 999) / 1000;
+    return {status: 429, contentType: 'text/plain; charset=utf-8', body: 'Too Many Requests', headers: ['Retry-After': `{seconds}`]};
+}
+
+/// <lang name="fr">
+/// <summary>Un intergiciel qui limite le débit par appelant : au-delà de `limit` requêtes dans la fenêtre `window`, il répond 429 sans appeler la route. L'appelant est reconnu par le premier élément de l'en-tête `X-Forwarded-For` (derrière un mandataire de confiance), sinon tous les appelants partagent le même compteur ; pour une autre clé, voir `rateLimitBy`. Les requêtes `OPTIONS` ne comptent pas.</summary>
+/// <param name="limit">Le nombre de requêtes permises par fenêtre.</param>
+/// <param name="window">La durée de la fenêtre.</param>
+/// <returns>L'intergiciel, à ajouter par `server.middleware(rateLimit(100, 1min))`.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A middleware that limits the rate per caller: beyond `limit` requests in the `window`, it answers 429 without calling the route. The caller is identified by the first element of the `X-Forwarded-For` header (behind a trusted proxy), otherwise all callers share one counter; for another key, see `rateLimitBy`. `OPTIONS` requests do not count.</summary>
+/// <param name="limit">The number of requests allowed per window.</param>
+/// <param name="window">The window length.</param>
+/// <returns>The middleware, to add with `server.middleware(rateLimit(100, 1min))`.</returns>
+/// </lang>
+gear rateLimit(uint limit, duration window): (HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse {
+    return rateLimitBy(limit, window, (HttpRequest request) => request.headerFields.getOr('x-forwarded-for', 'anonymous').split(',')[0].trim());
+}
+
+/// <lang name="fr">
+/// <summary>Comme `rateLimit`, avec la clé de l'appelant choisie par `keyOf` (une adresse, un utilisateur, une clé d'API…).</summary>
+/// <param name="limit">Le nombre de requêtes permises par fenêtre.</param>
+/// <param name="window">La durée de la fenêtre.</param>
+/// <param name="keyOf">Donne la clé de l'appelant d'une requête.</param>
+/// <returns>L'intergiciel.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Like `rateLimit`, with the caller key chosen by `keyOf` (an address, a user, an API key…).</summary>
+/// <param name="limit">The number of requests allowed per window.</param>
+/// <param name="window">The window length.</param>
+/// <param name="keyOf">Gives the caller key of a request.</param>
+/// <returns>The middleware.</returns>
+/// </lang>
+gear rateLimitBy(uint limit, duration window, (HttpRequest) => string keyOf): (HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse =>
+    (HttpRequest request, (HttpRequest) => HttpResponse next) => {
+        if (request.method eq 'OPTIONS') { return next(request); }
+        const long windowMs: window as long;
+        const long wait: _rateHit(`{limit}/{windowMs}/{keyOf(request)}`, limit, windowMs);
+        if (wait > 0) { return tooManyRequests(wait); }
+        return next(request);
+    };

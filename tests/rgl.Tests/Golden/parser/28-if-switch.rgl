@@ -1,0 +1,26 @@
+// if / else if / else, switch avec tous ses cas, break N, break all et goto.
+var n: 5;
+if (n < 0) {
+    n <- 0;
+} else if (n eq 0) {
+    n <- 1;
+} else {
+    n <- n * 2;
+}
+switch (n) {
+    case 1:
+        break;
+    case 2:
+        goto 1;
+    case 3, 4:
+    case 5:
+        switch (n + 1) {
+            case eval $ > 10:
+                break 1;
+            default:
+                break all;
+        }
+    default:
+        break;
+}
+train |> done;

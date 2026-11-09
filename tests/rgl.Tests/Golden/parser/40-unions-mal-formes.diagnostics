@@ -1,0 +1,4 @@
+40-unions-mal-formes.rgl:2:15: erreur[E030]: nom de paramètre attendu
+40-unions-mal-formes.rgl:2:30: erreur[E030]: « ) » attendu pour fermer le type
+40-unions-mal-formes.rgl:4:14: erreur[E030]: « |> » attendu après le motif du bras
+40-unions-mal-formes.rgl:5:22: erreur[E030]: « ; » attendu à la fin du bras

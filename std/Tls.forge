@@ -1,0 +1,85 @@
+forge: gears
+description: "Connexion TLS brute, hors HTTP : se connecter à un serveur chiffré, envoyer et recevoir des octets"
+
+/// <lang name="fr">
+/// <summary>Ouvre une connexion TLS (usage interne).</summary>
+/// <param name="host">Le nom de la machine ou son adresse.</param>
+/// <param name="port">Le port.</param>
+/// <param name="timeoutMs">Le délai de la connexion et de la poignée de main.</param>
+/// <returns>L'identifiant, ou un nombre négatif en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Opens a TLS connection (internal use).</summary>
+/// <param name="host">The host name or address.</param>
+/// <param name="port">The port.</param>
+/// <param name="timeoutMs">The delay of the connection and of the handshake.</param>
+/// <returns>The identifier, or a negative number on failure.</returns>
+/// </lang>
+@trusted
+gear _tlsConnect(string host, ushort port, uint timeoutMs): long => cpp {
+    #include <rgl/standard/http_tls.hpp>
+    rgl_return rgl(rgl_arg_host host, rgl_arg_port port, rgl_arg_timeoutMs timeoutMs) {
+        return rgl::standard::http::tls_connect(host, port, timeoutMs);
+    }
+}(string host: host, ushort port: port, uint timeoutMs: timeoutMs): long;
+
+/// <lang name="fr">
+/// <summary>Ouvre une connexion chiffrée en TLS à un serveur, et vérifie son certificat et son nom avec les autorités du système (ou le fichier de `SSL_CERT_FILE`). La connexion se lit et s'écrit ensuite comme une prise, avec `tlsSend` et `tlsReceive`. Comme pour le client HTTPS, OpenSSL est lié au programme seulement s'il utilise cette fonction.</summary>
+/// <param name="host">Le nom de la machine (il sert aussi à vérifier le certificat) ou son adresse.</param>
+/// <param name="port">Le port.</param>
+/// <param name="timeoutMs">Le délai de la connexion et de la poignée de main, en millisecondes.</param>
+/// <returns>La connexion, `null` si la machine ne répond pas, si la poignée de main échoue ou si le certificat est refusé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Opens a TLS-encrypted connection to a server, and checks its certificate and name with the system authorities (or the `SSL_CERT_FILE` file). The connection is then read and written like a socket, with `tlsSend` and `tlsReceive`. As for the HTTPS client, OpenSSL is linked to the program only if it uses this function.</summary>
+/// <param name="host">The host name (also used to check the certificate) or its address.</param>
+/// <param name="port">The port.</param>
+/// <param name="timeoutMs">The delay of the connection and of the handshake, in milliseconds.</param>
+/// <returns>The connection, `null` when the host does not answer, the handshake fails or the certificate is refused.</returns>
+/// </lang>
+gear tlsConnect(string host, ushort port, uint timeoutMs: 5000): long? {
+    const long id: _tlsConnect(host, port, timeoutMs);
+    return id > 0 ? id : null;
+}
+
+/// <lang name="fr"><summary>Envoie des octets sur une connexion TLS (tous, ou échec).</summary><param name="connection">La connexion, telle que la rend `tlsConnect`.</param><param name="data">Les octets à envoyer.</param><returns>Le nombre d'octets envoyés, `null` en cas d'échec.</returns></lang>
+/// <lang name="en"><summary>Sends bytes over a TLS connection (all of them, or a failure).</summary><param name="connection">The connection, as returned by `tlsConnect`.</param><param name="data">The bytes to send.</param><returns>The number of bytes sent, `null` on failure.</returns></lang>
+@trusted
+gear tlsSend(long connection, bytes data): long? => cpp {
+    #include <rgl/standard/http_tls.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_connection connection, rgl_arg_data data) {
+        std::vector<std::uint8_t> buffer(data.size());
+        for (std::size_t i = 0; i < buffer.size(); ++i) buffer[i] = data[i];
+        const auto sent = rgl::standard::http::tls_send(connection, buffer.data(), buffer.size());
+        if (sent < 0) return rgl_return{};
+        return rgl_return(sent);
+    }
+}(long connection: connection, bytes data: data): long?;
+
+/// <lang name="fr"><summary>Attend des octets sur une connexion TLS.</summary><param name="connection">La connexion.</param><param name="maxBytes">Le nombre maximal d'octets à lire.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Les octets reçus ; vides si le serveur a fermé la connexion ; `null` au bout du délai ou sur une erreur.</returns></lang>
+/// <lang name="en"><summary>Waits for bytes on a TLS connection.</summary><param name="connection">The connection.</param><param name="maxBytes">The maximal number of bytes to read.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The bytes received; empty when the server closed the connection; `null` when the delay ends or on an error.</returns></lang>
+@trusted
+gear tlsReceive(long connection, uint maxBytes, uint timeoutMs: 0): bytes? => cpp {
+    #include <rgl/standard/http_tls.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_connection connection, rgl_arg_maxBytes maxBytes, rgl_arg_timeoutMs timeoutMs) {
+        std::vector<std::uint8_t> buffer(maxBytes == 0 ? 1 : maxBytes);
+        const auto count = rgl::standard::http::tls_receive(connection, buffer.data(), buffer.size(), timeoutMs);
+        if (count < 0) return rgl_return{};
+        rgl::standard::array<std::uint8_t> result;
+        result.reserve(static_cast<std::size_t>(count));
+        for (std::int64_t i = 0; i < count; ++i) result.push(buffer[static_cast<std::size_t>(i)]);
+        return rgl_return(std::move(result));
+    }
+}(long connection: connection, uint maxBytes: maxBytes, uint timeoutMs: timeoutMs): bytes?;
+
+/// <lang name="fr"><summary>Ferme une connexion TLS.</summary><param name="connection">La connexion.</param></lang>
+/// <lang name="en"><summary>Closes a TLS connection.</summary><param name="connection">The connection.</param></lang>
+@trusted
+gear tlsClose(long connection): void => cpp {
+    #include <rgl/standard/http_tls.hpp>
+    rgl_return rgl(rgl_arg_connection connection) { rgl::standard::http::tls_close(connection); }
+}(long connection: connection): void;

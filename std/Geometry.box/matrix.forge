@@ -1,0 +1,395 @@
+forge: gears
+description: "Matrices 3x3 (transformations 2D) et 4x4 (transformations 3D)"
+
+import box Vectors only {Vector2, Vector3};
+use <Math> only {abs, sin, cos, tan};
+
+/// <lang name="fr">
+/// <summary>Une matrice 3x3, rangée ligne par ligne ; elle représente une transformation affine du plan en coordonnées homogènes.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A 3x3 matrix stored row by row; it represents an affine transformation of the plane in homogeneous coordinates.</summary>
+/// </lang>
+mold Matrix3 {
+    /// <lang name="fr">
+    /// <summary>Les neuf valeurs, ligne par ligne (`values[ligne * 3 + colonne]`).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The nine values, row by row (`values[row * 3 + column]`).</summary>
+    /// </lang>
+    [double] values;
+
+    /// <lang name="fr">
+    /// <summary>Le produit de deux matrices : `a * b` applique d'abord `b`, puis `a`.</summary>
+    /// <param name="a">La matrice appliquée en second.</param>
+    /// <param name="b">La matrice appliquée en premier.</param>
+    /// <returns>La matrice composée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The product of two matrices: `a * b` applies `b` first, then `a`.</summary>
+    /// <param name="a">The matrix applied second.</param>
+    /// <param name="b">The matrix applied first.</param>
+    /// <returns>The composed matrix.</returns>
+    /// </lang>
+    pure Matrix3 *(Matrix3 a, Matrix3 b) {
+        const [double] cells: [0..<9] ||> (i) =>
+            a.values[i / 3 * 3] * b.values[i % 3] + a.values[i / 3 * 3 + 1] * b.values[3 + i % 3] + a.values[i / 3 * 3 + 2] * b.values[6 + i % 3];
+        return {values: cells};
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les matrices 3x3.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on 3x3 matrices.</summary>
+/// </lang>
+extend Matrix3 {
+    /// <lang name="fr">
+    /// <summary>La matrice qui ne change rien.</summary>
+    /// <returns>La matrice identité.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The matrix that changes nothing.</summary>
+    /// <returns>The identity matrix.</returns>
+    /// </lang>
+    gear pure identity(): Matrix3 => {values: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une translation.</summary>
+    /// <param name="offset">Le déplacement.</param>
+    /// <returns>La matrice de translation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A translation.</summary>
+    /// <param name="offset">The displacement.</param>
+    /// <returns>The translation matrix.</returns>
+    /// </lang>
+    gear pure translation(Vector2 offset): Matrix3 => {values: [1.0, 0.0, offset.x, 0.0, 1.0, offset.y, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Un changement d'échelle autour de l'origine.</summary>
+    /// <param name="factors">Les facteurs sur x et y.</param>
+    /// <returns>La matrice d'échelle.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A scaling around the origin.</summary>
+    /// <param name="factors">The factors on x and y.</param>
+    /// <returns>The scaling matrix.</returns>
+    /// </lang>
+    gear pure scaling(Vector2 factors): Matrix3 => {values: [factors.x, 0.0, 0.0, 0.0, factors.y, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une rotation autour de l'origine, dans le sens trigonométrique.</summary>
+    /// <param name="radians">L'angle en radians.</param>
+    /// <returns>La matrice de rotation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A rotation around the origin, counterclockwise.</summary>
+    /// <param name="radians">The angle in radians.</param>
+    /// <returns>The rotation matrix.</returns>
+    /// </lang>
+    gear pure rotation(double radians): Matrix3 => {values: [cos(radians), -sin(radians), 0.0, sin(radians), cos(radians), 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Applique la transformation à un point (la translation compte).</summary>
+    /// <param name="m">La matrice.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Le point transformé.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Applies the transformation to a point (the translation counts).</summary>
+    /// <param name="m">The matrix.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>The transformed point.</returns>
+    /// </lang>
+    gear pure transformPoint(this Matrix3 m, Vector2 p): Vector2 => {x: m.values[0] * p.x + m.values[1] * p.y + m.values[2], y: m.values[3] * p.x + m.values[4] * p.y + m.values[5]};
+
+    /// <lang name="fr">
+    /// <summary>Applique la transformation à une direction (la translation ne compte pas).</summary>
+    /// <param name="m">La matrice.</param>
+    /// <param name="d">La direction.</param>
+    /// <returns>La direction transformée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Applies the transformation to a direction (the translation does not count).</summary>
+    /// <param name="m">The matrix.</param>
+    /// <param name="d">The direction.</param>
+    /// <returns>The transformed direction.</returns>
+    /// </lang>
+    gear pure transformDirection(this Matrix3 m, Vector2 d): Vector2 => {x: m.values[0] * d.x + m.values[1] * d.y, y: m.values[3] * d.x + m.values[4] * d.y};
+
+    /// <lang name="fr">
+    /// <summary>Le déterminant.</summary>
+    /// <param name="m">La matrice.</param>
+    /// <returns>Le déterminant.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The determinant.</summary>
+    /// <param name="m">The matrix.</param>
+    /// <returns>The determinant.</returns>
+    /// </lang>
+    gear pure determinant(this Matrix3 m): double {
+        const [double] v: m.values;
+        return v[0] * (v[4] * v[8] - v[5] * v[7]) - v[1] * (v[3] * v[8] - v[5] * v[6]) + v[2] * (v[3] * v[7] - v[4] * v[6]);
+    }
+
+    /// <lang name="fr">
+    /// <summary>La matrice transposée.</summary>
+    /// <param name="m">La matrice.</param>
+    /// <returns>La transposée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The transposed matrix.</summary>
+    /// <param name="m">The matrix.</param>
+    /// <returns>The transpose.</returns>
+    /// </lang>
+    gear pure transpose(this Matrix3 m): Matrix3 => {values: [0..<9] ||> (i) => m.values[i % 3 * 3 + i / 3]};
+
+    /// <lang name="fr">
+    /// <summary>La matrice inverse.</summary>
+    /// <param name="m">La matrice.</param>
+    /// <returns>L'inverse, `null` si la matrice n'est pas inversible.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The inverse matrix.</summary>
+    /// <param name="m">The matrix.</param>
+    /// <returns>The inverse, `null` when the matrix is not invertible.</returns>
+    /// </lang>
+    gear pure inverse(this Matrix3 m): Matrix3? {
+        const [double] v: m.values;
+        const double det: m.determinant();
+        if (abs(det) < 0.000000000001) { return null; }
+        const [double] cells: [
+            (v[4] * v[8] - v[5] * v[7]) / det, (v[2] * v[7] - v[1] * v[8]) / det, (v[1] * v[5] - v[2] * v[4]) / det,
+            (v[5] * v[6] - v[3] * v[8]) / det, (v[0] * v[8] - v[2] * v[6]) / det, (v[2] * v[3] - v[0] * v[5]) / det,
+            (v[3] * v[7] - v[4] * v[6]) / det, (v[1] * v[6] - v[0] * v[7]) / det, (v[0] * v[4] - v[1] * v[3]) / det
+        ];
+        return {values: cells};
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Une matrice 4x4, rangée ligne par ligne ; elle représente une transformation affine ou projective de l'espace en coordonnées homogènes.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A 4x4 matrix stored row by row; it represents an affine or projective transformation of space in homogeneous coordinates.</summary>
+/// </lang>
+mold Matrix4 {
+    /// <lang name="fr">
+    /// <summary>Les seize valeurs, ligne par ligne (`values[ligne * 4 + colonne]`).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The sixteen values, row by row (`values[row * 4 + column]`).</summary>
+    /// </lang>
+    [double] values;
+
+    /// <lang name="fr">
+    /// <summary>Le produit de deux matrices : `a * b` applique d'abord `b`, puis `a`.</summary>
+    /// <param name="a">La matrice appliquée en second.</param>
+    /// <param name="b">La matrice appliquée en premier.</param>
+    /// <returns>La matrice composée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The product of two matrices: `a * b` applies `b` first, then `a`.</summary>
+    /// <param name="a">The matrix applied second.</param>
+    /// <param name="b">The matrix applied first.</param>
+    /// <returns>The composed matrix.</returns>
+    /// </lang>
+    pure Matrix4 *(Matrix4 a, Matrix4 b) {
+        const [double] cells: [0..<16] ||> (i) =>
+            a.values[i / 4 * 4] * b.values[i % 4] + a.values[i / 4 * 4 + 1] * b.values[4 + i % 4]
+            + a.values[i / 4 * 4 + 2] * b.values[8 + i % 4] + a.values[i / 4 * 4 + 3] * b.values[12 + i % 4];
+        return {values: cells};
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les matrices 4x4.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on 4x4 matrices.</summary>
+/// </lang>
+extend Matrix4 {
+    /// <lang name="fr">
+    /// <summary>La matrice qui ne change rien.</summary>
+    /// <returns>La matrice identité.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The matrix that changes nothing.</summary>
+    /// <returns>The identity matrix.</returns>
+    /// </lang>
+    gear pure identity(): Matrix4 => {values: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une translation.</summary>
+    /// <param name="offset">Le déplacement.</param>
+    /// <returns>La matrice de translation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A translation.</summary>
+    /// <param name="offset">The displacement.</param>
+    /// <returns>The translation matrix.</returns>
+    /// </lang>
+    gear pure translation(Vector3 offset): Matrix4 => {values: [1.0, 0.0, 0.0, offset.x, 0.0, 1.0, 0.0, offset.y, 0.0, 0.0, 1.0, offset.z, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Un changement d'échelle autour de l'origine.</summary>
+    /// <param name="factors">Les facteurs sur x, y et z.</param>
+    /// <returns>La matrice d'échelle.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A scaling around the origin.</summary>
+    /// <param name="factors">The factors on x, y and z.</param>
+    /// <returns>The scaling matrix.</returns>
+    /// </lang>
+    gear pure scaling(Vector3 factors): Matrix4 => {values: [factors.x, 0.0, 0.0, 0.0, 0.0, factors.y, 0.0, 0.0, 0.0, 0.0, factors.z, 0.0, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une rotation autour de l'axe x.</summary>
+    /// <param name="radians">L'angle en radians.</param>
+    /// <returns>La matrice de rotation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A rotation around the x axis.</summary>
+    /// <param name="radians">The angle in radians.</param>
+    /// <returns>The rotation matrix.</returns>
+    /// </lang>
+    gear pure rotationX(double radians): Matrix4 => {values: [1.0, 0.0, 0.0, 0.0, 0.0, cos(radians), -sin(radians), 0.0, 0.0, sin(radians), cos(radians), 0.0, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une rotation autour de l'axe y.</summary>
+    /// <param name="radians">L'angle en radians.</param>
+    /// <returns>La matrice de rotation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A rotation around the y axis.</summary>
+    /// <param name="radians">The angle in radians.</param>
+    /// <returns>The rotation matrix.</returns>
+    /// </lang>
+    gear pure rotationY(double radians): Matrix4 => {values: [cos(radians), 0.0, sin(radians), 0.0, 0.0, 1.0, 0.0, 0.0, -sin(radians), 0.0, cos(radians), 0.0, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une rotation autour de l'axe z.</summary>
+    /// <param name="radians">L'angle en radians.</param>
+    /// <returns>La matrice de rotation.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A rotation around the z axis.</summary>
+    /// <param name="radians">The angle in radians.</param>
+    /// <returns>The rotation matrix.</returns>
+    /// </lang>
+    gear pure rotationZ(double radians): Matrix4 => {values: [cos(radians), -sin(radians), 0.0, 0.0, sin(radians), cos(radians), 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]};
+
+    /// <lang name="fr">
+    /// <summary>Une projection en perspective (repère main droite, profondeur de -1 à 1).</summary>
+    /// <param name="fieldOfView">L'angle d'ouverture vertical, en radians.</param>
+    /// <param name="aspect">Le rapport largeur sur hauteur.</param>
+    /// <param name="near">La distance du plan proche.</param>
+    /// <param name="far">La distance du plan lointain.</param>
+    /// <returns>La matrice de projection.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A perspective projection (right-handed, depth from -1 to 1).</summary>
+    /// <param name="fieldOfView">The vertical field of view, in radians.</param>
+    /// <param name="aspect">The width over height ratio.</param>
+    /// <param name="near">The distance of the near plane.</param>
+    /// <param name="far">The distance of the far plane.</param>
+    /// <returns>The projection matrix.</returns>
+    /// </lang>
+    gear pure perspective(double fieldOfView, double aspect, double near, double far): Matrix4 {
+        const double f: 1.0 / (tan(fieldOfView / 2.0) ?? 1.0);
+        return {values: [f / aspect, 0.0, 0.0, 0.0, 0.0, f, 0.0, 0.0, 0.0, 0.0, (far + near) / (near - far), 2.0 * far * near / (near - far), 0.0, 0.0, -1.0, 0.0]};
+    }
+
+    /// <lang name="fr">
+    /// <summary>Applique la transformation à un point (la translation compte ; la division perspective n'est pas faite).</summary>
+    /// <param name="m">La matrice.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Le point transformé.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Applies the transformation to a point (the translation counts; the perspective divide is not done).</summary>
+    /// <param name="m">The matrix.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>The transformed point.</returns>
+    /// </lang>
+    gear pure transformPoint(this Matrix4 m, Vector3 p): Vector3 => {x: m.values[0] * p.x + m.values[1] * p.y + m.values[2] * p.z + m.values[3], y: m.values[4] * p.x + m.values[5] * p.y + m.values[6] * p.z + m.values[7], z: m.values[8] * p.x + m.values[9] * p.y + m.values[10] * p.z + m.values[11]};
+
+    /// <lang name="fr">
+    /// <summary>Applique la transformation à une direction (la translation ne compte pas).</summary>
+    /// <param name="m">La matrice.</param>
+    /// <param name="d">La direction.</param>
+    /// <returns>La direction transformée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Applies the transformation to a direction (the translation does not count).</summary>
+    /// <param name="m">The matrix.</param>
+    /// <param name="d">The direction.</param>
+    /// <returns>The transformed direction.</returns>
+    /// </lang>
+    gear pure transformDirection(this Matrix4 m, Vector3 d): Vector3 => {x: m.values[0] * d.x + m.values[1] * d.y + m.values[2] * d.z, y: m.values[4] * d.x + m.values[5] * d.y + m.values[6] * d.z, z: m.values[8] * d.x + m.values[9] * d.y + m.values[10] * d.z};
+
+    /// <lang name="fr">
+    /// <summary>La matrice transposée.</summary>
+    /// <param name="m">La matrice.</param>
+    /// <returns>La transposée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The transposed matrix.</summary>
+    /// <param name="m">The matrix.</param>
+    /// <returns>The transpose.</returns>
+    /// </lang>
+    gear pure transpose(this Matrix4 m): Matrix4 => {values: [0..<16] ||> (i) => m.values[i % 4 * 4 + i / 4]};
+
+    /// <lang name="fr">
+    /// <summary>Le cofacteur d'une case : le déterminant de la matrice 3x3 restante, avec le signe de l'échiquier.</summary>
+    /// <param name="m">La matrice.</param>
+    /// <param name="row">La ligne (de 0 à 3).</param>
+    /// <param name="column">La colonne (de 0 à 3).</param>
+    /// <returns>Le cofacteur.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The cofactor of a cell: the determinant of the remaining 3x3 matrix, with the checkerboard sign.</summary>
+    /// <param name="m">The matrix.</param>
+    /// <param name="row">The row (0 to 3).</param>
+    /// <param name="column">The column (0 to 3).</param>
+    /// <returns>The cofactor.</returns>
+    /// </lang>
+    gear pure cofactor(this Matrix4 m, uint row, uint column): double {
+        const [int] positions: [0..<16];
+        const [int] kept: positions.filter((int k) => k / 4 not eq (row as int) and k % 4 not eq (column as int));
+        const [double] v: kept ||> (k) => m.values[k];
+        const double minor: v[0] * (v[4] * v[8] - v[5] * v[7]) - v[1] * (v[3] * v[8] - v[5] * v[6]) + v[2] * (v[3] * v[7] - v[4] * v[6]);
+        return (row + column) % 2 eq 0 ? minor : -minor;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le déterminant.</summary>
+    /// <param name="m">La matrice.</param>
+    /// <returns>Le déterminant.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The determinant.</summary>
+    /// <param name="m">The matrix.</param>
+    /// <returns>The determinant.</returns>
+    /// </lang>
+    gear pure determinant(this Matrix4 m): double => m.values[0] * m.cofactor(0, 0) + m.values[1] * m.cofactor(0, 1) + m.values[2] * m.cofactor(0, 2) + m.values[3] * m.cofactor(0, 3);
+
+    /// <lang name="fr">
+    /// <summary>La matrice inverse (adjointe divisée par le déterminant).</summary>
+    /// <param name="m">La matrice.</param>
+    /// <returns>L'inverse, `null` si la matrice n'est pas inversible.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The inverse matrix (the adjugate divided by the determinant).</summary>
+    /// <param name="m">The matrix.</param>
+    /// <returns>The inverse, `null` when the matrix is not invertible.</returns>
+    /// </lang>
+    gear pure inverse(this Matrix4 m): Matrix4? {
+        const double det: m.determinant();
+        if (abs(det) < 0.000000000001) { return null; }
+        const [double] cells: [0..<16] ||> (k) => m.cofactor((k % 4) as uint, (k / 4) as uint) / det;
+        return {values: cells};
+    }
+}

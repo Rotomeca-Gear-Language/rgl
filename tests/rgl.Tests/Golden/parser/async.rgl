@@ -1,0 +1,26 @@
+@async
+gear lent(int a): int {
+    await sleep(10ms);
+    return a + 1;
+}
+
+@fire
+gear signal(duration d): void {
+    await sleep(d);
+}
+
+@async
+gear types(): Promise<int ! AsyncException> {
+    var p: lent(1);
+    int x: await p ?? 0;
+    var y: await lent(x) + await lent(2);
+    return x;
+}
+
+@async
+emit principal(): uint {
+    await types();
+    return 0;
+}
+
+!train |> principal;

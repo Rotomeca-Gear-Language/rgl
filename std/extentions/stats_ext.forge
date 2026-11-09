@@ -1,0 +1,109 @@
+forge: extend
+description: 'Statistiques'
+
+namespace std/stats;
+
+use <Statistics> only {_sortedDoubles, _percentileOf, _varianceOf};
+use <Math> only {sqrt};
+
+/// <lang name="fr">
+/// <summary>Statistiques sur les tableaux de nombres : médiane, percentile, variance, écart-type, étendue.</summary>
+/// <typeparam name="T">Type numérique des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Statistics on arrays of numbers: median, percentile, variance, standard deviation, range.</summary>
+/// <typeparam name="T">The numeric type of the elements.</typeparam>
+/// </lang>
+extend<T: number> [T] {
+    /// <lang name="fr">
+    /// <summary>La médiane : la valeur du milieu, ou la moyenne des deux valeurs du milieu pour un nombre pair d'éléments.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Les valeurs ; l'original n'est pas modifié.</param>
+    /// <returns>La médiane en double, `null` pour un tableau vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The median: the middle value, or the mean of the two middle values for an even number of elements.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The values; the original is not modified.</param>
+    /// <returns>The median as a double, or `null` for an empty array.</returns>
+    /// </lang>
+    gear pure median(this [T] array): double? {
+        const [double] values: array ||> (x) => x as double;
+        return _percentileOf(_sortedDoubles(values), 50.0);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le percentile `p` : la valeur sous laquelle tombent `p` pour cent des éléments, par interpolation linéaire.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Les valeurs ; l'original n'est pas modifié.</param>
+    /// <param name="p">Le pourcentage, de 0 (le minimum) à 100 (le maximum).</param>
+    /// <returns>Le percentile en double, `null` pour un tableau vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The `p` percentile: the value below which `p` percent of the elements fall, by linear interpolation.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The values; the original is not modified.</param>
+    /// <param name="p">The percentage, from 0 (the minimum) to 100 (the maximum).</param>
+    /// <returns>The percentile as a double, or `null` for an empty array.</returns>
+    /// </lang>
+    gear pure percentile(this [T] array, double p): double? {
+        const [double] values: array ||> (x) => x as double;
+        return _percentileOf(_sortedDoubles(values), p);
+    }
+
+    /// <lang name="fr">
+    /// <summary>La variance : la moyenne des carrés des écarts à la moyenne.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Les valeurs.</param>
+    /// <param name="sample">`true` divise par n - 1 (variance d'un échantillon) au lieu de n (variance de la population, par défaut).</param>
+    /// <returns>La variance, `null` pour un tableau vide (ou d'un seul élément pour un échantillon).</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The variance: the mean of the squared deviations from the mean.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The values.</param>
+    /// <param name="sample">`true` divides by n - 1 (sample variance) instead of n (population variance, the default).</param>
+    /// <returns>The variance, or `null` for an empty array (or a single element for a sample).</returns>
+    /// </lang>
+    gear pure variance(this [T] array, bool sample: false): double? {
+        const [double] values: array ||> (x) => x as double;
+        return _varianceOf(values, sample);
+    }
+
+    /// <lang name="fr">
+    /// <summary>L'écart-type : la racine carrée de la variance.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Les valeurs.</param>
+    /// <param name="sample">`true` pour l'écart-type d'un échantillon (division par n - 1).</param>
+    /// <returns>L'écart-type, `null` s'il n'y a pas assez de valeurs.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The standard deviation: the square root of the variance.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The values.</param>
+    /// <param name="sample">`true` for the sample standard deviation (division by n - 1).</param>
+    /// <returns>The standard deviation, or `null` when there are not enough values.</returns>
+    /// </lang>
+    gear pure standardDeviation(this [T] array, bool sample: false): double? {
+        const [double] values: array ||> (x) => x as double;
+        const double? v: _varianceOf(values, sample);
+        return v eq null ? null : sqrt(v ?? 0.0);
+    }
+
+    /// <lang name="fr">
+    /// <summary>L'étendue : l'écart entre la plus grande et la plus petite valeur.</summary>
+    /// <typeparam name="T">Type numérique des éléments.</typeparam>
+    /// <param name="array">Les valeurs.</param>
+    /// <returns>L'étendue en double, `null` pour un tableau vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The range: the gap between the largest and the smallest value.</summary>
+    /// <typeparam name="T">The numeric type of the elements.</typeparam>
+    /// <param name="array">The values.</param>
+    /// <returns>The range as a double, or `null` for an empty array.</returns>
+    /// </lang>
+    gear pure range(this [T] array): double? {
+        const [double] values: _sortedDoubles(array ||> (x) => x as double);
+        return values.length eq 0 ? null : values[values.length - 1] - values[0];
+    }
+}

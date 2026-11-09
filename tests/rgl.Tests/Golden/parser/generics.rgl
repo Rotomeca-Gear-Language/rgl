@@ -1,0 +1,22 @@
+gear identity<T>(T val): T => val;
+gear clamp<T: number>(T v, T lo, T hi): T { return v; }
+gear champ<T: {int x}>(T v): int => v.x;
+gear borne<int max>(int v): int => v;
+gear echoue<E: error>(E e): E => e;
+mold Pair<T, U> {
+    T first;
+    U second;
+}
+gear essai<T>(T v): int {
+    Pair<int, string> p: {first: 1, second: "un"};
+    var a: identity<int>(3);
+    var b: borne<10>(a);
+    if (T is int) {
+        return 1;
+    }
+    if (T accept Pair<int, string>) {
+        return 2;
+    }
+    return 0;
+}
+train |> done;

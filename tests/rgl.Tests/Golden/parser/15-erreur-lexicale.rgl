@@ -1,0 +1,3 @@
+// Une chaîne non fermée : le lexer la signale, le parseur continue.
+train |> $ "abc
+;

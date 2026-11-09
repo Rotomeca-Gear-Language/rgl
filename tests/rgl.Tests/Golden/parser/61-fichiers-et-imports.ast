@@ -1,0 +1,62 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=train description="Commandes de l'outil" metadata=true
+  ImportDeclaration 5:1 module=Geometry only=none
+  ImportDeclaration 6:1 module=Commandes only=2
+    ImportName 6:24 name=ajouter alias=add
+    ImportName 6:40 name=retirer
+  ImportDeclaration 7:1 module=Outils only=0
+  ImportDeclaration 8:1 module="page.html" only=none kind=File alias=page
+  ImportDeclaration 9:1 module='commun.txt' only=none kind=FileOutside alias=commun
+  VarDeclaration 11:1 keyword=const name=MAX
+    PrimitiveType 11:7 type=uint
+    LiteralExpression 11:17 kind=IntegerLiteral text=100
+  GearDeclaration 12:1 kind=gear name=propre pure=true parameters=1
+    Parameter 12:18 name=t
+      PrimitiveType 12:18 type=string
+    PrimitiveType 12:29 type=string
+    NameExpression 12:39 name=t
+  TrainBlock 14:1 name=ajouter
+    GearDeclaration 15:5 kind=gear name=verifier pure=false parameters=1
+      Parameter 15:19 name=t
+        PrimitiveType 15:19 type=string
+      PrimitiveType 15:30 type=string
+      NameExpression 15:40 name=t
+    TrainDeclaration 16:5 unguarded=false parameters=1
+      Parameter 16:11 name=texte
+        PrimitiveType 16:11 type=string
+      NameExpression 16:25 name=texte
+      Pipeline 16:31
+        CallStep 16:34 gear=Geometry.lire
+          Rail 16:48
+            CallStep 16:52 gear=corriger
+        CallStep 16:65 gear=verifier
+        DoneStep 16:77
+  TrainBlock 19:1 name=retirer
+    TrainDeclaration 20:5 unguarded=false parameters=1
+      Parameter 20:11 name=texte
+        PrimitiveType 20:11 type=string
+      NameExpression 20:25 name=texte
+      Pipeline 20:31
+        CallStep 20:34 gear=ajouter
+        DoneStep 20:45
+  VarDeclaration 23:1 keyword=none name=origine
+    NamedType 23:1 name=Geometry.Vec2
+    MoldExpression 23:24
+      NamedType 23:28 name=Geometry.Vec2
+      MoldFieldValue 23:43 name=x
+        LiteralExpression 23:46 kind=IntegerLiteral text=0
+      MoldFieldValue 23:49 name=y
+        LiteralExpression 23:52 kind=IntegerLiteral text=0
+  TrainBlock 25:1 name=default
+    GearDeclaration 26:5 kind=gear name=local pure=false parameters=1
+      Parameter 26:16 name=n
+        PrimitiveType 26:16 type=uint
+      PrimitiveType 26:25 type=uint
+      NameExpression 26:33 name=n
+    TrainDeclaration 27:5 unguarded=true parameters=1
+      Parameter 27:12 name=n
+        PrimitiveType 27:12 type=uint
+      NameExpression 27:20 name=n
+      Pipeline 27:22
+        CallStep 27:25 gear=local
+        DoneStep 27:34

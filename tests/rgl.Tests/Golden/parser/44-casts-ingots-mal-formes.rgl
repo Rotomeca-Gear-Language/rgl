@@ -1,0 +1,9 @@
+// Ingots et bornes mal formés : nom manquant, « : » manquant, bornes sans « .. » ni « > ».
+ingot : int;
+ingot A int;
+gear g(): uint {
+    int<0 100> a: 1;
+    int<0..100 b: 1;
+    return 0;
+}
+!train |> $ g();

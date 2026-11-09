@@ -1,0 +1,20 @@
+CompilationUnit 1:1
+  MoldDeclaration 2:1 name=A
+    MoldField 2:10 name=<manquant>
+      PrimitiveType 2:10 type=int
+    MoldField 2:15 name=y
+      PrimitiveType 2:15 type=double
+  GearDeclaration 3:1 kind=gear name=f pure=false parameters=0
+    PrimitiveType 3:11 type=void
+    BlockStatement 3:16
+      VarDeclaration 4:5 keyword=var name=a
+        MoldExpression 4:12
+          NamedType 4:16 name=A
+      VarDeclaration 5:5 keyword=var name=b
+        MoldExpression 5:12
+          MoldFieldValue 5:13 name=x
+            LiteralExpression 5:16 kind=IntegerLiteral text=1
+          MoldFieldValue 5:19 name=y shorthand=true
+  TrainDeclaration 7:1 unguarded=true parameters=none
+    Pipeline 7:8
+      DoneStep 7:11

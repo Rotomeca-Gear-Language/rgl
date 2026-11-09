@@ -1,0 +1,61 @@
+CompilationUnit 1:1
+  GearDeclaration 3:1 kind=gear name=fetchProfile pure=false parameters=1
+    DeclarationNotes 1:1
+      DeprecatedAnnotation 1:1
+        LiteralExpression 1:13 kind=StringLiteral text="Utiliser newApi()"
+      MetadataBlock 2:1
+        MetadataEntry 2:2 key=db
+        MetadataEntry 2:6 key=cache
+          LiteralExpression 2:13 kind=StringLiteral text="5min"
+        MetadataEntry 2:21 key=description
+          LiteralExpression 2:34 kind=StringLiteral text="Charge le profil"
+    Parameter 3:19 name=id
+      PrimitiveType 3:19 type=int
+    PrimitiveType 3:28 type=int
+    NameExpression 3:35 name=id
+  GearDeclaration 8:1 kind=gear name=twice pure=false parameters=1
+    DeclarationNotes 5:1
+      TapAnnotation 5:1 mode=Before target=console
+        TemplateExpression 5:14
+          TemplateText 5:15 text=→ 
+          TemplateInterpolation 5:17
+            NameExpression 5:18 name=n
+      TapAnnotation 6:1 mode=After target=console
+        TemplateExpression 6:6
+          TemplateText 6:7 text=← 
+          TemplateInterpolation 6:9
+            DollarExpression 6:10
+      TapAnnotation 7:1 mode=After closure=true
+        LambdaExpression 7:22 parameters=1
+          LambdaParameter 7:23 name=val
+            PrimitiveType 7:23 type=int
+          CallExpression 7:35
+            NameExpression 7:35 name=log
+            NameExpression 7:39 name=val
+    Parameter 8:12 name=n
+      PrimitiveType 8:12 type=int
+    PrimitiveType 8:20 type=int
+    BinaryExpression 8:27 op=*
+      NameExpression 8:27 name=n
+      LiteralExpression 8:31 kind=IntegerLiteral text=2
+  VarDeclaration 11:1 keyword=const name=N
+    DeclarationNotes 10:1
+      MetadataBlock 10:1
+        MetadataEntry 10:2 key=cle
+    PrimitiveType 11:7 type=int
+    LiteralExpression 11:14 kind=IntegerLiteral text=3
+  MoldDeclaration 15:1 name=M
+    DeclarationNotes 13:1
+      OtherAnnotation 13:1 name=async
+      CustomAnnotation 14:1 name=inconnue
+    MoldField 15:10 name=x
+      PrimitiveType 15:10 type=int
+  VarDeclaration 17:1 keyword=none name=nombres
+    ArrayType 17:1
+      PrimitiveType 17:2 type=int
+    ArrayExpression 17:16
+      LiteralExpression 17:17 kind=IntegerLiteral text=1
+      LiteralExpression 17:20 kind=IntegerLiteral text=2
+  TrainDeclaration 18:1 unguarded=false parameters=none
+    Pipeline 18:7
+      DoneStep 18:10

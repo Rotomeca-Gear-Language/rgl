@@ -1,0 +1,408 @@
+{
+  "Train": {
+    "prefix": "train",
+    "body": [
+      "train([string] args) args |> ${1:etape} |> ${2:done};"
+    ],
+    "description": "Le train d'entrée, avec les arguments de la ligne de commande"
+  },
+  "Gear": {
+    "prefix": "gear",
+    "body": [
+      "gear ${1:nom}(${2:int n}): ${3:int} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Un gear"
+  },
+  "Gear pur": {
+    "prefix": "gearpure",
+    "body": [
+      "gear pure ${1:nom}(${2:int n}): ${3:int} => ${0:n};"
+    ],
+    "description": "Un gear pur, corps en une expression"
+  },
+  "Guard": {
+    "prefix": "guard",
+    "body": [
+      "guard ${1:nom}(${2:int n}): ${3:int} {",
+      "\tif (${4:n < 0}) {",
+      "\t\tfail \"${5:message}\";",
+      "\t}",
+      "\tdone;",
+      "}"
+    ],
+    "description": "Un guard, qui laisse passer sa valeur ou échoue"
+  },
+  "Emit": {
+    "prefix": "emit",
+    "body": [
+      "emit ${1:nom}(${2:int n}): void {",
+      "\t`${3:{n\\}}` -> console;",
+      "}"
+    ],
+    "description": "Un emit, dernière étape d'un chemin"
+  },
+  "Mold": {
+    "prefix": "mold",
+    "body": [
+      "mold ${1:Nom} {",
+      "\t${2:int} ${3:champ};",
+      "}"
+    ],
+    "description": "Un mold"
+  },
+  "Mold à cycle de vie": {
+    "prefix": "moldfin",
+    "body": [
+      "mold ${1:Handle} -> ${2:fermer} {",
+      "\t${3:int} ${4:id};",
+      "}",
+      "",
+      "gear ${2:fermer}(${1:Handle} ${5:h}): void {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Un mold dont le gear de fin s'appelle tout seul quand la valeur sort de portée"
+  },
+  "Dataset": {
+    "prefix": "dataset",
+    "body": [
+      "dataset ${1:Moves} of ${2:Move} {",
+      "\t${3:attaquer}: {${4:name: 'Attaquer', power: 5}},",
+      "\t$0",
+      "}"
+    ],
+    "description": "Un dataset : une table dont chaque entrée a un nom, qui devient son identifiant (Moves.id), lue comme un mold déclaré"
+  },
+  "Annotation déclarée": {
+    "prefix": "annotation",
+    "body": ["annotation ${1:exigeRole}(params [${2:Role}] ${3:roles}) = @before(${4:controle}(${3:roles}));"],
+    "description": "Déclare une annotation : un paquet d'annotations de base, développé à la compilation"
+  },
+  "Contrôle avant un gear": {
+    "prefix": "before",
+    "body": ["@before(${1:controle})"],
+    "description": "Un contrôle exécuté avant le corps : une réponse non nulle remplace le corps"
+  },
+  "Dataset (mold créé)": {
+    "prefix": "datasetas",
+    "body": [
+      "dataset ${1:Moves} as ${2:Move} {",
+      "\t${3:attaquer}: {${4:name: 'Attaquer', power: 5}},",
+      "\t$0",
+      "}"
+    ],
+    "description": "Un dataset qui crée son mold depuis ses entrées (types simples seulement)"
+  },
+  "Dataset (fichier JSON)": {
+    "prefix": "datasetfrom",
+    "body": [
+      "dataset ${1:Moves} from \"${2:moves}.json\" of ${3:Move};"
+    ],
+    "description": "Un dataset dont les entrées sont lues d'un fichier JSON, par son nom"
+  },
+  "Error": {
+    "prefix": "error",
+    "body": [
+      "error ${1:Nom} {",
+      "\t${2:string} ${3:champ};",
+      "}"
+    ],
+    "description": "Un type d'erreur (message et where reçus d'office)"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Nom} { ${2:A}, ${3:B} }"
+    ],
+    "description": "Un enum"
+  },
+  "If": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "if"
+  },
+  "If else": {
+    "prefix": "ifelse",
+    "body": [
+      "if (${1:condition}) {",
+      "\t$2",
+      "} else {",
+      "\t$0",
+      "}"
+    ],
+    "description": "if / else"
+  },
+  "Switch": {
+    "prefix": "switch",
+    "body": [
+      "switch (${1:valeur}) {",
+      "\tcase ${2:1}:",
+      "\t\t$3",
+      "\t\tbreak;",
+      "\tdefault:",
+      "\t\t$0",
+      "\t\tbreak;",
+      "}"
+    ],
+    "description": "switch"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": [
+      "match (${1:valeur}) {",
+      "\tok ${2:v} |> ${3:v};",
+      "\terr ${4:e} |> ${5:0};",
+      "}"
+    ],
+    "description": "match sur un résultat"
+  },
+  "Rail": {
+    "prefix": "rail",
+    "body": [
+      "!> [${1:reparer} |> ${2:\\$ 1}]"
+    ],
+    "description": "Le rail d'un guard"
+  },
+  "Gear générique": {
+    "prefix": "geargeneric",
+    "body": [
+      "gear ${1:nom}<${2:T}>(${2:T} ${3:valeur}): ${2:T} {",
+      "\treturn ${3:valeur};",
+      "}"
+    ],
+    "description": "Un gear générique : un exemplaire est créé pour chaque type qu'on lui donne"
+  },
+  "Gear numérique": {
+    "prefix": "gearnumber",
+    "body": [
+      "gear ${1:nom}<${2:T}: number>(${2:T} ${3:a}, ${2:T} ${4:b}): ${2:T} => ${0:a + b};"
+    ],
+    "description": "Un gear générique réservé aux types numériques"
+  },
+  "Mold générique": {
+    "prefix": "moldgeneric",
+    "body": [
+      "mold ${1:Pair}<${2:T}, ${3:U}> {",
+      "\t${2:T} ${4:first};",
+      "\t${3:U} ${5:second};",
+      "}"
+    ],
+    "description": "Un mold générique"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": [
+      "import ${1:Fichier};"
+    ],
+    "description": "Importe un fichier .forge du projet"
+  },
+  "Import only": {
+    "prefix": "importonly",
+    "body": [
+      "import ${1:Fichier} only {${2:nom}};"
+    ],
+    "description": "Importe des noms choisis d'un fichier .forge"
+  },
+  "Extension": {
+    "prefix": "extend",
+    "body": [
+      "extend ${1:Vec2} {",
+      "\tgear pure ${2:norme}(this ${1:Vec2} v): ${3:float} => $0;",
+      "}"
+    ],
+    "description": "Ajoute des gears et des constantes à un type (fichier forge: gears)"
+  },
+  "Extension générique": {
+    "prefix": "extendgeneric",
+    "body": [
+      "extend<${1:T}: ${2:number}> [${1:T}] {",
+      "\tgear pure ${3:premier}(this [${1:T}] xs): ${1:T} => $0;",
+      "}"
+    ],
+    "description": "Une extension générique, instanciée à l'appel selon le type de la valeur"
+  },
+  "Namespace": {
+    "prefix": "namespace",
+    "body": [
+      "namespace ${1:Mon/Namespace};"
+    ],
+    "description": "Nom qui départage les extensions de même nom (fichier forge: gears)"
+  },
+  "Appel par namespace": {
+    "prefix": "nsCall",
+    "body": [
+      "${1:valeur}.<${2:Mon/Namespace}>${3:nom}($0)"
+    ],
+    "description": "Appelle l'extension d'un namespace précis"
+  },
+  "Test de type": {
+    "prefix": "typetest",
+    "body": [
+      "if (${1:T} is ${2:int}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Dans un corps générique : branche choisie à la compilation selon le type"
+  },
+  "Documentation multilingue": {
+    "prefix": "doclang",
+    "body": [
+      "/// <lang name=\"${1:fr}\">",
+      "/// <summary>${2:Résumé.}</summary>",
+      "/// <param name=\"${3:valeur}\">${4:Description du paramètre.}</param>",
+      "/// <returns>${5:Résultat.}</returns>",
+      "/// </lang>",
+      "/// <lang name=\"en\">",
+      "/// <summary>${6:Summary.}</summary>",
+      "/// <param name=\"${3:valeur}\">${7:Parameter description.}</param>",
+      "/// <returns>${8:Result.}</returns>",
+      "/// </lang>",
+      "$0"
+    ],
+    "description": "Une documentation complète par langue : résumé, paramètres et retour"
+  },
+  "Section documentaire personnalisée": {
+    "prefix": "doccustom",
+    "body": [
+      "/// <${1:attention}>${2:Description.}</${1:attention}>$0"
+    ],
+    "description": "Une balise personnalisée dans un commentaire documentaire"
+  },
+  "Gear unsafe": {
+    "prefix": "unsafe",
+    "body": [
+      "unsafe ${1:nom}(${2}): ${3:void} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Gear autorisant les pointeurs et appels bruts (A2.4)"
+  },
+  "Pointeur propriétaire": {
+    "prefix": "ptr",
+    "body": [
+      "ptr<${1:int}> ${2:p}: ${3:5};$0"
+    ],
+    "description": "Alloue une valeur, libération automatique, déplacement uniquement"
+  },
+  "Pointeur unsafe": {
+    "prefix": "uptr",
+    "body": [
+      "uptr<${1:int}> ${2:p}: ${3:5};",
+      "$0",
+      "${2:p}.free();"
+    ],
+    "description": "Alloue une valeur à libérer explicitement dans un gear unsafe"
+  },
+  "Déplacement de pointeur": {
+    "prefix": "ptrmove",
+    "body": [
+      "${1:cible} <-| ${2:source};$0"
+    ],
+    "description": "Transfère la valeur et invalide la source, y compris entre ptr et uptr"
+  },
+  "Tableau pour appel natif": {
+    "prefix": "pack",
+    "body": [
+      "pack(${1:tableau})$0"
+    ],
+    "description": "Prépare une représentation par éléments sans modifier la source SoA"
+  },
+  "En-tête natif C": {
+    "prefix": "forgenative",
+    "body": [
+      "forge: native",
+      "description: \"${1:Liaisons C}\"",
+      "header: \"${2:lib/api.h}\"",
+      "link: static",
+      "$0"
+    ],
+    "description": "Importe les fonctions et types d’un en-tête C (A2.1)"
+  },
+  "En-tête descriptor C++": {
+    "prefix": "forgedescriptor",
+    "body": [
+      "forge: descriptor",
+      "description: \"${1:Liaisons C++}\"",
+      "header: \"${2:lib/counter.hpp}\"",
+      "link: static",
+      "$0"
+    ],
+    "description": "En-tête d’un fichier décrivant des classes C++ (A2.3)"
+  },
+  "Descriptor C++": {
+    "prefix": "descriptor",
+    "body": [
+      "descriptor ${1:Counter} -> ${2:Compteur} {",
+      "\tconstructor(${3:int n}) => ${1:Counter}(${4:n});",
+      "\tfield ${5:value}: ${6:int} => ${5:value};",
+      "\t${7:add}(${8:int n}): ${9:int} => ${7:add};",
+      "\t$0",
+      "}"
+    ],
+    "description": "Classe C++ : constructeur, champ et méthode exposés comme guards"
+  },
+  "Descriptor générique C++": {
+    "prefix": "descriptorgeneric",
+    "body": [
+      "descriptor ${1:demo::Box}<T> -> ${2:Boite}<T> {",
+      "\tconstructor(T start) => ${1:demo::Box}<T>(start);",
+      "\tfield value: T => value;",
+      "\tadd(T n): T => add;",
+      "\t$0",
+      "}"
+    ],
+    "description": "Descriptor d’une classe template C++"
+  },
+  "Guard natif C++": {
+    "prefix": "guardnative",
+    "body": [
+      "guard ${1:doubler}(${2:int n}): ${3:int};$0"
+    ],
+    "description": "Déclaration implémentée dans nom.rgl.cpp, namespace rgl_native"
+  },
+  "Gear unsafe natif C++": {
+    "prefix": "unsafenative",
+    "body": [
+      "unsafe ${1:lire}(${2:uptr<int> p}): ${3:int};$0"
+    ],
+    "description": "Déclaration brute implémentée dans nom.rgl.cpp"
+  },
+  "Train natif C++": {
+    "prefix": "trainnative",
+    "body": [
+      "forge: train",
+      "description: \"${1:Train natif}\"",
+      "train(${2:int n}): ${3:int};$0"
+    ],
+    "description": "Train implémenté en C++ dans NomDuFichier.rgl.cpp"
+  },
+  "Bloc C++": {
+    "prefix": "cpp",
+    "body": [
+      "cpp {",
+      "\t${1:double} rgl(${2:double x}) {",
+      "\t\treturn ${3:x};",
+      "\t}",
+      "}(${4:double x: valeur}): ${5:double}$0"
+    ],
+    "description": "Bloc C++ typé dans un gear unsafe ou @trusted"
+  },
+  "Gear de confiance pur": {
+    "prefix": "trustedpure",
+    "body": [
+      "@trusted",
+      "gear pure ${1:nom}(${2:double x}): ${3:double} {",
+      "\treturn cpp {",
+      "\t\t${3:double} rgl(${2:double x}) { return ${4:x}; }",
+      "\t}(${5:double x: x}): ${3:double};",
+      "}"
+    ],
+    "description": "Interface pure de confiance autour de C++ : pureté native attestée"
+  }
+}

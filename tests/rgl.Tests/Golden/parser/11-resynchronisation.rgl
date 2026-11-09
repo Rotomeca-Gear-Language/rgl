@@ -1,0 +1,2 @@
+// Après une erreur, le parseur saute jusqu'au « ; » : une seule erreur.
+train |> done done done;

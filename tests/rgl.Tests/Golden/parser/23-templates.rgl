@@ -1,0 +1,4 @@
+// Un template : du texte, des expressions entre accolades, des accolades échappées.
+var a: 1;
+var t: `a = {a}, somme = {a + 2 * 3}, {"}"} \{littéral\}`;
+train |> done;

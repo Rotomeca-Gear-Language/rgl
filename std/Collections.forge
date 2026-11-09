@@ -1,0 +1,215 @@
+forge: gears
+description: "Aides sur les tableaux : transformer, associer, trier et chercher par clé"
+
+/// <lang name="fr">
+/// <summary>Un rang dans un tableau, une chaîne ou un type qui déclare l'opérateur `[]`.</summary>
+/// <remarks>
+/// C'est un `long` d'une autre identité : un entier se convertit implicitement vers `index` dans un opérateur d'index.
+/// Un index négatif compte depuis la fin (`-1` désigne le dernier élément).
+/// </remarks>
+/// </lang>
+/// <lang name="en">
+/// <summary>A position in an array, string, or type that declares the `[]` operator.</summary>
+/// <remarks>
+/// A branded `long`: integers are implicitly converted to `index` in an indexing operator.
+/// A negative index counts from the end (`-1` denotes the last element).
+/// </remarks>
+/// </lang>
+ingot index: long;
+
+/// <lang name="fr">
+/// <summary>Transforme chaque élément d'un tableau, dans l'ordre.</summary>
+/// <typeparam name="T">Le type des éléments d'entrée.</typeparam>
+/// <typeparam name="U">Le type des éléments produits.</typeparam>
+/// <param name="array">Le tableau à parcourir.</param>
+/// <param name="transform">La transformation pure appliquée une fois à chaque élément.</param>
+/// <returns>Un nouveau tableau de même longueur contenant les résultats.</returns>
+/// <example><code language="rgl">const [int] doubled: map([1, 2], (int n) => n * 2);</code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>Transforms every array element in order.</summary>
+/// <typeparam name="T">The input element type.</typeparam>
+/// <typeparam name="U">The produced element type.</typeparam>
+/// <param name="array">The array to traverse.</param>
+/// <param name="transform">The pure transformation applied once to every element.</param>
+/// <returns>A new array of the same length containing the results.</returns>
+/// <example><code language="rgl">const [int] doubled: map([1, 2], (int n) => n * 2);</code></example>
+/// </lang>
+gear pure map<T, U>([T] array, pure (T) => U transform): [U] => array ||> transform;
+
+/// <lang name="fr">
+/// <summary>Transforme chaque élément en tableau puis concatène les résultats.</summary>
+/// <typeparam name="T">Le type des éléments d'entrée.</typeparam>
+/// <typeparam name="U">Le type des éléments produits.</typeparam>
+/// <param name="array">Le tableau à parcourir.</param>
+/// <param name="transform">La transformation pure qui produit zéro, un ou plusieurs éléments.</param>
+/// <returns>Un nouveau tableau contenant tous les résultats dans leur ordre de production.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Transforms every element into an array, then concatenates the results.</summary>
+/// <typeparam name="T">The input element type.</typeparam>
+/// <typeparam name="U">The produced element type.</typeparam>
+/// <param name="array">The array to traverse.</param>
+/// <param name="transform">The pure transformation producing zero, one, or several elements.</param>
+/// <returns>A new array containing every result in production order.</returns>
+/// </lang>
+gear pure flatMap<T, U>([T] array, pure (T) => [U] transform): [U] {
+    [U] none: [];
+    return array |+> none with (acc, value) => [...acc, ...transform(value)];
+}
+
+/// <lang name="fr">
+/// <summary>Combine les éléments de même rang de deux tableaux.</summary>
+/// <typeparam name="T">Le type du premier tableau.</typeparam>
+/// <typeparam name="U">Le type du second tableau.</typeparam>
+/// <param name="array">Le premier tableau.</param>
+/// <param name="other">Le second tableau.</param>
+/// <returns>Les couples jusqu'à la fin du tableau le plus court.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Combines elements at matching positions from two arrays.</summary>
+/// <typeparam name="T">The first array's element type.</typeparam>
+/// <typeparam name="U">The second array's element type.</typeparam>
+/// <param name="array">The first array.</param>
+/// <param name="other">The second array.</param>
+/// <returns>Pairs up to the end of the shorter array.</returns>
+/// </lang>
+gear pure zip<T, U>([T] array, [U] other): [(T, U)] {
+    const uint length: array.length < other.length ? array.length : other.length;
+    return [0..<length] ||> (i) => (array[i], other[i]);
+}
+
+/// <lang name="fr">
+/// <summary>Combine deux tableaux élément par élément avec une fonction, jusqu'à la longueur du plus court.</summary>
+/// <typeparam name="T">Type des éléments du premier tableau.</typeparam>
+/// <typeparam name="U">Type des éléments du second tableau.</typeparam>
+/// <typeparam name="R">Type des résultats.</typeparam>
+/// <param name="array">Le premier tableau.</param>
+/// <param name="other">Le second tableau.</param>
+/// <param name="combine">La fonction pure qui combine deux éléments de même rang.</param>
+/// <returns>Un tableau des résultats.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Combines two arrays element by element with a function, up to the shorter length.</summary>
+/// <typeparam name="T">The first array element type.</typeparam>
+/// <typeparam name="U">The second array element type.</typeparam>
+/// <typeparam name="R">The result type.</typeparam>
+/// <param name="array">The first array.</param>
+/// <param name="other">The second array.</param>
+/// <param name="combine">The pure function combining two elements of the same position.</param>
+/// <returns>An array of the results.</returns>
+/// </lang>
+gear pure zipWith<T, U, R>([T] array, [U] other, pure (T, U) => R combine): [R] {
+    const uint length: array.length < other.length ? array.length : other.length;
+    return [0..<length] ||> (i) => combine(array[i], other[i]);
+}
+
+/// <lang name="fr">
+/// <summary>Trie un tableau d'après une clé calculée pour chaque élément (tri stable, ordre croissant).</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <typeparam name="K">Type de la clé de tri, comparable avec `&lt;`.</typeparam>
+/// <param name="array">Le tableau à trier.</param>
+/// <param name="key">La clé de tri d'un élément.</param>
+/// <returns>Un nouveau tableau trié.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sorts an array by a key computed for each element (stable, ascending).</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <typeparam name="K">The sort key type, comparable with `&lt;`.</typeparam>
+/// <param name="array">The array to sort.</param>
+/// <param name="key">The sort key of an element.</param>
+/// <returns>A new sorted array.</returns>
+/// </lang>
+gear pure sortBy<T, K>([T] array, pure (T) => K key): [T] =>
+    array.sortedWith((T a, T b) => key(a) < key(b) ? -1 : (key(b) < key(a) ? 1 : 0));
+
+/// <lang name="fr">
+/// <summary>L'élément dont la clé est la plus petite (le premier en cas d'égalité).</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <typeparam name="K">Type de la clé, comparable avec `&lt;`.</typeparam>
+/// <param name="array">Le tableau à parcourir.</param>
+/// <param name="key">La clé d'un élément.</param>
+/// <returns>L'élément trouvé, `null` pour un tableau vide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The element with the smallest key (the first on a tie).</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <typeparam name="K">The key type, comparable with `&lt;`.</typeparam>
+/// <param name="array">The array to traverse.</param>
+/// <param name="key">The key of an element.</param>
+/// <returns>The element found, `null` for an empty array.</returns>
+/// </lang>
+gear pure minBy<T, K>([T] array, pure (T) => K key): T? {
+    if (array.length eq 0) { return null; }
+    return array |+> array[0] with (best, x) => key(x) < key(best) ? x : best;
+}
+
+/// <lang name="fr">
+/// <summary>L'élément dont la clé est la plus grande (le premier en cas d'égalité).</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <typeparam name="K">Type de la clé, comparable avec `&lt;`.</typeparam>
+/// <param name="array">Le tableau à parcourir.</param>
+/// <param name="key">La clé d'un élément.</param>
+/// <returns>L'élément trouvé, `null` pour un tableau vide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The element with the largest key (the first on a tie).</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <typeparam name="K">The key type, comparable with `&lt;`.</typeparam>
+/// <param name="array">The array to traverse.</param>
+/// <param name="key">The key of an element.</param>
+/// <returns>The element found, `null` for an empty array.</returns>
+/// </lang>
+gear pure maxBy<T, K>([T] array, pure (T) => K key): T? {
+    if (array.length eq 0) { return null; }
+    return array |+> array[0] with (best, x) => key(best) < key(x) ? x : best;
+}
+
+/// <lang name="fr">
+/// <summary>Range les éléments par clé : chaque clé donne le tableau de ses éléments, dans leur ordre.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// <typeparam name="K">Type de la clé de groupe (un type permis comme clé de dictionnaire).</typeparam>
+/// <param name="array">Le tableau à ranger.</param>
+/// <param name="key">La clé d'un élément.</param>
+/// <returns>Un dictionnaire clé → éléments.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Groups the elements by key: each key maps to the array of its elements, in order.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// <typeparam name="K">The group key type (a type allowed as a dictionary key).</typeparam>
+/// <param name="array">The array to group.</param>
+/// <param name="key">The key of an element.</param>
+/// <returns>A dictionary of key → elements.</returns>
+/// </lang>
+gear pure groupBy<T, K>([T] array, pure (T) => K key): [K:[T]] {
+    [K:[T]] none: [:];
+    return array |+> none with (acc, x) => {
+        const K group: key(x);
+        const [T] empty: [];
+        const [T] current: acc.has(group) ? acc[group] : empty;
+        return acc.put(group, [...current, x]);
+    };
+}
+
+/// <lang name="fr">
+/// <summary>Transforme chaque valeur d'un dictionnaire en gardant ses clés.</summary>
+/// <typeparam name="K">Type des clés.</typeparam>
+/// <typeparam name="V">Type des valeurs.</typeparam>
+/// <typeparam name="R">Type des nouvelles valeurs.</typeparam>
+/// <param name="dictionary">Le dictionnaire à transformer.</param>
+/// <param name="transform">La transformation pure d'une valeur.</param>
+/// <returns>Un nouveau dictionnaire de mêmes clés.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Transforms every value of a dictionary, keeping its keys.</summary>
+/// <typeparam name="K">The key type.</typeparam>
+/// <typeparam name="V">The value type.</typeparam>
+/// <typeparam name="R">The new value type.</typeparam>
+/// <param name="dictionary">The dictionary to transform.</param>
+/// <param name="transform">The pure transformation of a value.</param>
+/// <returns>A new dictionary with the same keys.</returns>
+/// </lang>
+gear pure mapValues<K, V, R>([K:V] dictionary, pure (V) => R transform): [K:R] {
+    [K:R] none: [:];
+    return dictionary.keys() |+> none with (acc, key) => acc.put(key, transform(dictionary[key]));
+}

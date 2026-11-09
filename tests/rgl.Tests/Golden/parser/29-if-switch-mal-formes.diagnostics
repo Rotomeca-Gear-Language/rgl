@@ -1,0 +1,5 @@
+29-if-switch-mal-formes.rgl:2:3: erreur[E030]: « ( » attendu avant la condition
+29-if-switch-mal-formes.rgl:2:9: erreur[E030]: « ) » attendu après la condition
+29-if-switch-mal-formes.rgl:5:7: erreur[E030]: « { » attendu pour ouvrir la branche du if
+29-if-switch-mal-formes.rgl:7:5: erreur[E030]: « case » ou « default » attendu
+29-if-switch-mal-formes.rgl:8:11: erreur[E030]: « : » attendu après le cas

@@ -1,0 +1,128 @@
+forge: gears
+description: "MessagePack : écrire et lire une valeur de données dans le format binaire compact"
+
+use <Data> only {DataKind, DataValue, dataNull, dataBool, dataInt, dataDouble, dataText, dataBytes, _dateText, _Read, _readOk, _readFail, _readSequence, _doubleBits, _bitsDouble, _bitsFloat, _asUnsigned, _asSigned, _beBytes, _readBe};
+
+/// <lang name="fr"><summary>Écrit un entier en MessagePack, sous la forme la plus courte (usage interne).</summary><param name="n">L'entier.</param><returns>Les octets.</returns></lang>
+/// <lang name="en"><summary>Writes an integer as MessagePack, in its shortest form (internal use).</summary><param name="n">The integer.</param><returns>The bytes.</returns></lang>
+gear pure _mpInt(long n): bytes {
+    if (n >= 0) {
+        if (n <= 127) { return [n as ubyte]; }
+        if (n <= 255) { return [0xcc, n as ubyte]; }
+        if (n <= 65535) { return [0xcd, ..._beBytes(n as ulong, 2)]; }
+        if (n <= 4294967295) { return [0xce, ..._beBytes(n as ulong, 4)]; }
+        return [0xcf, ..._beBytes(n as ulong, 8)];
+    }
+    if (n >= -32) { return [(n + 256) as ubyte]; }
+    if (n >= -128) { return [0xd0, (n + 256) as ubyte]; }
+    if (n >= -32768) { return [0xd1, ..._beBytes((n + 65536) as ulong, 2)]; }
+    if (n >= -2147483648) { return [0xd2, ..._beBytes((n + 4294967296) as ulong, 4)]; }
+    return [0xd3, ..._beBytes(_asUnsigned(n), 8)];
+}
+
+/// <lang name="fr"><summary>Écrit l'en-tête d'un conteneur ou d'une chaîne : le jeton court si la taille tient, sinon le jeton à 16 puis à 32 bits (usage interne).</summary><param name="size">La taille.</param><param name="fix">Le jeton court (la taille s'ajoute), ou -1 s'il n'y en a pas.</param><param name="fixMax">La plus grande taille du jeton court.</param><param name="eight">Le jeton à taille sur 8 bits, ou -1.</param><param name="sixteen">Le jeton à taille sur 16 bits.</param><param name="thirtyTwo">Le jeton à taille sur 32 bits.</param><returns>L'en-tête.</returns></lang>
+/// <lang name="en"><summary>Writes the header of a container or a string: the short token if the size fits, otherwise the 16-bit then the 32-bit token (internal use).</summary><param name="size">The size.</param><param name="fix">The short token (the size is added), or -1 if there is none.</param><param name="fixMax">The largest size of the short token.</param><param name="eight">The token whose size is on 8 bits, or -1.</param><param name="sixteen">The token whose size is on 16 bits.</param><param name="thirtyTwo">The token whose size is on 32 bits.</param><returns>The header.</returns></lang>
+gear pure _mpHeader(long size, long fix, long fixMax, long eight, long sixteen, long thirtyTwo): bytes {
+    if (fix >= 0 and size <= fixMax) { return [(fix + size) as ubyte]; }
+    if (eight >= 0 and size <= 255) { return [eight as ubyte, size as ubyte]; }
+    if (size <= 65535) { return [sixteen as ubyte, ..._beBytes(size as ulong, 2)]; }
+    return [thirtyTwo as ubyte, ..._beBytes(size as ulong, 4)];
+}
+
+/// <lang name="fr"><summary>Écrit une valeur de données en MessagePack. Une valeur de sorte table s'écrit avec ses clés en texte, dans l'ordre.</summary><param name="value">La valeur.</param><returns>Les octets MessagePack.</returns></lang>
+/// <lang name="en"><summary>Writes a data value as MessagePack. A table value is written with its text keys, in order.</summary><param name="value">The value.</param><returns>The MessagePack bytes.</returns></lang>
+gear pure toMessagePack(DataValue value): bytes {
+    if (value.kind eq DataKind.Null) { return [0xc0]; }
+    if (value.kind eq DataKind.Bool) { return [value.flag ? 0xc3 : 0xc2]; }
+    if (value.kind eq DataKind.Int) { return _mpInt(value.number); }
+    if (value.kind eq DataKind.Double) { return [0xcb, ..._beBytes(_doubleBits(value.real), 8)]; }
+    if (value.kind eq DataKind.Text) {
+        const bytes raw: value.text as bytes;
+        return [..._mpHeader(raw.length as long, 0xa0, 31, 0xd9, 0xda, 0xdb), ...raw];
+    }
+    if (value.kind eq DataKind.Date) { return toMessagePack({kind: DataKind.Text, flag: false, number: 0, real: 0.0, text: _dateText(value), data: '' as bytes, items: [], keys: []}); }
+    if (value.kind eq DataKind.Bytes) { return [..._mpHeader(value.data.length as long, -1, 0, 0xc4, 0xc5, 0xc6), ...value.data]; }
+    const bytes none: '' as bytes;
+    if (value.kind eq DataKind.List) {
+        return [..._mpHeader(value.items.length as long, 0x90, 15, -1, 0xdc, 0xdd), ...(value.items |+> none with (acc, item) => [...acc, ...toMessagePack(item)])];
+    }
+    return [..._mpHeader(value.items.length as long, 0x80, 15, -1, 0xde, 0xdf), ...(value.items |+> none with (acc, item, i) => [...acc, ...toMessagePack({kind: DataKind.Text, flag: false, number: 0, real: 0.0, text: value.keys[i], data: none, items: [], keys: []}), ...toMessagePack(item)])];
+}
+
+/// <lang name="fr"><summary>Lit un texte de `size` octets à partir de `at` (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang du premier.</param><param name="size">La taille.</param><returns>Le texte, ou un échec s'il manque des octets ou s'ils ne sont pas de l'UTF-8.</returns></lang>
+/// <lang name="en"><summary>Reads a text of `size` bytes from `at` (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the first.</param><param name="size">The size.</param><returns>The text, or a failure when bytes are missing or are not UTF-8.</returns></lang>
+gear pure _mpString(bytes data, long at, long size): _Read {
+    if (at + size > (data.length as long)) { return _readFail(); }
+    const string? text: data.slice(at, at + size) as? string;
+    if (text eq null) { return _readFail(); }
+    return _readOk(dataText(text ?? ''), at + size);
+}
+
+/// <lang name="fr"><summary>Lit des octets de `size` octets à partir de `at` (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang du premier.</param><param name="size">La taille.</param><returns>Les octets lus, ou un échec s'il en manque.</returns></lang>
+/// <lang name="en"><summary>Reads `size` bytes from `at` (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the first.</param><param name="size">The size.</param><returns>The bytes read, or a failure when some are missing.</returns></lang>
+gear pure _mpBinary(bytes data, long at, long size): _Read {
+    if (at + size > (data.length as long)) { return _readFail(); }
+    return _readOk(dataBytes(data.slice(at, at + size)), at + size);
+}
+
+/// <lang name="fr"><summary>Lit un entier de `size` octets à partir de `at`, signé ou non (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang du premier.</param><param name="size">La taille : 1, 2, 4 ou 8.</param><param name="signed">Vrai pour un entier signé.</param><returns>L'entier, ou un échec s'il manque des octets ou si un non signé dépasse 63 bits.</returns></lang>
+/// <lang name="en"><summary>Reads an integer of `size` bytes from `at`, signed or not (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the first.</param><param name="size">The size: 1, 2, 4 or 8.</param><param name="signed">True for a signed integer.</param><returns>The integer, or a failure when bytes are missing or an unsigned one exceeds 63 bits.</returns></lang>
+gear pure _mpNumber(bytes data, long at, long size, bool signed): _Read {
+    if (at + size > (data.length as long)) { return _readFail(); }
+    const ulong raw: _readBe(data, at, size);
+    if (size eq 8) {
+        const long whole: _asSigned(raw);
+        if (not signed and whole < 0) { return _readFail(); }
+        return _readOk(dataInt(whole), at + size);
+    }
+    const long unsignedValue: raw as long;
+    const long limit: size eq 1 ? 128 : (size eq 2 ? 32768 : 2147483648);
+    const long value: signed and unsignedValue >= limit ? unsignedValue - limit * 2 : unsignedValue;
+    return _readOk(dataInt(value), at + size);
+}
+
+/// <lang name="fr"><summary>Lit la taille d'un conteneur ou d'une chaîne écrite sur 1, 2 ou 4 octets (usage interne).</summary><param name="data">Les octets.</param><param name="at">Le rang de la taille.</param><param name="width">1, 2 ou 4.</param><returns>La taille, ou -1 s'il manque des octets.</returns></lang>
+/// <lang name="en"><summary>Reads the size of a container or string written on 1, 2 or 4 bytes (internal use).</summary><param name="data">The bytes.</param><param name="at">The index of the size.</param><param name="width">1, 2 or 4.</param><returns>The size, or -1 when bytes are missing.</returns></lang>
+gear pure _mpSize(bytes data, long at, long width): long => at + width > (data.length as long) ? -1 : (_readBe(data, at, width) as long);
+
+/// <lang name="fr"><summary>Lit une valeur MessagePack à partir de `at` (usage interne).</summary><param name="data">Les octets.</param><param name="at">Où lire.</param><returns>La valeur et la position qui suit, ou un échec.</returns></lang>
+/// <lang name="en"><summary>Reads a MessagePack value from `at` (internal use).</summary><param name="data">The bytes.</param><param name="at">Where to read.</param><returns>The value and the position that follows, or a failure.</returns></lang>
+gear pure _mpRead(bytes data, long at): _Read {
+    if (at >= (data.length as long)) { return _readFail(); }
+    const long b: data[at] as long;
+    if (b <= 0x7f) { return _readOk(dataInt(b), at + 1); }
+    if (b >= 0xe0) { return _readOk(dataInt(b - 256), at + 1); }
+    if (b >= 0xa0 and b <= 0xbf) { return _mpString(data, at + 1, b - 0xa0); }
+    if (b >= 0x90 and b <= 0x9f) { return _readSequence(data, at + 1, b - 0x90, false, _mpRead); }
+    if (b >= 0x80 and b <= 0x8f) { return _readSequence(data, at + 1, b - 0x80, true, _mpRead); }
+    if (b eq 0xc0) { return _readOk(dataNull(), at + 1); }
+    if (b eq 0xc2) { return _readOk(dataBool(false), at + 1); }
+    if (b eq 0xc3) { return _readOk(dataBool(true), at + 1); }
+    if (b >= 0xc4 and b <= 0xc6) {
+        const long width: b eq 0xc4 ? 1 : (b eq 0xc5 ? 2 : 4);
+        const long size: _mpSize(data, at + 1, width);
+        return size < 0 ? _readFail() : _mpBinary(data, at + 1 + width, size);
+    }
+    if (b eq 0xca) { return at + 5 > (data.length as long) ? _readFail() : _readOk(dataDouble(_bitsFloat(_readBe(data, at + 1, 4))), at + 5); }
+    if (b eq 0xcb) { return at + 9 > (data.length as long) ? _readFail() : _readOk(dataDouble(_bitsDouble(_readBe(data, at + 1, 8))), at + 9); }
+    if (b >= 0xcc and b <= 0xcf) { return _mpNumber(data, at + 1, b eq 0xcc ? 1 : (b eq 0xcd ? 2 : (b eq 0xce ? 4 : 8)), false); }
+    if (b >= 0xd0 and b <= 0xd3) { return _mpNumber(data, at + 1, b eq 0xd0 ? 1 : (b eq 0xd1 ? 2 : (b eq 0xd2 ? 4 : 8)), true); }
+    if (b >= 0xd9 and b <= 0xdb) {
+        const long width: b eq 0xd9 ? 1 : (b eq 0xda ? 2 : 4);
+        const long size: _mpSize(data, at + 1, width);
+        return size < 0 ? _readFail() : _mpString(data, at + 1 + width, size);
+    }
+    if (b eq 0xdc or b eq 0xdd or b eq 0xde or b eq 0xdf) {
+        const long width: b eq 0xdc or b eq 0xde ? 2 : 4;
+        const long count: _mpSize(data, at + 1, width);
+        return count < 0 ? _readFail() : _readSequence(data, at + 1 + width, count, b eq 0xde or b eq 0xdf, _mpRead);
+    }
+    return _readFail();
+}
+
+/// <lang name="fr"><summary>Lit une valeur de données écrite en MessagePack. Les types d'extension, les clés qui ne sont pas du texte et les entiers non signés au-delà de 63 bits ne sont pas pris en charge.</summary><param name="data">Les octets MessagePack (une seule valeur, sans octet en trop).</param><returns>La valeur, `null` si les octets ne sont pas du MessagePack valide ou en contiennent d'autres après la valeur.</returns></lang>
+/// <lang name="en"><summary>Reads a data value written as MessagePack. Extension types, keys that are not text and unsigned integers beyond 63 bits are not supported.</summary><param name="data">The MessagePack bytes (a single value, with no extra byte).</param><returns>The value, or `null` when the bytes are not valid MessagePack or contain others after the value.</returns></lang>
+gear pure fromMessagePack(bytes data): DataValue? {
+    const _Read read: _mpRead(data, 0);
+    return read.ok and read.at eq (data.length as long) ? read.value : null;
+}

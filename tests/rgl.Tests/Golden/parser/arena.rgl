@@ -1,0 +1,12 @@
+gear frame(int n): int {
+    arena {
+        var xs: [0..<10];
+    }
+    arena(65536) {
+        var ys: ArenaPool.set([1, 2, 3]);
+    }
+    arena(n);
+    return 0;
+}
+
+train |> done;

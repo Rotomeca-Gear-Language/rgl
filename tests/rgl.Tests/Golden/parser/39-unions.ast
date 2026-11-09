@@ -1,0 +1,54 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=decrire pure=false parameters=3
+    Parameter 2:14 name=v
+      UnionType 2:14
+        PrimitiveType 2:14 type=int
+        PrimitiveType 2:20 type=string
+    Parameter 2:31 name=w
+      NullableType 2:31
+        UnionType 2:31
+          PrimitiveType 2:31 type=int
+          PrimitiveType 2:37 type=string
+    Parameter 2:49 name=r
+      ResultType 2:49
+        PrimitiveType 2:49 type=int
+        PrimitiveType 2:55 type=string
+    PrimitiveType 2:66 type=string
+    BlockStatement 2:73
+      VarDeclaration 3:5 keyword=var name=a
+        MatchExpression 3:12
+          NameExpression 3:19 name=v
+          MatchArm 4:9 kind=Type name=i
+            PrimitiveType 4:9 type=int
+            TemplateExpression 4:18
+              TemplateText 4:19 text=entier 
+              TemplateInterpolation 4:26
+                NameExpression 4:27 name=i
+          MatchArm 5:9 kind=Type
+            PrimitiveType 5:9 type=string
+            LiteralExpression 5:19 kind=StringLiteral text="texte"
+      ExpressionStatement 7:5
+        MatchExpression 7:5
+          NameExpression 7:12 name=r
+          MatchArm 8:9 kind=Ok name=n
+            BlockStatement 8:17
+              ReturnStatement 8:19
+                NameExpression 8:26 name=a
+          MatchArm 9:9 kind=Err name=e
+            BlockStatement 9:18
+              ReturnStatement 9:18
+                NameExpression 9:25 name=e
+      VarDeclaration 11:5 keyword=var name=b
+        MatchExpression 11:12
+          NameExpression 11:19 name=w
+          MatchArm 11:24 kind=Default
+            CallExpression 11:35
+              NameExpression 11:35 name=ok
+              LiteralExpression 11:38 kind=IntegerLiteral text=1
+      ReturnStatement 12:5
+        CallExpression 12:12
+          NameExpression 12:12 name=err
+          LiteralExpression 12:16 kind=StringLiteral text="x"
+  TrainDeclaration 15:1 unguarded=true parameters=none
+    Pipeline 15:8
+      DoneStep 15:11

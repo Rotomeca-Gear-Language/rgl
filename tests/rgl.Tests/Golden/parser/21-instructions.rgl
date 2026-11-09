@@ -1,0 +1,11 @@
+// Affectations, rappel de type, blocs et undefine.
+int score: 0;
+score <- 5;
+score: int <- score + 1;
+{
+    var a: score;
+    {
+        undefine a;
+    }
+}
+!train |> $ 0;

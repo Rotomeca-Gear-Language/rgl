@@ -1,0 +1,5 @@
+// Ternaire sans « : », pas manquant ou non fermé.
+var a: 1;
+var b: a ? 1 2;
+increment<> a;
+increment<2 a;

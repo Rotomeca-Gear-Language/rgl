@@ -1,0 +1,20 @@
+// Mutabilité : mut devant une déclaration ou un paramètre, déclarations typées sans mot-clé,
+// modifications en place et parcours qui modifie ses éléments.
+mold Vec2 { float x; float y; }
+
+gear bouger(mut Vec2 v, float dx): void {
+    v.x +<- dx;
+}
+
+gear g(): void {
+    mut var ps: [1, 2];
+    mut [Vec2] liste: [];
+    int n: 3;
+    (int | string)? valeur: null;
+    liste[0].x <- 1.0;
+    liste[n].y *<- 2.0;
+    bouger(liste[0], 1.0);
+    liste ||> (mut v) => { v.x <- 0.0; };
+    liste ||> (mut Vec2 v, int i) => i;
+}
+!train |> done;

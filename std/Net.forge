@@ -1,0 +1,325 @@
+forge: gears
+description: "Réseau brut : sockets TCP et UDP bloquants, avec délai. Une prise est un entier ; `null` signale l'échec"
+
+use <Errors> only {AsyncException, AsyncKind};
+
+/// <lang name="fr">
+/// <summary>Ouvre une connexion TCP vers un serveur.</summary>
+/// <param name="host">Le nom ou l'adresse du serveur.</param>
+/// <param name="port">Le port.</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>La prise, `null` si la connexion échoue ou si le délai passe.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Opens a TCP connection to a server.</summary>
+/// <param name="host">The name or address of the server.</param>
+/// <param name="port">The port.</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>The socket, `null` when the connection fails or the delay passes.</returns>
+/// </lang>
+@trusted
+gear tcpConnect(string host, ushort port, uint timeoutMs: 5000): long? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_host host, rgl_arg_port port, rgl_arg_timeoutMs timeoutMs) {
+        const auto s = rgl::standard::net::tcp_connect(host, port, timeoutMs);
+        if (s < 0) return rgl_return{};
+        return rgl_return(s);
+    }
+}(string host: host, ushort port: port, uint timeoutMs: timeoutMs): long?;
+
+/// <lang name="fr">
+/// <summary>Écoute les connexions TCP entrantes, en IPv4 ou en IPv6.</summary>
+/// <param name="address">L'adresse locale (`0.0.0.0` pour toutes les interfaces IPv4, `::` pour toutes en IPv4 et IPv6, `127.0.0.1` ou `::1` pour la machine seule).</param>
+/// <param name="port">Le port ; 0 laisse le système en choisir un (lisible avec `socketPort`).</param>
+/// <returns>La prise d'écoute, `null` si l'adresse ou le port est inutilisable.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Listens for incoming TCP connections, over IPv4 or IPv6.</summary>
+/// <param name="address">The local address (`0.0.0.0` for all IPv4 interfaces, `::` for all of them over IPv4 and IPv6, `127.0.0.1` or `::1` for the machine only).</param>
+/// <param name="port">The port; 0 lets the system pick one (readable with `socketPort`).</param>
+/// <returns>The listening socket, `null` when the address or port is unusable.</returns>
+/// </lang>
+@trusted
+gear tcpListen(string address: '0.0.0.0', ushort port: 0): long? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_address address, rgl_arg_port port) {
+        const auto s = rgl::standard::net::tcp_listen(address, port);
+        if (s < 0) return rgl_return{};
+        return rgl_return(s);
+    }
+}(string address: address, ushort port: port): long?;
+
+/// <lang name="fr">
+/// <summary>Attend une connexion entrante.</summary>
+/// <param name="listener">La prise d'écoute rendue par `tcpListen`.</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>La prise du client, `null` au délai ou en cas d'erreur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Waits for an incoming connection.</summary>
+/// <param name="listener">The listening socket returned by `tcpListen`.</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>The client socket, `null` on timeout or error.</returns>
+/// </lang>
+@trusted
+gear tcpAccept(long listener, uint timeoutMs: 0): long? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_listener listener, rgl_arg_timeoutMs timeoutMs) {
+        const auto s = rgl::standard::net::tcp_accept(listener, timeoutMs);
+        if (s < 0) return rgl_return{};
+        return rgl_return(s);
+    }
+}(long listener: listener, uint timeoutMs: timeoutMs): long?;
+
+/// <lang name="fr">
+/// <summary>Ouvre une prise UDP liée à une adresse locale.</summary>
+/// <param name="address">L'adresse locale.</param>
+/// <param name="port">Le port local ; 0 laisse le système en choisir un.</param>
+/// <returns>La prise, `null` en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Opens a UDP socket bound to a local address.</summary>
+/// <param name="address">The local address.</param>
+/// <param name="port">The local port; 0 lets the system pick one.</param>
+/// <returns>The socket, `null` on failure.</returns>
+/// </lang>
+@trusted
+gear udpOpen(string address: '0.0.0.0', ushort port: 0): long? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_address address, rgl_arg_port port) {
+        const auto s = rgl::standard::net::udp_open(address, port);
+        if (s < 0) return rgl_return{};
+        return rgl_return(s);
+    }
+}(string address: address, ushort port: port): long?;
+
+/// <lang name="fr">
+/// <summary>Envoie des octets sur une connexion TCP (tous, ou échec).</summary>
+/// <param name="socket">La prise, telle que la rendent `tcpConnect`, `tcpAccept` ou `udpOpen`.</param>
+/// <param name="data">Les octets à envoyer.</param>
+/// <returns>Le nombre d'octets envoyés, `null` en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sends bytes over a TCP connection (all of them, or a failure).</summary>
+/// <param name="socket">The socket, as returned by `tcpConnect`, `tcpAccept` or `udpOpen`.</param>
+/// <param name="data">The bytes to send.</param>
+/// <returns>The number of bytes sent, `null` on failure.</returns>
+/// </lang>
+@trusted
+gear socketSend(long socket, bytes data): long? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_socket socket, rgl_arg_data data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        const auto sent = rgl::standard::net::send(socket, bytes.data(), bytes.size());
+        if (sent < 0) return rgl_return{};
+        return rgl_return(sent);
+    }
+}(long socket: socket, bytes data: data): long?;
+
+/// <lang name="fr">
+/// <summary>Envoie un datagramme UDP.</summary>
+/// <param name="socket">La prise, telle que la rendent `tcpConnect`, `tcpAccept` ou `udpOpen`.</param>
+/// <param name="host">Le nom ou l'adresse du destinataire.</param>
+/// <param name="port">Son port.</param>
+/// <param name="data">Les octets du datagramme.</param>
+/// <returns>Le nombre d'octets envoyés, `null` en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sends a UDP datagram.</summary>
+/// <param name="socket">The socket, as returned by `tcpConnect`, `tcpAccept` or `udpOpen`.</param>
+/// <param name="host">The name or address of the recipient.</param>
+/// <param name="port">Its port.</param>
+/// <param name="data">The bytes of the datagram.</param>
+/// <returns>The number of bytes sent, `null` on failure.</returns>
+/// </lang>
+@trusted
+gear udpSend(long socket, string host, ushort port, bytes data): long? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_socket socket, rgl_arg_host host, rgl_arg_port port, rgl_arg_data data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        const auto sent = rgl::standard::net::send_to(socket, host, port, bytes.data(), bytes.size());
+        if (sent < 0) return rgl_return{};
+        return rgl_return(sent);
+    }
+}(long socket: socket, string host: host, ushort port: port, bytes data: data): long?;
+
+/// <lang name="fr">
+/// <summary>Reçoit des octets (au plus `maxBytes`) d'une connexion TCP, ou un datagramme d'une prise UDP.</summary>
+/// <param name="socket">La prise, telle que la rendent `tcpConnect`, `tcpAccept` ou `udpOpen`.</param>
+/// <param name="maxBytes">La taille maximale à lire.</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>Les octets reçus ; vide quand l'autre bout a fermé la connexion ; `null` au délai ou en cas d'erreur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Receives bytes (at most `maxBytes`) from a TCP connection, or a datagram from a UDP socket.</summary>
+/// <param name="socket">The socket, as returned by `tcpConnect`, `tcpAccept` or `udpOpen`.</param>
+/// <param name="maxBytes">The maximal size to read.</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>The bytes received; empty when the other end closed the connection; `null` on timeout or error.</returns>
+/// </lang>
+@trusted
+gear socketReceive(long socket, uint maxBytes, uint timeoutMs: 0): bytes? => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_socket socket, rgl_arg_maxBytes maxBytes, rgl_arg_timeoutMs timeoutMs) {
+        std::vector<std::uint8_t> buffer(maxBytes == 0 ? 1 : maxBytes);
+        const auto count = rgl::standard::net::receive(socket, buffer.data(), buffer.size(), timeoutMs);
+        if (count < 0) return rgl_return{};
+        rgl::standard::array<std::uint8_t> result;
+        result.reserve(static_cast<std::size_t>(count));
+        for (std::int64_t i = 0; i < count; ++i) result.push(buffer[static_cast<std::size_t>(i)]);
+        return rgl_return(std::move(result));
+    }
+}(long socket: socket, uint maxBytes: maxBytes, uint timeoutMs: timeoutMs): bytes?;
+
+/// <lang name="fr">
+/// <summary>L'expéditeur du dernier datagramme reçu par `socketReceive` dans ce thread, écrit `hôte:port`.</summary>
+/// <returns>Le texte, vide si aucun datagramme n'a été reçu.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The sender of the last datagram received by `socketReceive` in this thread, written `host:port`.</summary>
+/// <returns>The text, empty when no datagram was received.</returns>
+/// </lang>
+@trusted
+gear udpSender(): string => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl() {
+        const auto& sender = rgl::standard::net::last_sender();
+        return rgl::standard::string(sender.c_str(), sender.size());
+    }
+}(): string;
+
+/// <lang name="fr">
+/// <summary>Le port local d'une prise (utile après avoir demandé le port 0).</summary>
+/// <param name="socket">La prise, telle que la rendent `tcpConnect`, `tcpAccept` ou `udpOpen`.</param>
+/// <returns>Le port, 0 si la prise est invalide.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The local port of a socket (useful after asking for port 0).</summary>
+/// <param name="socket">The socket, as returned by `tcpConnect`, `tcpAccept` or `udpOpen`.</param>
+/// <returns>The port, 0 when the socket is invalid.</returns>
+/// </lang>
+@trusted
+gear socketPort(long socket): ushort => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_socket socket) {
+        return rgl::standard::net::local_port(socket);
+    }
+}(long socket: socket): ushort;
+
+/// <lang name="fr">
+/// <summary>Ferme une prise (connexion, écoute ou UDP).</summary>
+/// <param name="socket">La prise, telle que la rendent `tcpConnect`, `tcpAccept` ou `udpOpen`.</param>
+/// </lang>
+/// <lang name="en">
+/// <summary>Closes a socket (connection, listener or UDP).</summary>
+/// <param name="socket">The socket, as returned by `tcpConnect`, `tcpAccept` or `udpOpen`.</param>
+/// </lang>
+@trusted
+gear socketClose(long socket): void => cpp {
+    #include <rgl/standard/net.hpp>
+    #include <cstdint>
+    #include <vector>
+    rgl_return rgl(rgl_arg_socket socket) {
+        rgl::standard::net::close(socket);
+    }
+}(long socket: socket): void;
+
+/// <lang name="fr">
+/// <summary>Ouvre une connexion TCP sans bloquer la boucle : l'attente se fait sur le pool de threads.</summary>
+/// <param name="host">Le nom ou l'adresse du serveur.</param>
+/// <param name="port">Le port.</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>Une promesse de la prise ; une erreur de genre `IoError` si la connexion échoue ou si le délai passe.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Opens a TCP connection without blocking the loop: the wait happens on the thread pool.</summary>
+/// <param name="host">The name or address of the server.</param>
+/// <param name="port">The port.</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>A promise of the socket; an `IoError` error if the connection fails or the delay passes.</returns>
+/// </lang>
+@task
+gear tcpConnectAsync(string host, ushort port, uint timeoutMs: 5000): Promise<long ! AsyncException> {
+    const long? socket: tcpConnect(host, port, timeoutMs);
+    if (socket eq null) { return err({message: 'connexion impossible ou délai dépassé', kind: AsyncKind.IoError}); }
+    return ok(socket ?? 0);
+}
+
+/// <lang name="fr">
+/// <summary>Attend une connexion entrante sans bloquer la boucle. Chaque attente occupe un thread du pool : donne un délai plutôt qu'une attente sans limite, que `cancel` ne peut pas interrompre.</summary>
+/// <param name="listener">La prise d'écoute rendue par `tcpListen`.</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>Une promesse de la prise du client ; une erreur de genre `IoError` au délai ou en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Waits for an incoming connection without blocking the loop. Each wait occupies a pool thread: give a delay rather than an unlimited wait, which `cancel` cannot interrupt.</summary>
+/// <param name="listener">The listening socket returned by `tcpListen`.</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>A promise of the client socket; an `IoError` error on timeout or failure.</returns>
+/// </lang>
+@task
+gear tcpAcceptAsync(long listener, uint timeoutMs: 0): Promise<long ! AsyncException> {
+    const long? socket: tcpAccept(listener, timeoutMs);
+    if (socket eq null) { return err({message: 'aucune connexion reçue', kind: AsyncKind.IoError}); }
+    return ok(socket ?? 0);
+}
+
+/// <lang name="fr">
+/// <summary>Envoie des octets sur une connexion TCP sans bloquer la boucle.</summary>
+/// <param name="socket">La prise de la connexion.</param>
+/// <param name="data">Les octets à envoyer.</param>
+/// <returns>Une promesse du nombre d'octets envoyés ; une erreur de genre `IoError` en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Sends bytes over a TCP connection without blocking the loop.</summary>
+/// <param name="socket">The connection socket.</param>
+/// <param name="data">The bytes to send.</param>
+/// <returns>A promise of the number of bytes sent; an `IoError` error on failure.</returns>
+/// </lang>
+@task
+gear socketSendAsync(long socket, bytes data): Promise<long ! AsyncException> {
+    const long? sent: socketSend(socket, data);
+    if (sent eq null) { return err({message: 'envoi impossible', kind: AsyncKind.IoError}); }
+    return ok(sent ?? 0);
+}
+
+/// <lang name="fr">
+/// <summary>Reçoit des octets (au plus `maxBytes`) sans bloquer la boucle. Chaque attente occupe un thread du pool : donne un délai plutôt qu'une attente sans limite.</summary>
+/// <param name="socket">La prise de la connexion ou du datagramme.</param>
+/// <param name="maxBytes">La taille maximale à lire.</param>
+/// <param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param>
+/// <returns>Une promesse des octets reçus (vide quand l'autre bout a fermé la connexion) ; une erreur de genre `IoError` au délai ou en cas d'échec.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Receives bytes (at most `maxBytes`) without blocking the loop. Each wait occupies a pool thread: give a delay rather than an unlimited wait.</summary>
+/// <param name="socket">The connection or datagram socket.</param>
+/// <param name="maxBytes">The maximal size to read.</param>
+/// <param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param>
+/// <returns>A promise of the bytes received (empty when the other end closed the connection); an `IoError` error on timeout or failure.</returns>
+/// </lang>
+@task
+gear socketReceiveAsync(long socket, uint maxBytes, uint timeoutMs: 0): Promise<bytes ! AsyncException> {
+    const bytes? received: socketReceive(socket, maxBytes, timeoutMs);
+    if (received eq null) { return err({message: 'aucune donnée reçue', kind: AsyncKind.IoError}); }
+    return ok(received ?? ('' as bytes));
+}

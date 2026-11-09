@@ -1,0 +1,12 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=mold description=none metadata=false
+  ExpressionStatement 3:14
+    LiteralExpression 3:14 kind=IntegerLiteral text=3
+  ImportDeclaration 5:1 module=Commandes only=0
+  ImportDeclaration 6:1 module=Commandes only=1
+    ImportName 6:24 name=ajouter alias=<manquant>
+  ImportDeclaration 7:1 module=<manquant> only=none kind=File
+  TrainBlock 8:1 name=a
+    TrainDeclaration 9:5 unguarded=false parameters=none
+      Pipeline 9:11
+        DoneStep 9:14

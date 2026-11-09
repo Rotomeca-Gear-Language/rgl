@@ -1,0 +1,59 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=verifie pure=false parameters=1
+    Parameter 1:14 name=n
+      PrimitiveType 1:14 type=int
+    PrimitiveType 1:22 type=int
+    BlockStatement 1:26
+      IfStatement 2:5
+        BinaryExpression 2:9 op=>
+          NameExpression 2:9 name=n
+          LiteralExpression 2:13 kind=IntegerLiteral text=5
+        BlockStatement 2:16
+          PanicStatement 2:18
+            LiteralExpression 2:24 kind=StringLiteral text="trop grand"
+      IfStatement 3:5
+        BinaryExpression 3:9 op=>
+          NameExpression 3:9 name=n
+          LiteralExpression 3:13 kind=IntegerLiteral text=50
+        BlockStatement 3:17
+          PanicStatement 3:19
+      ReturnStatement 4:5
+        NameExpression 4:12 name=n
+  GearDeclaration 7:1 kind=gear name=nom pure=false parameters=1
+    Parameter 7:10 name=v
+      UnionType 7:10
+        PrimitiveType 7:10 type=int
+        PrimitiveType 7:16 type=string
+        PrimitiveType 7:25 type=bool
+    PrimitiveType 7:34 type=string
+    MatchExpression 7:44
+      NameExpression 7:51 name=v
+      MatchArm 8:5 kind=Type name=i
+        PrimitiveType 8:5 type=int
+        LiteralExpression 8:14 kind=StringLiteral text="entier"
+      MatchArm 9:5 kind=Default name=reste
+        LiteralExpression 9:22 kind=StringLiteral text="autre"
+  GearDeclaration 12:1 kind=gear name=touche pure=false parameters=1
+    Parameter 12:13 name=h
+      NamedType 12:13 name=Hero
+    NamedType 12:22 name=Hero
+    WithExpression 12:30
+      NameExpression 12:30 name=h
+      WithChange 12:38
+        NameExpression 12:38 name=hp
+        BinaryExpression 12:42 op=-
+          MemberAccessExpression 12:42 member=hp
+            NameExpression 12:42 name=h
+          LiteralExpression 12:49 kind=IntegerLiteral text=1
+      WithChange 12:52
+        MemberAccessExpression 12:52 member=x
+          NameExpression 12:52 name=pos
+        LiteralExpression 12:59 kind=IntegerLiteral text=3
+      WithChange 12:62
+        IndexExpression 12:62
+          NameExpression 12:62 name=cells
+          LiteralExpression 12:68 kind=IntegerLiteral text=0
+        LiteralExpression 12:72 kind=IntegerLiteral text=1
+  TrainDeclaration 14:1 unguarded=true parameters=none
+    Pipeline 14:8
+      DoneStep 14:11

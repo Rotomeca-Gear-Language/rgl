@@ -1,0 +1,60 @@
+CompilationUnit 1:1
+  MoldDeclaration 2:1 name=Vec2
+    MoldField 2:13 name=x
+      PrimitiveType 2:13 type=double
+    MoldField 2:23 name=y
+      PrimitiveType 2:23 type=double
+  MoldDeclaration 3:1 name=Vec3
+    MoldSpread 4:5
+      NamedType 4:8 name=Vec2
+    MoldField 5:5 name=z
+      PrimitiveType 5:5 type=double
+      LiteralExpression 5:15 kind=FloatLiteral text=0.0
+  GearDeclaration 8:1 kind=gear name=taille pure=true parameters=1
+    Parameter 8:18 name=v
+      AnonymousMoldType 8:18
+        MoldField 8:19 name=x
+          PrimitiveType 8:19 type=double
+        MoldField 8:29 name=y
+          PrimitiveType 8:29 type=double
+    PrimitiveType 8:43 type=double
+    BinaryExpression 8:53 op=+
+      MemberAccessExpression 8:53 member=x
+        NameExpression 8:53 name=v
+      MemberAccessExpression 8:59 member=y
+        NameExpression 8:59 name=v
+  GearDeclaration 10:1 kind=gear name=deplacer pure=false parameters=1
+    Parameter 10:15 name=v
+      NamedType 10:15 name=Vec3
+    NamedType 10:24 name=Vec3
+    BlockStatement 10:29
+      VarDeclaration 11:5 keyword=var name=x
+        BinaryExpression 11:12 op=+
+          MemberAccessExpression 11:12 member=x
+            NameExpression 11:12 name=v
+          LiteralExpression 11:18 kind=FloatLiteral text=1.0
+      VarDeclaration 12:5 keyword=var name=a
+        MoldExpression 12:12
+          NamedType 12:16 name=Vec2
+          MoldFieldValue 12:22 name=x
+            LiteralExpression 12:25 kind=FloatLiteral text=1.0
+          MoldFieldValue 12:30 name=y
+            LiteralExpression 12:33 kind=FloatLiteral text=2.0
+      VarDeclaration 13:5 keyword=var name=b
+        MoldExpression 13:12
+          MoldFieldValue 13:13 name=x shorthand=true
+          MoldFieldValue 13:16 name=y
+            MemberAccessExpression 13:19 member=y
+              NameExpression 13:19 name=a
+      FieldAssignmentStatement 14:5
+        MemberAccessExpression 14:5 member=z
+          NameExpression 14:5 name=v
+        LiteralExpression 14:12 kind=FloatLiteral text=2.0
+      ReturnStatement 15:5
+        MoldExpression 15:12
+          MoldSpreadValue 15:13
+            NameExpression 15:16 name=v
+          MoldFieldValue 15:19 name=x shorthand=true
+  TrainDeclaration 18:1 unguarded=true parameters=none
+    Pipeline 18:8
+      DoneStep 18:11

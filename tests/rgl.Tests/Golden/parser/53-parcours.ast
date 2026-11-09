@@ -1,0 +1,46 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=test pure=false parameters=1
+    Parameter 1:11 name=nums
+      ArrayType 1:11
+        PrimitiveType 1:12 type=int
+    PrimitiveType 1:24 type=void
+    BlockStatement 1:29
+      VarDeclaration 2:5 keyword=var name=doubles
+        EachExpression 2:18 strict=false
+          NameExpression 2:18 name=nums
+          EachTarget 2:27 name=doubler
+      VarDeclaration 3:5 keyword=var name=pairs
+        EachExpression 3:16 strict=true
+          EachExpression 3:16 strict=false
+            EachExpression 3:16 strict=false
+              NameExpression 3:16 name=nums
+              EachTarget 3:25
+                LambdaExpression 3:25 parameters=1
+                  LambdaParameter 3:26 name=x
+                  BinaryExpression 3:32 op=*
+                    NameExpression 3:32 name=x
+                    LiteralExpression 3:36 kind=IntegerLiteral text=2
+            EachTarget 3:42 name=scale
+              LiteralExpression 3:48 kind=IntegerLiteral text=3
+          EachTarget 3:56 name=verifier
+      ExpressionStatement 4:5
+        EachExpression 4:5 strict=false
+          NameExpression 4:5 name=nums
+          EachTarget 4:14 name=afficher
+  TrainDeclaration 6:1 unguarded=false parameters=none
+    ArrayExpression 6:7
+      LiteralExpression 6:8 kind=IntegerLiteral text=1
+      LiteralExpression 6:11 kind=IntegerLiteral text=2
+    Pipeline 6:14
+      EachStep 6:14 strict=false
+        EachTarget 6:18 name=actif
+        Rail 6:24
+          CallStep 6:28 gear=journal
+          DoneStep 6:39
+      EachStep 6:45 strict=true
+        EachTarget 6:50 name=verifier
+        Rail 6:59
+          CallStep 6:63 gear=rapport
+          ExitCodeStep 6:74
+            LiteralExpression 6:76 kind=IntegerLiteral text=2
+      CallStep 6:82 gear=fin

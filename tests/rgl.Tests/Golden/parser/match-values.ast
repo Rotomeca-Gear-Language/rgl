@@ -1,0 +1,21 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=taille pure=false parameters=1
+    Parameter 1:13 name=n
+      PrimitiveType 1:13 type=int
+    PrimitiveType 1:21 type=string
+    MatchExpression 1:31
+      NameExpression 1:38 name=n
+      MatchArm 1:43 kind=Case
+        LiteralExpression 1:48 kind=IntegerLiteral text=1
+        LiteralExpression 1:51 kind=IntegerLiteral text=2
+        LiteralExpression 1:56 kind=StringLiteral text="petit"
+      MatchArm 1:65 kind=Eval
+        BinaryExpression 1:75 op=>
+          DollarExpression 1:75
+          LiteralExpression 1:79 kind=IntegerLiteral text=10
+        LiteralExpression 1:85 kind=StringLiteral text="grand"
+      MatchArm 1:94 kind=Default
+        LiteralExpression 1:105 kind=StringLiteral text="moyen"
+  TrainDeclaration 3:1 unguarded=true parameters=none
+    Pipeline 3:8
+      DoneStep 3:11

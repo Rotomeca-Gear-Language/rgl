@@ -1,0 +1,884 @@
+forge: extend
+description: "Opérations sur les piles, files, ensembles et files de priorité"
+
+namespace std/structures;
+
+use <Structures> only {Stack, Queue, Set, PriorityQueue, Deque, LruCache, Heap};
+
+/// <lang name="fr">
+/// <summary>Opérations sur les piles.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on stacks.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> Stack<T> {
+    /// <lang name="fr">
+    /// <summary>Empile un élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="stack">La pile à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément empilé.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Pushes an element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="stack">The stack to modify (a `mut` variable).</param>
+    /// <param name="value">The pushed element.</param>
+    /// </lang>
+    gear push(this mut Stack<T> stack, T value): void {
+        stack.items.push(value);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Dépile le dernier élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="stack">La pile à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` si la pile est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Pops the last element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="stack">The stack to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` when the stack is empty.</returns>
+    /// </lang>
+    gear pop(this mut Stack<T> stack): T? {
+        if (stack.items.length eq 0) { return null; }
+        const T last: stack.items[-1];
+        stack.items <- stack.items.slice(0, -1);
+        return last;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit l'élément du dessus sans le retirer.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="stack">La pile à lire.</param>
+    /// <returns>L'élément du dessus, `null` si la pile est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads the top element without removing it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="stack">The stack to read.</param>
+    /// <returns>The top element, `null` when the stack is empty.</returns>
+    /// </lang>
+    gear pure peek(this Stack<T> stack): T? => stack.items.last();
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="stack">La pile à mesurer.</param>
+    /// <returns>Le nombre d'éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of elements.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="stack">The stack to measure.</param>
+    /// <returns>The number of elements.</returns>
+    /// </lang>
+    gear pure size(this Stack<T> stack): uint => stack.items.length;
+
+    /// <lang name="fr">
+    /// <summary>Indique si la pile est vide.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="stack">La pile à tester.</param>
+    /// <returns>`true` si la pile est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the stack is empty.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="stack">The stack to test.</param>
+    /// <returns>`true` when the stack is empty.</returns>
+    /// </lang>
+    gear pure isEmpty(this Stack<T> stack): bool => stack.items.length eq 0;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les files.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on queues.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> Queue<T> {
+    /// <lang name="fr">
+    /// <summary>Ajoute un élément à la fin de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément ajouté.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds an element at the end of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to modify (a `mut` variable).</param>
+    /// <param name="value">The added element.</param>
+    /// </lang>
+    gear enqueue(this mut Queue<T> queue, T value): void {
+        queue.items.push(value);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire le premier élément de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the first element of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear dequeue(this mut Queue<T> queue): T? {
+        if (queue.head >= queue.items.length) { return null; }
+        const T first: queue.items[queue.head];
+        queue.head <- queue.head + 1;
+        if (queue.head * 2 >= queue.items.length) {
+            queue.items <- queue.items.slice(queue.head as long, queue.items.length as long);
+            queue.head <- 0;
+        }
+        return first;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit le premier élément sans le retirer.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à lire.</param>
+    /// <returns>Le premier élément, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads the first element without removing it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to read.</param>
+    /// <returns>The first element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear pure peek(this Queue<T> queue): T? => queue.head < queue.items.length ? queue.items[queue.head] : null;
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments en attente.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à mesurer.</param>
+    /// <returns>Le nombre d'éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of waiting elements.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to measure.</param>
+    /// <returns>The number of elements.</returns>
+    /// </lang>
+    gear pure size(this Queue<T> queue): uint => queue.items.length - queue.head;
+
+    /// <lang name="fr">
+    /// <summary>Indique si la file est vide.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à tester.</param>
+    /// <returns>`true` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the queue is empty.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to test.</param>
+    /// <returns>`true` when the queue is empty.</returns>
+    /// </lang>
+    gear pure isEmpty(this Queue<T> queue): bool => queue.head >= queue.items.length;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les ensembles.</summary>
+/// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on sets.</summary>
+/// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+/// </lang>
+extend<K> Set<K> {
+    /// <lang name="fr">
+    /// <summary>Ajoute un élément s'il n'y est pas déjà.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">L'ensemble à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément ajouté.</param>
+    /// <returns>`true` si l'élément était absent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds an element if it is not already there.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The set to modify (a `mut` variable).</param>
+    /// <param name="value">The added element.</param>
+    /// <returns>`true` when the element was absent.</returns>
+    /// </lang>
+    gear add(this mut Set<K> set, K value): bool {
+        if (set.items.has(value)) { return false; }
+        set.items.add(value, true);
+        return true;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire un élément.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">L'ensemble à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément retiré.</param>
+    /// <returns>`true` si l'élément était présent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes an element.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The set to modify (a `mut` variable).</param>
+    /// <param name="value">The removed element.</param>
+    /// <returns>`true` when the element was present.</returns>
+    /// </lang>
+    gear remove(this mut Set<K> set, K value): bool {
+        const bool found: set.items.has(value);
+        set.items <- set.items.without(value);
+        return found;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Indique si l'élément est dans l'ensemble.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">L'ensemble à lire.</param>
+    /// <param name="value">L'élément cherché.</param>
+    /// <returns>`true` si l'élément est présent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the element is in the set.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The set to read.</param>
+    /// <param name="value">The searched element.</param>
+    /// <returns>`true` when the element is present.</returns>
+    /// </lang>
+    gear pure has(this Set<K> set, K value): bool => set.items.has(value);
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">L'ensemble à mesurer.</param>
+    /// <returns>Le nombre d'éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of elements.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The set to measure.</param>
+    /// <returns>The number of elements.</returns>
+    /// </lang>
+    gear pure size(this Set<K> set): uint => set.items.length;
+
+    /// <lang name="fr">
+    /// <summary>Les éléments, dans l'ordre de leurs clés.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">L'ensemble à lire.</param>
+    /// <returns>Un tableau des éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements, in key order.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The set to read.</param>
+    /// <returns>An array of the elements.</returns>
+    /// </lang>
+    gear pure values(this Set<K> set): [K] => set.items.keys();
+
+    /// <lang name="fr">
+    /// <summary>Les éléments de l'un ou de l'autre.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">Le premier ensemble.</param>
+    /// <param name="other">Le second ensemble.</param>
+    /// <returns>Un nouvel ensemble.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements of either set.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The first set.</param>
+    /// <param name="other">The second set.</param>
+    /// <returns>A new set.</returns>
+    /// </lang>
+    gear pure union(this Set<K> set, Set<K> other): Set<K> =>
+        {items: other.items.keys() |+> set.items with (acc, value) => acc.put(value, true)};
+
+    /// <lang name="fr">
+    /// <summary>Les éléments présents dans les deux ensembles.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">Le premier ensemble.</param>
+    /// <param name="other">Le second ensemble.</param>
+    /// <returns>Un nouvel ensemble.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements present in both sets.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The first set.</param>
+    /// <param name="other">The second set.</param>
+    /// <returns>A new set.</returns>
+    /// </lang>
+    gear pure intersection(this Set<K> set, Set<K> other): Set<K> {
+        [K:bool] none: [:];
+        return {items: set.items.keys() |+> none with (acc, value) => other.items.has(value) ? acc.put(value, true) : acc};
+    }
+
+    /// <lang name="fr">
+    /// <summary>Les éléments de ce premier ensemble qui ne sont pas dans l'autre.</summary>
+    /// <typeparam name="K">Type des éléments (un type permis comme clé de dictionnaire).</typeparam>
+    /// <param name="set">Le premier ensemble.</param>
+    /// <param name="other">Le second ensemble.</param>
+    /// <returns>Un nouvel ensemble.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements of the first set that are not in the other.</summary>
+    /// <typeparam name="K">The element type (a type allowed as a dictionary key).</typeparam>
+    /// <param name="set">The first set.</param>
+    /// <param name="other">The second set.</param>
+    /// <returns>A new set.</returns>
+    /// </lang>
+    gear pure difference(this Set<K> set, Set<K> other): Set<K> {
+        [K:bool] none: [:];
+        return {items: set.items.keys() |+> none with (acc, value) => other.items.has(value) ? acc : acc.put(value, true)};
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les files de priorité.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on priority queues.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> PriorityQueue<T> {
+    /// <lang name="fr">
+    /// <summary>Ajoute un élément à sa place dans l'ordre de la file (après les éléments égaux déjà présents).</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément ajouté.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds an element at its place in the queue order (after the equal elements already present).</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to modify (a `mut` variable).</param>
+    /// <param name="value">The added element.</param>
+    /// </lang>
+    gear push(this mut PriorityQueue<T> queue, T value): void {
+        const long end: queue.items.length as long;
+        const long place: queue.items |+> end with (found, x, i) =>
+            (found eq end and queue.compare(value, x) < 0) ? (i as long) : found;
+        queue.items <- [...queue.items.slice(0, place), value, ...queue.items.slice(place, end)];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire le plus petit élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the smallest element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear pop(this mut PriorityQueue<T> queue): T? {
+        if (queue.items.length eq 0) { return null; }
+        const T first: queue.items[0];
+        queue.items <- queue.items.slice(1, queue.items.length as long);
+        return first;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit le plus petit élément sans le retirer.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à lire.</param>
+    /// <returns>Le plus petit élément, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads the smallest element without removing it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to read.</param>
+    /// <returns>The smallest element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear pure peek(this PriorityQueue<T> queue): T? => queue.items.first();
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à mesurer.</param>
+    /// <returns>Le nombre d'éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of elements.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to measure.</param>
+    /// <returns>The number of elements.</returns>
+    /// </lang>
+    gear pure size(this PriorityQueue<T> queue): uint => queue.items.length;
+
+    /// <lang name="fr">
+    /// <summary>Indique si la file est vide.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="queue">La file à tester.</param>
+    /// <returns>`true` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the queue is empty.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="queue">The queue to test.</param>
+    /// <returns>`true` when the queue is empty.</returns>
+    /// </lang>
+    gear pure isEmpty(this PriorityQueue<T> queue): bool => queue.items.length eq 0;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les files à deux bouts.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on double-ended queues.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> Deque<T> {
+    /// <lang name="fr">
+    /// <summary>Ajoute un élément au début de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément ajouté.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds an element at the start of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to modify (a `mut` variable).</param>
+    /// <param name="value">The added element.</param>
+    /// </lang>
+    gear pushFront(this mut Deque<T> deque, T value): void {
+        if (deque.frontSize < deque.front.length) { deque.front[deque.frontSize] <- value; }
+        else { deque.front.push(value); }
+        deque.frontSize <- deque.frontSize + 1;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Ajoute un élément à la fin de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément ajouté.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds an element at the end of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to modify (a `mut` variable).</param>
+    /// <param name="value">The added element.</param>
+    /// </lang>
+    gear pushBack(this mut Deque<T> deque, T value): void {
+        if (deque.backSize < deque.back.length) { deque.back[deque.backSize] <- value; }
+        else { deque.back.push(value); }
+        deque.backSize <- deque.backSize + 1;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire le premier élément de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the first element of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear popFront(this mut Deque<T> deque): T? {
+        if (deque.frontSize eq 0) {
+            const long n: deque.backSize as long;
+            if (n eq 0) { return null; }
+            const long take: (n + 1) / 2;
+            deque.front <- deque.back.slice(0, take).reversed();
+            deque.frontSize <- take as uint;
+            deque.back <- deque.back.slice(take, n);
+            deque.backSize <- (n - take) as uint;
+        }
+        deque.frontSize <- deque.frontSize - 1;
+        return deque.front[deque.frontSize];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire le dernier élément de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the last element of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear popBack(this mut Deque<T> deque): T? {
+        if (deque.backSize eq 0) {
+            const long n: deque.frontSize as long;
+            if (n eq 0) { return null; }
+            const long keep: n / 2;
+            deque.back <- deque.front.slice(0, n - keep).reversed();
+            deque.backSize <- (n - keep) as uint;
+            deque.front <- deque.front.slice(n - keep, n);
+            deque.frontSize <- keep as uint;
+        }
+        deque.backSize <- deque.backSize - 1;
+        return deque.back[deque.backSize];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit le premier élément sans le retirer.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à lire.</param>
+    /// <returns>Le premier élément, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads the first element without removing it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to read.</param>
+    /// <returns>The first element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear pure peekFront(this Deque<T> deque): T? => deque.frontSize > 0 ? deque.front[deque.frontSize - 1] : (deque.backSize > 0 ? deque.back[0] : null);
+
+    /// <lang name="fr">
+    /// <summary>Lit le dernier élément sans le retirer.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à lire.</param>
+    /// <returns>Le dernier élément, `null` si la file est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads the last element without removing it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to read.</param>
+    /// <returns>The last element, `null` when the queue is empty.</returns>
+    /// </lang>
+    gear pure peekBack(this Deque<T> deque): T? => deque.backSize > 0 ? deque.back[deque.backSize - 1] : (deque.frontSize > 0 ? deque.front[0] : null);
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments de la file.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à mesurer.</param>
+    /// <returns>Le nombre d'éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of elements of the queue.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to measure.</param>
+    /// <returns>The number of elements.</returns>
+    /// </lang>
+    gear pure size(this Deque<T> deque): uint => deque.frontSize + deque.backSize;
+
+    /// <lang name="fr">
+    /// <summary>Dit si la file est vide.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à tester.</param>
+    /// <returns>Vrai si elle n'a aucun élément.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Tells whether the queue is empty.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to test.</param>
+    /// <returns>True when it has no elements.</returns>
+    /// </lang>
+    gear pure isEmpty(this Deque<T> deque): bool => deque.frontSize + deque.backSize eq 0;
+
+    /// <lang name="fr">
+    /// <summary>Les éléments, du premier au dernier.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="deque">La file à lire.</param>
+    /// <returns>Un tableau des éléments dans l'ordre de la file.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The elements, from the first to the last.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="deque">The queue to read.</param>
+    /// <returns>An array of the elements in queue order.</returns>
+    /// </lang>
+    gear pure toArray(this Deque<T> deque): [T] => [...deque.front.slice(0, deque.frontSize as long).reversed(), ...deque.back.slice(0, deque.backSize as long)];
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les caches à éviction du moins récemment utilisé.</summary>
+/// <typeparam name="K">Type des clés.</typeparam>
+/// <typeparam name="V">Type des valeurs.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on least-recently-used caches.</summary>
+/// <typeparam name="K">The key type.</typeparam>
+/// <typeparam name="V">The value type.</typeparam>
+/// </lang>
+extend<K, V> LruCache<K, V> {
+    /// <lang name="fr">
+    /// <summary>Range une valeur : la clé devient la plus récente. Si le cache est plein et que la clé est nouvelle, l'entrée la moins récente est retirée.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à modifier (variable `mut`).</param>
+    /// <param name="key">La clé.</param>
+    /// <param name="value">La valeur.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Stores a value: the key becomes the most recent. If the cache is full and the key is new, the least recent entry is removed.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to modify (a `mut` variable).</param>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The value.</param>
+    /// </lang>
+    gear put(this mut LruCache<K, V> cache, K key, V value): void {
+        cache.order <- [...cache.order.filter((K other) => other not eq key), key];
+        cache.entries <- cache.entries.put(key, value);
+        if (cache.order.length > cache.capacity) {
+            const K oldest: cache.order[0];
+            cache.entries <- cache.entries.without(oldest);
+            cache.order <- cache.order.slice(1, cache.order.length as long);
+        }
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit une valeur et rend sa clé la plus récente.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à modifier (variable `mut`).</param>
+    /// <param name="key">La clé.</param>
+    /// <returns>La valeur, `null` si la clé n'y est pas.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads a value and makes its key the most recent.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to modify (a `mut` variable).</param>
+    /// <param name="key">The key.</param>
+    /// <returns>The value, `null` when the key is not there.</returns>
+    /// </lang>
+    gear get(this mut LruCache<K, V> cache, K key): V? {
+        if (not cache.entries.has(key)) { return null; }
+        cache.order <- [...cache.order.filter((K other) => other not eq key), key];
+        return cache.entries[key];
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit une valeur sans changer l'ordre de récence.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à lire.</param>
+    /// <param name="key">La clé.</param>
+    /// <returns>La valeur, `null` si la clé n'y est pas.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads a value without changing the recency order.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to read.</param>
+    /// <param name="key">The key.</param>
+    /// <returns>The value, `null` when the key is not there.</returns>
+    /// </lang>
+    gear pure peek(this LruCache<K, V> cache, K key): V? => cache.entries.has(key) ? cache.entries[key] : null;
+
+    /// <lang name="fr">
+    /// <summary>Dit si une clé est dans le cache, sans changer l'ordre de récence.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à lire.</param>
+    /// <param name="key">La clé.</param>
+    /// <returns>Vrai si la clé y est.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Tells whether a key is in the cache, without changing the recency order.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to read.</param>
+    /// <param name="key">The key.</param>
+    /// <returns>True when the key is there.</returns>
+    /// </lang>
+    gear pure has(this LruCache<K, V> cache, K key): bool => cache.entries.has(key);
+
+    /// <lang name="fr">
+    /// <summary>Retire une entrée.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à modifier (variable `mut`).</param>
+    /// <param name="key">La clé.</param>
+    /// <returns>Vrai si la clé y était.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes an entry.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to modify (a `mut` variable).</param>
+    /// <param name="key">The key.</param>
+    /// <returns>True when the key was there.</returns>
+    /// </lang>
+    gear remove(this mut LruCache<K, V> cache, K key): bool {
+        if (not cache.entries.has(key)) { return false; }
+        cache.entries <- cache.entries.without(key);
+        cache.order <- cache.order.filter((K other) => other not eq key);
+        return true;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'entrées.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à mesurer.</param>
+    /// <returns>Le nombre d'entrées.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of entries.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to measure.</param>
+    /// <returns>The number of entries.</returns>
+    /// </lang>
+    gear pure size(this LruCache<K, V> cache): uint => cache.order.length;
+
+    /// <lang name="fr">
+    /// <summary>Les clés, de la moins récente à la plus récente.</summary>
+    /// <typeparam name="K">Type des clés.</typeparam>
+    /// <typeparam name="V">Type des valeurs.</typeparam>
+    /// <param name="cache">Le cache à lire.</param>
+    /// <returns>Les clés dans l'ordre de récence.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The keys, from the least recent to the most recent.</summary>
+    /// <typeparam name="K">The key type.</typeparam>
+    /// <typeparam name="V">The value type.</typeparam>
+    /// <param name="cache">The cache to read.</param>
+    /// <returns>The keys in recency order.</returns>
+    /// </lang>
+    gear pure keys(this LruCache<K, V> cache): [K] => cache.order;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les tas binaires.</summary>
+/// <typeparam name="T">Type des éléments.</typeparam>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on binary heaps.</summary>
+/// <typeparam name="T">The element type.</typeparam>
+/// </lang>
+extend<T> Heap<T> {
+    /// <lang name="fr">
+    /// <summary>Remonte un élément à sa place (usage interne).</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à modifier (variable `mut`).</param>
+    /// <param name="index">Le rang de l'élément.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Moves an element up to its place (internal use).</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to modify (a `mut` variable).</param>
+    /// <param name="index">The element's index.</param>
+    /// </lang>
+    gear _siftUp(this mut Heap<T> heap, long index): void {
+        if (index <= 0) { return; }
+        const long parent: (index - 1) / 2;
+        if (heap.compare(heap.items[index], heap.items[parent]) < 0) {
+            const T moved: heap.items[index];
+            heap.items[index] <- heap.items[parent];
+            heap.items[parent] <- moved;
+            heap._siftUp(parent);
+        }
+    }
+
+    /// <lang name="fr">
+    /// <summary>Descend un élément à sa place (usage interne).</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à modifier (variable `mut`).</param>
+    /// <param name="index">Le rang de l'élément.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Moves an element down to its place (internal use).</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to modify (a `mut` variable).</param>
+    /// <param name="index">The element's index.</param>
+    /// </lang>
+    gear _siftDown(this mut Heap<T> heap, long index): void {
+        const long count: heap.count as long;
+        const long left: 2 * index + 1;
+        const long right: left + 1;
+        long smallest: index;
+        if (left < count and heap.compare(heap.items[left], heap.items[smallest]) < 0) { smallest <- left; }
+        if (right < count and heap.compare(heap.items[right], heap.items[smallest]) < 0) { smallest <- right; }
+        if (smallest not eq index) {
+            const T moved: heap.items[index];
+            heap.items[index] <- heap.items[smallest];
+            heap.items[smallest] <- moved;
+            heap._siftDown(smallest);
+        }
+    }
+
+    /// <lang name="fr">
+    /// <summary>Ajoute un élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à modifier (variable `mut`).</param>
+    /// <param name="value">L'élément ajouté.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds an element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to modify (a `mut` variable).</param>
+    /// <param name="value">The added element.</param>
+    /// </lang>
+    gear push(this mut Heap<T> heap, T value): void {
+        if (heap.count < heap.items.length) { heap.items[heap.count] <- value; }
+        else { heap.items.push(value); }
+        heap.count <- heap.count + 1;
+        heap._siftUp((heap.count as long) - 1);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Retire le plus petit élément.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à modifier (variable `mut`).</param>
+    /// <returns>L'élément retiré, `null` si le tas est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Removes the smallest element.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to modify (a `mut` variable).</param>
+    /// <returns>The removed element, `null` when the heap is empty.</returns>
+    /// </lang>
+    gear pop(this mut Heap<T> heap): T? {
+        if (heap.count eq 0) { return null; }
+        const T smallest: heap.items[0];
+        heap.count <- heap.count - 1;
+        heap.items[0] <- heap.items[heap.count];
+        heap._siftDown(0);
+        return smallest;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Lit le plus petit élément sans le retirer.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à lire.</param>
+    /// <returns>Le plus petit élément, `null` si le tas est vide.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Reads the smallest element without removing it.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to read.</param>
+    /// <returns>The smallest element, `null` when the heap is empty.</returns>
+    /// </lang>
+    gear pure peek(this Heap<T> heap): T? => heap.count > 0 ? heap.items[0] : null;
+
+    /// <lang name="fr">
+    /// <summary>Le nombre d'éléments du tas.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à mesurer.</param>
+    /// <returns>Le nombre d'éléments.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The number of elements of the heap.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to measure.</param>
+    /// <returns>The number of elements.</returns>
+    /// </lang>
+    gear pure size(this Heap<T> heap): uint => heap.count;
+
+    /// <lang name="fr">
+    /// <summary>Dit si le tas est vide.</summary>
+    /// <typeparam name="T">Type des éléments.</typeparam>
+    /// <param name="heap">Le tas à tester.</param>
+    /// <returns>Vrai s'il n'a aucun élément.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Tells whether the heap is empty.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="heap">The heap to test.</param>
+    /// <returns>True when it has no elements.</returns>
+    /// </lang>
+    gear pure isEmpty(this Heap<T> heap): bool => heap.count eq 0;
+}

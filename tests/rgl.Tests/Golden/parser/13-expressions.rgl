@@ -1,0 +1,2 @@
+// Précédence et associativité des opérateurs, dans les arguments et le code de sortie.
+train |> check(a > 0 and b not eq 3, -x * 2) |> $ flags bitand 4 eq 0 ?? 1;

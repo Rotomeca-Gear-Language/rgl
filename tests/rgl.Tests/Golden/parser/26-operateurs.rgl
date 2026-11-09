@@ -1,0 +1,11 @@
+// Ternaire, increment<X>, affectations composées, invert.
+var a: 1;
+var signe: a < 0 ? -1 : a eq 0 ? 0 : 1;
+var b: a > 0 ? a + 1 : a - 1;
+increment a;
+increment<3> a;
+var ancien: post_decrement<2> a;
+a +<- 10;
+a: int *<- 2;
+var masque: invert 0b1010 bitand a;
+train |> done;

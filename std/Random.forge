@@ -1,0 +1,212 @@
+forge: gears
+description: "Nombres pseudo-aléatoires : un générateur de Park-Miller, déterministe pour une graine donnée"
+
+use <Math> only {abs, min as getMin, max as getMax, sqrt, ln, cos, TAU};
+use <Crypto> only {randomBytes};
+import Time only {now};
+
+/// <lang name="fr">
+/// <summary>Le modulo du générateur : l'état reste entre 1 et `MODULUS - 1`.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The generator's modulus: the state remains between 1 and `MODULUS - 1`.</summary>
+/// </lang>
+const long MODULUS: 2147483647;
+
+/// <lang name="fr">
+/// <summary>Le multiplicateur du générateur : son produit avec l'état tient dans un `long`.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The generator's multiplier: its product with the state fits in a `long`.</summary>
+/// </lang>
+const long MULTIPLIER: 16807;
+
+/// <lang name="fr"><summary>Choisit uniformément un élément d'un tableau.</summary><typeparam name="T">Le type des éléments.</typeparam><param name="random">Le générateur mutable, avancé par l'opération.</param><param name="values">Les valeurs proposées.</param><returns>L'élément choisi, ou `null` si le tableau est vide.</returns></lang>
+/// <lang name="en"><summary>Uniformly chooses an element from an array.</summary><typeparam name="T">The element type.</typeparam><param name="random">The mutable generator, advanced by the operation.</param><param name="values">The candidate values.</param><returns>The chosen element, or `null` when the array is empty.</returns></lang>
+gear choice<T>(mut Random random, [T] values): T? =>
+    values.length eq 0 ? null : values[random.nextInt(0, (values.length - 1) as int)];
+
+/// <lang name="fr"><summary>Retourne une copie mélangée uniformément par Fisher-Yates.</summary><typeparam name="T">Le type des éléments.</typeparam><param name="random">Le générateur mutable, avancé par chaque échange.</param><param name="values">Le tableau d'origine, laissé intact.</param><returns>Une nouvelle copie mélangée.</returns></lang>
+/// <lang name="en"><summary>Returns a copy uniformly shuffled with Fisher-Yates.</summary><typeparam name="T">The element type.</typeparam><param name="random">The mutable generator, advanced by every swap.</param><param name="values">The original array, left unchanged.</param><returns>A new shuffled copy.</returns></lang>
+gear shuffled<T>(mut Random random, [T] values): [T] {
+    mut [T] result: [...values];
+    if (result.length < 2) { return result; }
+    [((result.length as long) - 1)..1 by -1] ||> (i) => {
+        const long j: random.nextInt(0, i as int) as long;
+        T value: result[i];
+        result[i] <- result[j];
+        result[j] <- value;
+    };
+    return result;
+}
+
+/// <lang name="fr">
+/// <summary>Un générateur de nombres pseudo-aléatoires (Park-Miller) : la même graine donne toujours la même suite.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A pseudorandom number generator (Park-Miller): the same seed always produces the same sequence.</summary>
+/// </lang>
+mold Random {
+    /// <lang name="fr">
+    /// <summary>L'état courant, entre 1 et `MODULUS - 1`.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The current state, between 1 and `MODULUS - 1`.</summary>
+    /// </lang>
+    long state;
+}
+
+extend Random {
+    /// <lang name="fr"><summary>Helper interne de tirage sans biais modulo.</summary><param name="random">Le générateur avancé.</param><param name="span">Le nombre de résultats possibles, strictement positif.</param><returns>Une valeur uniforme entre zéro inclus et `span` exclu.</returns></lang>
+    /// <lang name="en"><summary>Internal helper for sampling without modulo bias.</summary><param name="random">The advanced generator.</param><param name="span">The strictly positive outcome count.</param><returns>A uniform value from zero inclusive to `span` exclusive.</returns></lang>
+    gear _uniform(this mut Random random, long span): long {
+        const long sourceSize: (MODULUS - 1) * (MODULUS - 1);
+        const long limit: sourceSize - sourceSize % span;
+        const long value: (random.next() - 1) * (MODULUS - 1) + (random.next() - 1);
+        return value < limit ? value : random._uniform(span);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Crée un générateur de graine donnée : la même graine donne toujours la même suite.</summary>
+    /// <param name="value">La graine ; sa valeur absolue est ramenée dans l'intervalle de l'état.</param>
+    /// <returns>Un <see cref="Random"/> prêt à servir.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Creates a generator with the given seed: the same seed always produces the same sequence.</summary>
+    /// <param name="value">The seed; its absolute value is reduced to the state's range.</param>
+    /// <returns>A <see cref="Random"/> ready for use.</returns>
+    /// </lang>
+    gear pure seed(long value): Random => {state: abs(value) % (MODULUS - 1) + 1};
+
+    /// <lang name="fr">
+    /// <summary>Tire le nombre suivant, entre 1 et 2147483646, et fait avancer le générateur.</summary>
+    /// <param name="random">Le générateur, modifié sur place.</param>
+    /// <returns>Le nombre tiré.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws the next number, between 1 and 2147483646, and advances the generator.</summary>
+    /// <param name="random">The generator, modified in place.</param>
+    /// <returns>The drawn number.</returns>
+    /// </lang>
+    gear next(this mut Random random): long {
+        random.state <- random.state * MULTIPLIER % MODULUS;
+        return random.state;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Tire un entier entre deux bornes, incluses toutes les deux.</summary>
+    /// <param name="random">Le générateur, modifié sur place.</param>
+    /// <param name="min">Une borne ; les deux peuvent être données dans n'importe quel ordre.</param>
+    /// <param name="max">L'autre borne.</param>
+    /// <returns>Un entier de la plage.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws an integer between two bounds, both inclusive.</summary>
+    /// <param name="random">The generator, modified in place.</param>
+    /// <param name="min">One bound; the two bounds may be supplied in either order.</param>
+    /// <param name="max">The other bound.</param>
+    /// <returns>An integer in the range.</returns>
+    /// </lang>
+    gear nextInt(this mut Random random, int min, int max): int {
+        const long low: getMin(min, max);
+        const long high: getMax(min, max);
+        const long span: high - low + 1;
+        return (low + random._uniform(span) % span) as int;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Tire un nombre de 0 inclus à 1 exclu.</summary>
+    /// <param name="random">Le générateur, modifié sur place.</param>
+    /// <returns>Un nombre dans [0, 1[.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws a number from 0 inclusive to 1 exclusive.</summary>
+    /// <param name="random">The generator, modified in place.</param>
+    /// <returns>A number in [0, 1).</returns>
+    /// </lang>
+    gear nextDouble(this mut Random random): double => ((random.next() - 1) as double) / ((MODULUS - 1) as double);
+
+    /// <lang name="fr">
+    /// <summary>Tire un booléen.</summary>
+    /// <param name="random">Le générateur, modifié sur place.</param>
+    /// <returns>`true` ou `false`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws a Boolean.</summary>
+    /// <param name="random">The generator, modified in place.</param>
+    /// <returns>`true` or `false`.</returns>
+    /// </lang>
+    gear nextBool(this mut Random random): bool => random.next() % 2 eq 0;
+
+
+    /// <lang name="fr">
+    /// <summary>Tire un entier entre deux bornes sans générateur à tenir : la graine vient de l'appelant ou de l'heure courante.</summary>
+    /// <param name="min">Une borne.</param>
+    /// <param name="max">L'autre borne.</param>
+    /// <param name="baseSeed">La graine ; sans elle, elle est déduite de la date en cours.</param>
+    /// <returns>Un entier de la plage.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws an integer between two bounds without managing a generator: the seed comes from the caller or the current time.</summary>
+    /// <param name="min">One bound.</param>
+    /// <param name="max">The other bound.</param>
+    /// <param name="baseSeed">The seed; when omitted, it is derived from the time.</param>
+    /// <returns>An integer in the range.</returns>
+    /// </lang>
+    gear range(int min, int max, long? baseSeed: null): int {
+        mut Random random: Random.seed(baseSeed ?? (now() as long));
+        return random.nextInt(min, max);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Tire un nombre à virgule entre deux bornes : la première incluse, la seconde exclue.</summary>
+    /// <param name="random">Le générateur, modifié sur place.</param>
+    /// <param name="min">La borne basse, incluse.</param>
+    /// <param name="max">La borne haute, exclue.</param>
+    /// <returns>Un nombre de la plage.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws a floating-point number between two bounds: the first inclusive, the second exclusive.</summary>
+    /// <param name="random">The generator, modified in place.</param>
+    /// <param name="min">The inclusive lower bound.</param>
+    /// <param name="max">The exclusive upper bound.</param>
+    /// <returns>A number in the range.</returns>
+    /// </lang>
+    gear nextDouble(this mut Random random, double min, double max): double => min + random.nextDouble() * (max - min);
+
+    /// <lang name="fr">
+    /// <summary>Tire un nombre suivant une loi normale (gaussienne), par la méthode de Box-Muller.</summary>
+    /// <param name="random">Le générateur, modifié sur place.</param>
+    /// <param name="mean">La moyenne de la loi (0 par défaut).</param>
+    /// <param name="deviation">L'écart-type de la loi (1 par défaut).</param>
+    /// <returns>Un nombre dont la distribution est gaussienne.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Draws a number following a normal (Gaussian) distribution, using the Box-Muller method.</summary>
+    /// <param name="random">The generator, modified in place.</param>
+    /// <param name="mean">The mean of the distribution (0 by default).</param>
+    /// <param name="deviation">The standard deviation of the distribution (1 by default).</param>
+    /// <returns>A number with a Gaussian distribution.</returns>
+    /// </lang>
+    gear nextGaussian(this mut Random random, double mean: 0.0, double deviation: 1.0): double {
+        const double u1: 1.0 - random.nextDouble();
+        const double u2: random.nextDouble();
+        const double radius: sqrt(-2.0 * (ln(u1) ?? 0.0)) ?? 0.0;
+        return mean + deviation * radius * cos(TAU * u2);
+    }
+
+    /// <lang name="fr">
+    /// <summary>Crée un générateur dont la graine vient du générateur du système : deux appels donnent deux suites différentes, imprévisibles pour un tiers (pas pour une clé de chiffrement : la suite elle-même reste celle de Park-Miller).</summary>
+    /// <returns>Un <see cref="Random"/> prêt à servir.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Creates a generator whose seed comes from the system generator: two calls give two different sequences, unpredictable to a third party (not for an encryption key: the sequence itself remains Park-Miller).</summary>
+    /// <returns>A <see cref="Random"/> ready for use.</returns>
+    /// </lang>
+    gear fromEntropy(): Random {
+        const bytes entropy: randomBytes(6);
+        const long none: 0;
+        const long value: entropy |+> none with (acc, x) => acc * 256 + (x as long);
+        return Random.seed(value);
+    }
+}

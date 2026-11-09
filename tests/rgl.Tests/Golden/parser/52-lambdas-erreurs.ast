@@ -1,0 +1,27 @@
+CompilationUnit 1:1
+  GearDeclaration 1:1 kind=gear name=a pure=false parameters=1
+    Parameter 1:8 name=f
+      FunctionType 1:8 pure=true
+        PrimitiveType 1:14 type=int
+        MissingType 1:19
+    PrimitiveType 1:23 type=void
+    BlockStatement 1:28
+  GearDeclaration 3:1 kind=gear name=b pure=false parameters=0
+    PrimitiveType 3:11 type=void
+    BlockStatement 3:16
+      VarDeclaration 4:5 keyword=var name=g
+        LambdaExpression 4:12 parameters=0
+          MissingExpression 4:18
+      VarDeclaration 5:5 keyword=var name=h
+        LambdaExpression 5:12 parameters=1
+          LambdaParameter 5:13 name=x
+            PrimitiveType 5:13 type=int
+          MoldExpression 5:23
+            MoldFieldValue 5:24 name=x
+              LiteralExpression 5:27 kind=IntegerLiteral text=1
+      VarDeclaration 6:5 keyword=var name=k
+        ParenthesizedExpression 6:12
+          MissingExpression 6:13
+  TrainDeclaration 8:1 unguarded=false parameters=none
+    Pipeline 8:7
+      DoneStep 8:10

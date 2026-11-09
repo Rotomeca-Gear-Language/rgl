@@ -1,0 +1,10 @@
+CompilationUnit 1:1
+  MoldDeclaration 1:1 name=Handle destructor=fermer
+    MoldField 2:5 name=id
+      PrimitiveType 2:5 type=int
+  MoldDeclaration 5:1 name=Session destructor=Outils.cloturer
+    MoldField 6:5 name=canal
+      NamedType 6:5 name=Handle
+  TrainDeclaration 9:1 unguarded=true parameters=none
+    Pipeline 9:8
+      DoneStep 9:11

@@ -1,0 +1,11 @@
+// Types d'erreur et rails entre crochets, collés à leur guard, imbriqués.
+error Introuvable { string chemin; }
+
+guard charger(string chemin): string {
+    fail new Introuvable {chemin};
+}
+
+train "a.txt"
+    |> charger !> [reparer !> [rapport |> $ 3] |> $ 2]
+    |> sauver
+    |> done;

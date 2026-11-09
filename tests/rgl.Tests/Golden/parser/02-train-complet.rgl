@@ -1,0 +1,8 @@
+// Train d'entrée complet : paramètres, valeur de départ, gears avec arguments,
+// code de sortie et rails d'erreur.
+
+!train([string] args) args
+    |> parseArgs !> [printUsage |> $ 2]
+    |> add(1, f(x))   // appel avec arguments
+    !> [fail "oups"]  /* rail de add */
+    |> $ 0;

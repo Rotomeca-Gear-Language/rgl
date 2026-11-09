@@ -1,0 +1,42 @@
+forge: gears
+description: "Construction fonctionnelle d'un serveur web"
+
+use <Http> only {HttpServer};
+
+/// <lang name="fr"><summary>Crée un serveur web vide pour commencer un pipeline de configuration.</summary><returns>Le serveur sans route.</returns></lang>
+/// <lang name="en"><summary>Creates an empty web server to start a configuration pipeline.</summary><returns>The server with no routes.</returns></lang>
+export gear pure createServer(): HttpServer => HttpServer.create();
+
+/// <lang name="fr"><summary>Ajoute le dossier `static` de l'exécutable comme fallback, puis transmet le serveur.</summary><param name="server">Serveur reçu du pipeline.</param><returns>Le serveur configuré.</returns></lang>
+/// <lang name="en"><summary>Adds the executable's `static` directory as a fallback, then forwards the server.</summary><param name="server">Server received from the pipeline.</param><returns>The configured server.</returns></lang>
+export gear staticFiles(HttpServer server): HttpServer {
+    mut HttpServer configured: server;
+    configured.staticFiles();
+    return configured;
+}
+
+/// <lang name="fr"><summary>Ajoute le dossier choisi comme fallback, puis transmet le serveur.</summary><param name="server">Serveur reçu du pipeline.</param><param name="root">Dossier à servir.</param><returns>Le serveur configuré.</returns></lang>
+/// <lang name="en"><summary>Adds the selected directory as a fallback, then forwards the server.</summary><param name="server">Server received from the pipeline.</param><param name="root">Directory to serve.</param><returns>The configured server.</returns></lang>
+export gear staticFilesFrom(HttpServer server, string root): HttpServer {
+    mut HttpServer configured: server;
+    configured.staticFiles(root);
+    return configured;
+}
+
+/// <lang name="fr"><summary>Écoute avec la configuration par défaut et termine le pipeline.</summary><param name="server">Serveur configuré.</param></lang>
+/// <lang name="en"><summary>Listens with the default configuration and terminates the pipeline.</summary><param name="server">Configured server.</param></lang>
+export guard listen(HttpServer server): void {
+    server.listen('127.0.0.1', 8080, 0, 0);
+}
+
+/// <lang name="fr"><summary>Écoute sur le port donné et termine le pipeline.</summary><param name="server">Serveur configuré.</param><param name="port">Port TCP local.</param></lang>
+/// <lang name="en"><summary>Listens on the selected port and terminates the pipeline.</summary><param name="server">Configured server.</param><param name="port">Local TCP port.</param></lang>
+export guard listenOn(HttpServer server, ushort port): void {
+    server.listen('127.0.0.1', port, 0, 0);
+}
+
+/// <lang name="fr"><summary>Écoute avec tous les paramètres du transport et termine le pipeline.</summary><param name="server">Serveur configuré.</param><param name="address">Adresse locale, IPv4 ou IPv6 (`::` écoute les deux).</param><param name="port">Port TCP.</param><param name="maxRequests">Limite de requêtes, zéro pour aucune.</param><param name="workers">Nombre de workers, zéro pour automatique.</param></lang>
+/// <lang name="en"><summary>Listens with every transport setting and terminates the pipeline.</summary><param name="server">Configured server.</param><param name="address">Local address, IPv4 or IPv6 (`::` listens on both).</param><param name="port">TCP port.</param><param name="maxRequests">Request limit, zero for none.</param><param name="workers">Worker count, zero for automatic.</param></lang>
+export guard listenWith(HttpServer server, string address, ushort port, uint maxRequests, uint workers): void {
+    server.listen(address, port, maxRequests, workers);
+}

@@ -1,0 +1,8 @@
+CompilationUnit 1:1
+  TrainDeclaration 2:1 unguarded=false parameters=2
+    Parameter 2:7 name=<manquant>
+      MissingType 2:7
+    Parameter 2:9 name=<manquant>
+      NamedType 2:9 name=x
+    Pipeline 2:12
+      DoneStep 2:15

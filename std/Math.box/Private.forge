@@ -1,0 +1,21 @@
+forge: gears
+description: "Fonctions internes de Math, qui n'importe pas ce fichier à l'envers : il n'a besoin de rien d'elle"
+
+import Constants only {TAU as FULL_TURN};
+
+/// <lang name="fr">
+/// <summary>Ramène un angle entre 0 et un tour (TAU) pour que les séries convergent ; l'arrondi vers le bas est refait ici pour ne pas dépendre de Math.</summary>
+/// <param name="x">L'angle en radians.</param>
+/// <returns>L'angle équivalent dans l'intervalle de 0 à un tour.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reduces an angle to between 0 and one turn (TAU) so that the series converge; the floor operation is repeated here to avoid depending on Math.</summary>
+/// <param name="x">The angle in radians.</param>
+/// <returns>The equivalent angle in the interval from 0 to one turn.</returns>
+/// </lang>
+gear pure _turn(double x): double {
+    const double turns: x / FULL_TURN;
+    const long whole: turns as long;
+    const long below: (whole as double) > turns ? whole - 1 : whole;
+    return x - (below as double) * FULL_TURN;
+}

@@ -1,0 +1,283 @@
+forge: gears
+description: "Client WebSocket (ws://) : se connecter, envoyer et recevoir des messages texte ou binaires, répondre aux pings, fermer"
+
+use <Net> only {tcpConnect, socketSend, socketReceive, socketClose};
+use <Tls> only {tlsConnect, tlsSend, tlsReceive, tlsClose};
+use <Crypto> only {randomBytes, sha1};
+use <Text> only {base64Encode, hexDecode};
+use <Data> only {_beBytes, _readBe};
+use <Time> only {now};
+
+/// <lang name="fr"><summary>Une connexion WebSocket ouverte, du côté client. À passer à `webSocketSend` et `webSocketReceive` par une variable `mut` : elle garde les octets reçus qui ne forment pas encore un message entier.</summary></lang>
+/// <lang name="en"><summary>An open WebSocket connection, on the client side. Pass it to `webSocketSend` and `webSocketReceive` through a `mut` variable: it keeps the received bytes that do not yet form a whole message.</summary></lang>
+mold WebSocketClient {
+    /// <lang name="fr"><summary>La prise TCP ; pour une connexion `wss://`, l'opposé de l'identifiant de la connexion TLS (usage interne : n'y touche pas).</summary></lang>
+    /// <lang name="en"><summary>The TCP socket; for a `wss://` connection, the opposite of the TLS connection identifier (internal use: do not touch it).</summary></lang>
+    long socket;
+    /// <lang name="fr"><summary>Les octets reçus pas encore lus comme message.</summary></lang>
+    /// <lang name="en"><summary>The received bytes not yet read as a message.</summary></lang>
+    bytes buffer;
+}
+
+/// <lang name="fr"><summary>Ce que `webSocketReceive` a reçu.</summary></lang>
+/// <lang name="en"><summary>What `webSocketReceive` received.</summary></lang>
+mold ClientMessage {
+    /// <lang name="fr"><summary>La sorte : `text`, `binary`, `close` (le serveur ferme la connexion) ou `timeout` (rien n'est arrivé à temps, ou la connexion est coupée).</summary></lang>
+    /// <lang name="en"><summary>The kind: `text`, `binary`, `close` (the server closes the connection) or `timeout` (nothing arrived in time, or the connection is cut).</summary></lang>
+    string kind;
+    /// <lang name="fr"><summary>Le texte d'un message `text` ; la raison d'une fermeture.</summary></lang>
+    /// <lang name="en"><summary>The text of a `text` message; the reason of a closure.</summary></lang>
+    string text;
+    /// <lang name="fr"><summary>Les octets d'un message `binary`.</summary></lang>
+    /// <lang name="en"><summary>The bytes of a `binary` message.</summary></lang>
+    bytes data;
+    /// <lang name="fr"><summary>Le code d'une fermeture (1000 : normale), 0 sinon.</summary></lang>
+    /// <lang name="en"><summary>The code of a closure (1000: normal), 0 otherwise.</summary></lang>
+    uint code;
+}
+
+/// <lang name="fr"><summary>Une trame lue dans les octets reçus (usage interne).</summary></lang>
+/// <lang name="en"><summary>A frame read from the received bytes (internal use).</summary></lang>
+mold _Frame {
+    /// <lang name="fr"><summary>Vrai si la trame est entière dans les octets reçus.</summary></lang>
+    /// <lang name="en"><summary>True when the frame is whole in the received bytes.</summary></lang>
+    bool complete;
+    /// <lang name="fr"><summary>Vrai pour la dernière trame d'un message.</summary></lang>
+    /// <lang name="en"><summary>True for the last frame of a message.</summary></lang>
+    bool fin;
+    /// <lang name="fr"><summary>Le code opération : 0 suite, 1 texte, 2 binaire, 8 fermeture, 9 ping, 10 pong ; 255 pour une trame refusée.</summary></lang>
+    /// <lang name="en"><summary>The opcode: 0 continuation, 1 text, 2 binary, 8 close, 9 ping, 10 pong; 255 for a refused frame.</summary></lang>
+    long opcode;
+    /// <lang name="fr"><summary>Le contenu, démasqué.</summary></lang>
+    /// <lang name="en"><summary>The content, unmasked.</summary></lang>
+    bytes payload;
+    /// <lang name="fr"><summary>Le nombre d'octets que la trame occupe.</summary></lang>
+    /// <lang name="en"><summary>The number of bytes the frame takes.</summary></lang>
+    long size;
+}
+
+/// <lang name="fr"><summary>La taille maximale d'un message accepté (usage interne).</summary></lang>
+/// <lang name="en"><summary>The maximal size of an accepted message (internal use).</summary></lang>
+const long _maxFrame: 16777216;
+
+/// <lang name="fr"><summary>Lit une trame au début des octets reçus (usage interne).</summary><param name="data">Les octets reçus.</param><returns>La trame, incomplète si les octets ne suffisent pas encore.</returns></lang>
+/// <lang name="en"><summary>Reads a frame at the start of the received bytes (internal use).</summary><param name="data">The received bytes.</param><returns>The frame, incomplete when the bytes are not enough yet.</returns></lang>
+gear pure _parseFrame(bytes data): _Frame {
+    const bytes none: '' as bytes;
+    const _Frame incomplete: {complete: false, fin: false, opcode: 0, payload: none, size: 0};
+    const long total: data.length as long;
+    if (total < 2) { return incomplete; }
+    const long first: data[0] as long;
+    const long second: data[1] as long;
+    const long lengthCode: second bitand 127;
+    const long headerSize: lengthCode eq 126 ? 4 : (lengthCode eq 127 ? 10 : 2);
+    if (total < headerSize) { return incomplete; }
+    const ulong declared: lengthCode eq 126 ? _readBe(data, 2, 2) : (lengthCode eq 127 ? _readBe(data, 2, 8) : (lengthCode as ulong));
+    if (declared > (_maxFrame as ulong)) { return {complete: true, fin: true, opcode: 255, payload: none, size: total}; }
+    const long length: declared as long;
+    const bool masked: (second bitand 128) not eq 0;
+    const long maskSize: masked ? 4 : 0;
+    const long size: headerSize + maskSize + length;
+    if (total < size) { return incomplete; }
+    const bytes raw: data.slice(headerSize + maskSize, size);
+    const bytes key: masked ? data.slice(headerSize, headerSize + 4) : none;
+    const bytes payload: masked ? (raw ||> (value, i) => ((value as int) bitxor (key[i % 4] as int)) as ubyte) : raw;
+    return {complete: true, fin: (first bitand 128) not eq 0, opcode: first bitand 15, payload, size};
+}
+
+/// <lang name="fr"><summary>Écrit une trame de client : masquée, avec un masque tiré au hasard (usage interne).</summary><param name="opcode">Le code opération.</param><param name="payload">Le contenu.</param><returns>Les octets de la trame.</returns></lang>
+/// <lang name="en"><summary>Writes a client frame: masked, with a randomly drawn mask (internal use).</summary><param name="opcode">The opcode.</param><param name="payload">The content.</param><returns>The bytes of the frame.</returns></lang>
+gear _frameBytes(long opcode, bytes payload): bytes {
+    const long length: payload.length as long;
+    const bytes mask: randomBytes(4);
+    const bytes lengthBytes: length < 126 ? [(128 + length) as ubyte] : (length < 65536 ? [254 as ubyte, ..._beBytes(length as ulong, 2)] : [255 as ubyte, ..._beBytes(length as ulong, 8)]);
+    const bytes masked: payload ||> (value, i) => ((value as int) bitxor (mask[i % 4] as int)) as ubyte;
+    return [(128 + opcode) as ubyte, ...lengthBytes, ...mask, ...masked];
+}
+
+/// <lang name="fr"><summary>Envoie une trame (usage interne).</summary><param name="socket">La prise.</param><param name="opcode">Le code opération.</param><param name="payload">Le contenu.</param><returns>Vrai si tout est envoyé.</returns></lang>
+/// <lang name="en"><summary>Sends a frame (internal use).</summary><param name="socket">The socket.</param><param name="opcode">The opcode.</param><param name="payload">The content.</param><returns>True when everything is sent.</returns></lang>
+gear _sendFrame(long socket, long opcode, bytes payload): bool => _wsSend(socket, _frameBytes(opcode, payload));
+
+/// <lang name="fr"><summary>L'opposé d'un identifiant, ou `null` (usage interne : une connexion TLS se range en négatif).</summary><param name="id">L'identifiant.</param><returns>Son opposé.</returns></lang>
+/// <lang name="en"><summary>The opposite of an identifier, or `null` (internal use: a TLS connection is stored as a negative).</summary><param name="id">The identifier.</param><returns>Its opposite.</returns></lang>
+gear pure _opposite(long? id): long? => id eq null ? null : -(id ?? 0);
+
+/// <lang name="fr"><summary>Envoie des octets sur la prise ou la connexion TLS d'un client (usage interne).</summary><param name="socket">La prise (négative : une connexion TLS).</param><param name="data">Les octets.</param><returns>Vrai si tout est envoyé.</returns></lang>
+/// <lang name="en"><summary>Sends bytes over the socket or TLS connection of a client (internal use).</summary><param name="socket">The socket (negative: a TLS connection).</param><param name="data">The bytes.</param><returns>True when everything is sent.</returns></lang>
+gear _wsSend(long socket, bytes data): bool => socket < 0 ? tlsSend(-socket, data) not eq null : socketSend(socket, data) not eq null;
+
+/// <lang name="fr"><summary>Reçoit des octets de la prise ou de la connexion TLS d'un client (usage interne).</summary><param name="socket">La prise (négative : une connexion TLS).</param><param name="maxBytes">Le nombre maximal d'octets.</param><param name="timeoutMs">Le délai.</param><returns>Les octets ; vides si fermée ; `null` au délai ou sur une erreur.</returns></lang>
+/// <lang name="en"><summary>Receives bytes from the socket or TLS connection of a client (internal use).</summary><param name="socket">The socket (negative: a TLS connection).</param><param name="maxBytes">The maximal number of bytes.</param><param name="timeoutMs">The delay.</param><returns>The bytes; empty when closed; `null` on timeout or error.</returns></lang>
+gear _wsReceive(long socket, uint maxBytes, uint timeoutMs): bytes? => socket < 0 ? tlsReceive(-socket, maxBytes, timeoutMs) : socketReceive(socket, maxBytes, timeoutMs);
+
+/// <lang name="fr"><summary>Ferme la prise ou la connexion TLS d'un client (usage interne).</summary><param name="socket">La prise (négative : une connexion TLS).</param></lang>
+/// <lang name="en"><summary>Closes the socket or TLS connection of a client (internal use).</summary><param name="socket">The socket (negative: a TLS connection).</param></lang>
+gear _wsClose(long socket): void {
+    if (socket < 0) { tlsClose(-socket); } else { socketClose(socket); }
+}
+
+/// <lang name="fr"><summary>Lit la réponse à la poignée de main jusqu'à la ligne vide (usage interne).</summary><param name="socket">La prise.</param><param name="timeoutMs">Le délai de chaque lecture.</param><returns>Les octets reçus (les en-têtes, puis peut-être déjà des trames) ; `null` si la connexion échoue.</returns></lang>
+/// <lang name="en"><summary>Reads the reply to the handshake up to the blank line (internal use).</summary><param name="socket">The socket.</param><param name="timeoutMs">The delay of each read.</param><returns>The bytes received (the headers, then perhaps already frames); `null` when the connection fails.</returns></lang>
+gear _readHandshake(long socket, uint timeoutMs): bytes? {
+    const bytes none: '' as bytes;
+    const bytes end: "\r\n\r\n" as bytes;
+    const bytes received: [0..<64] |+> none with (acc, i) => {
+        if ((acc.length as long) > 65536 or acc.indexOf(13) not eq null and (acc.length as long) >= 4 and _endsHeaders(acc)) { done acc; }
+        const bytes? chunk: _wsReceive(socket, 4096, timeoutMs);
+        if (chunk eq null or (chunk ?? none).length eq 0) { done acc; }
+        return [...acc, ...(chunk ?? none)];
+    };
+    return _endsHeaders(received) ? received : null;
+}
+
+/// <lang name="fr"><summary>Dit si des octets contiennent la fin des en-têtes HTTP (usage interne).</summary><param name="data">Les octets.</param><returns>Vrai s'ils contiennent une ligne vide.</returns></lang>
+/// <lang name="en"><summary>Tells whether bytes contain the end of the HTTP headers (internal use).</summary><param name="data">The bytes.</param><returns>True when they contain a blank line.</returns></lang>
+gear pure _endsHeaders(bytes data): bool => _headerEnd(data) >= 0;
+
+/// <lang name="fr"><summary>Le rang où finissent les en-têtes : celui qui suit la ligne vide (usage interne).</summary><param name="data">Les octets.</param><returns>Le rang, -1 s'il n'y a pas de ligne vide.</returns></lang>
+/// <lang name="en"><summary>The index where the headers end: the one after the blank line (internal use).</summary><param name="data">The bytes.</param><returns>The index, -1 when there is no blank line.</returns></lang>
+gear pure _headerEnd(bytes data): long {
+    const long total: data.length as long;
+    const long none: -1;
+    return [0..<(total - 3 > 0 ? total - 3 : 0)] |+> none with (acc, i) => {
+        if (acc >= 0) { done acc; }
+        return data[i] eq 13 and data[i + 1] eq 10 and data[i + 2] eq 13 and data[i + 3] eq 10 ? i + 4 : acc;
+    };
+}
+
+/// <lang name="fr">
+/// <summary>Ouvre une connexion WebSocket : se connecte, fait la poignée de main HTTP et vérifie la réponse du serveur. `ws://` et `wss://` (chiffré en TLS, certificat vérifié avec les autorités du système ou `SSL_CERT_FILE`) sont pris en charge.</summary>
+/// <param name="url">L'adresse, `ws://hôte[:port][/chemin]` ou `wss://…` (port 443 par défaut).</param>
+/// <param name="timeoutMs">Le délai de la connexion et de la poignée de main, en millisecondes.</param>
+/// <returns>La connexion ; `null` si l'adresse n'est pas un `ws://` ou `wss://`, si la connexion échoue ou si le serveur refuse la poignée de main.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Opens a WebSocket connection: connects, does the HTTP handshake and checks the server's reply. `ws://` and `wss://` (TLS-encrypted, certificate checked with the system authorities or `SSL_CERT_FILE`) are supported.</summary>
+/// <param name="url">The address, `ws://host[:port][/path]` or `wss://…` (port 443 by default).</param>
+/// <param name="timeoutMs">The delay of the connection and of the handshake, in milliseconds.</param>
+/// <returns>The connection; `null` when the address is not a `ws://` or `wss://`, the connection fails or the server refuses the handshake.</returns>
+/// </lang>
+gear webSocketConnect(string url, uint timeoutMs: 5000): WebSocketClient? {
+    if (not url.startsWith('ws://') and not url.startsWith('wss://')) { return null; }
+    const bool secure: url.startsWith('wss://');
+    const string rest: url.substring(secure ? 6 : 5, url.length);
+    const (string before, string after, bool found) split: rest.splitOnce('/');
+    const string path: split.found ? `/{split.after}` : '/';
+    const (string before, string after, bool found) address: split.before.splitOnce(':');
+    const int? parsedPort: address.found ? address.after as? int : (secure ? 443 : 80);
+    if (parsedPort eq null or address.before eq '') { return null; }
+    const ushort port: (parsedPort ?? 80) as ushort;
+    const long? socket: secure ? _opposite(tlsConnect(address.before, port, timeoutMs)) : tcpConnect(address.before, port, timeoutMs);
+    if (socket eq null) { return null; }
+    const long id: socket ?? 0;
+
+    const string key: base64Encode(randomBytes(16));
+    const string request: `GET {path} HTTP/1.1\r\nHost: {split.before}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n`;
+    const bytes none: '' as bytes;
+    if (not _wsSend(id, request as bytes)) { _wsClose(id); return null; }
+    const bytes? reply: _readHandshake(id, timeoutMs);
+    if (reply eq null) { _wsClose(id); return null; }
+    const bytes received: reply ?? none;
+    const long end: _headerEnd(received);
+    const string? head: received.slice(0, end) as? string;
+    const string expected: base64Encode(hexDecode(sha1(`{key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11` as bytes)) ?? none);
+    const [string] lines: (head ?? '').split("\r\n");
+    const bool upgraded: lines.length > 0 and lines[0].startsWith('HTTP/1.1 101');
+    const bool accepted: lines |+> false with (acc, line) => acc or (line.toLower().startsWith('sec-websocket-accept:') and line.substring(21, line.length).trim() eq expected);
+    if (not upgraded or not accepted) { _wsClose(id); return null; }
+    return {socket: id, buffer: received.slice(end, received.length as long)};
+}
+
+/// <lang name="fr"><summary>Envoie un message texte.</summary><param name="client">La connexion (variable `mut`).</param><param name="text">Le texte (UTF-8).</param><returns>Vrai si le message est envoyé.</returns></lang>
+/// <lang name="en"><summary>Sends a text message.</summary><param name="client">The connection (a `mut` variable).</param><param name="text">The text (UTF-8).</param><returns>True when the message is sent.</returns></lang>
+gear webSocketSend(mut WebSocketClient client, string text): bool => _sendFrame(client.socket, 1, text as bytes);
+
+/// <lang name="fr"><summary>Envoie un message binaire.</summary><param name="client">La connexion (variable `mut`).</param><param name="data">Les octets.</param><returns>Vrai si le message est envoyé.</returns></lang>
+/// <lang name="en"><summary>Sends a binary message.</summary><param name="client">The connection (a `mut` variable).</param><param name="data">The bytes.</param><returns>True when the message is sent.</returns></lang>
+gear webSocketSendBytes(mut WebSocketClient client, bytes data): bool => _sendFrame(client.socket, 2, data);
+
+/// <lang name="fr"><summary>Où en est la lecture d'un message (usage interne).</summary></lang>
+/// <lang name="en"><summary>Where reading a message stands (internal use).</summary></lang>
+mold _Receiving {
+    /// <lang name="fr"><summary>Vrai quand le résultat est arrêté.</summary></lang>
+    /// <lang name="en"><summary>True when the result is final.</summary></lang>
+    bool finished;
+    /// <lang name="fr"><summary>Le message, ou l'état courant.</summary></lang>
+    /// <lang name="en"><summary>The message, or the current state.</summary></lang>
+    ClientMessage message;
+    /// <lang name="fr"><summary>Le code opération du message en cours d'assemblage.</summary></lang>
+    /// <lang name="en"><summary>The opcode of the message being assembled.</summary></lang>
+    long opcode;
+    /// <lang name="fr"><summary>Les octets des trames déjà reçues du message en cours.</summary></lang>
+    /// <lang name="en"><summary>The bytes of the frames already received of the current message.</summary></lang>
+    bytes payload;
+}
+
+/// <lang name="fr">
+/// <summary>Attend le prochain message. Les pings du serveur reçoivent leur pong sans que tu le voies, un message coupé en plusieurs trames est rassemblé, et une fermeture demandée par le serveur reçoit sa réponse avant d'être rendue.</summary>
+/// <param name="client">La connexion (variable `mut`).</param>
+/// <param name="timeoutMs">Le délai total en millisecondes ; 0 attend sans limite.</param>
+/// <returns>Le message : `text`, `binary`, `close`, ou `timeout` si rien n'est arrivé à temps ou si la connexion est coupée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Waits for the next message. The server's pings get their pong without you seeing it, a message split into several frames is reassembled, and a closure requested by the server gets its reply before being returned.</summary>
+/// <param name="client">The connection (a `mut` variable).</param>
+/// <param name="timeoutMs">The total delay in milliseconds; 0 waits without limit.</param>
+/// <returns>The message: `text`, `binary`, `close`, or `timeout` when nothing arrived in time or the connection is cut.</returns>
+/// </lang>
+gear webSocketReceive(mut WebSocketClient client, uint timeoutMs: 0): ClientMessage {
+    const datetime started: now();
+    const bytes none: '' as bytes;
+    const ClientMessage waiting: {kind: 'timeout', text: '', data: none, code: 0};
+    const _Receiving start: {finished: false, message: waiting, opcode: 0, payload: none};
+    const _Receiving end: [0..<100000] |+> start with (state, attempt) => {
+        if (state.finished) { done state; }
+        const _Frame frame: _parseFrame(client.buffer);
+        if (not frame.complete) {
+            const long elapsed: (now() - started) as long;
+            const long left: (timeoutMs as long) - elapsed;
+            if (timeoutMs not eq 0 and left <= 0) { return {...state, finished: true}; }
+            const bytes? chunk: _wsReceive(client.socket, 65536, timeoutMs eq 0 ? 0 : (left as uint));
+            if (chunk eq null or (chunk ?? none).length eq 0) { return {...state, finished: true}; }
+            client.buffer <- [...client.buffer, ...(chunk ?? none)];
+            return state;
+        }
+        client.buffer <- client.buffer.slice(frame.size, client.buffer.length as long);
+        if (frame.opcode eq 255) {
+            _sendFrame(client.socket, 8, [3 as ubyte, 241 as ubyte]);
+            return {finished: true, message: {kind: 'close', text: 'message trop grand', data: none, code: 1009}, opcode: 0, payload: none};
+        }
+        if (frame.opcode eq 9) {
+            _sendFrame(client.socket, 10, frame.payload);
+            return state;
+        }
+        if (frame.opcode eq 10) { return state; }
+        if (frame.opcode eq 8) {
+            const uint code: frame.payload.length >= 2 ? (_readBe(frame.payload, 0, 2) as uint) : 1005;
+            const string? reason: frame.payload.length > 2 ? frame.payload.slice(2, frame.payload.length as long) as? string : '';
+            _sendFrame(client.socket, 8, frame.payload.length >= 2 ? frame.payload.slice(0, 2) : none);
+            return {finished: true, message: {kind: 'close', text: reason ?? '', data: none, code}, opcode: 0, payload: none};
+        }
+        const long opcode: frame.opcode eq 0 ? state.opcode : frame.opcode;
+        const bytes payload: [...state.payload, ...frame.payload];
+        if (not frame.fin) { return {finished: false, message: waiting, opcode, payload}; }
+        if (opcode eq 1) {
+            const string? text: payload as? string;
+            if (text eq null) {
+                _sendFrame(client.socket, 8, [3 as ubyte, 239 as ubyte]);
+                return {finished: true, message: {kind: 'close', text: 'texte invalide', data: none, code: 1007}, opcode: 0, payload: none};
+            }
+            return {finished: true, message: {kind: 'text', text: text ?? '', data: none, code: 0}, opcode: 0, payload: none};
+        }
+        return {finished: true, message: {kind: 'binary', text: '', data: payload, code: 0}, opcode: 0, payload: none};
+    };
+    return end.message;
+}
+
+/// <lang name="fr"><summary>Ferme la connexion : envoie la fermeture avec son code, puis ferme la prise (sans attendre la réponse du serveur).</summary><param name="client">La connexion (variable `mut`).</param><param name="code">Le code de fermeture (1000 : normale).</param></lang>
+/// <lang name="en"><summary>Closes the connection: sends the closure with its code, then closes the socket (without waiting for the server's reply).</summary><param name="client">The connection (a `mut` variable).</param><param name="code">The closure code (1000: normal).</param></lang>
+gear webSocketClose(mut WebSocketClient client, uint code: 1000): void {
+    _sendFrame(client.socket, 8, _beBytes(code as ulong, 2));
+    _wsClose(client.socket);
+}

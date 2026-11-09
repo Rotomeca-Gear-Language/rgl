@@ -1,0 +1,10 @@
+// Parenthèses et accolades manquantes, instruction hors cas.
+if n < 0 {
+    n <- 0;
+}
+if (n) n <- 1;
+switch (n) {
+    n <- 2;
+    case 1
+        break;
+}

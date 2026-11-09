@@ -1,0 +1,6 @@
+gear test([int] nums): void {
+    var doubles: nums ||> doubler;
+    var pairs: nums ||> (x) => x * 2 ||> scale(3) |!|> verifier;
+    nums ||> afficher;
+}
+train [1, 2] ||> actif !> [journal |> done] |!|> verifier !> [rapport |> $ 2] |> fin;

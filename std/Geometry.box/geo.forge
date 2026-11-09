@@ -1,0 +1,515 @@
+forge: gears
+description: "Formes géométriques : rayons, boîtes, sphères, plans, quaternions"
+
+import box Vectors only {Vector3, normalizedVec3};
+use <Math> only {abs, min, max, clamp, toRadians, toDegrees};
+
+/// <lang name="fr">
+/// <summary>Seuil de tolérance : sous cette valeur, un rayon est considéré parallèle à un plan et un point est considéré sur un plan.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The tolerance threshold: below this value, a ray is considered parallel to a plane and a point is considered to lie on a plane.</summary>
+/// </lang>
+const double EPSILON: 0.000000001;
+
+/// <lang name="fr">
+/// <summary>Convertit des degrés en radians (raccourci de `toRadians`).</summary>
+/// <param name="degrees">L'angle en degrés.</param>
+/// <returns>L'angle en radians.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Converts degrees to radians (a shorthand for `toRadians`).</summary>
+/// <param name="degrees">The angle in degrees.</param>
+/// <returns>The angle in radians.</returns>
+/// </lang>
+gear pure degToRad(double degrees): double =>
+    toRadians(degrees);
+
+/// <lang name="fr">
+/// <summary>Convertit des radians en degrés (raccourci de `toDegrees`).</summary>
+/// <param name="radians">L'angle en radians.</param>
+/// <returns>L'angle en degrés.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Converts radians to degrees (a shorthand for `toDegrees`).</summary>
+/// <param name="radians">The angle in radians.</param>
+/// <returns>The angle in degrees.</returns>
+/// </lang>
+gear pure radToDeg(double radians): double =>
+    toDegrees(radians);
+
+// --- Plan : normal · p = distance ---
+
+/// <lang name="fr">
+/// <summary>Un plan défini par sa normale et sa distance à l'origine : l'ensemble des points `p` tels que `normal · p = distance`.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A plane defined by its normal and distance from the origin: the set of points `p` such that `normal · p = distance`.</summary>
+/// </lang>
+mold Plane {
+    /// <lang name="fr">
+    /// <summary>La normale du plan ; elle doit être de longueur 1 pour que les distances soient des distances réelles.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The plane normal; it must have length 1 for distances to represent actual distances.</summary>
+    /// </lang>
+    Vector3 normal;
+    /// <lang name="fr">
+    /// <summary>La distance signée du plan à l'origine, le long de la normale.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The signed distance from the origin to the plane, along the normal.</summary>
+    /// </lang>
+    double distance;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations d'un plan.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on a plane.</summary>
+/// </lang>
+extend Plane {
+    /// <lang name="fr">
+    /// <summary>La distance signée d'un point au plan : positive du côté vers lequel pointe la normale, négative de l'autre, nulle sur le plan.</summary>
+    /// <param name="plane">Le plan.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>`normal · p - distance`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The signed distance from a point to the plane: positive on the side the normal points toward, negative on the other, and zero on the plane.</summary>
+    /// <param name="plane">The plane.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>`normal · p - distance`.</returns>
+    /// </lang>
+    gear pure signedDistance(this Plane plane, Vector3 p): double =>
+        plane.normal.dot(p) - plane.distance;
+
+    /// <lang name="fr">
+    /// <summary>Dit si un point est sur le plan, à `EPSILON` près.</summary>
+    /// <param name="plane">Le plan.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Vrai si la distance du point au plan est inférieure ou égale à `EPSILON`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether a point lies on the plane, within `EPSILON`.</summary>
+    /// <param name="plane">The plane.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>True if the point's distance to the plane is less than or equal to `EPSILON`.</returns>
+    /// </lang>
+    gear pure contains(this Plane plane, Vector3 p): bool =>
+        abs(plane.signedDistance(p)) <= EPSILON;
+}
+
+// --- Rayon ---
+
+/// <lang name="fr">
+/// <summary>Un rayon : une demi-droite partant d'une origine dans une direction.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A ray: a half-line starting at an origin and extending in a direction.</summary>
+/// </lang>
+mold Ray {
+    /// <lang name="fr">
+    /// <summary>Le point de départ du rayon.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The starting point of the ray.</summary>
+    /// </lang>
+    Vector3 origin;
+    /// <lang name="fr">
+    /// <summary>La direction du rayon, de longueur 1.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The ray direction, of length 1.</summary>
+    /// </lang>
+    normalizedVec3 direction;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations d'un rayon.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on a ray.</summary>
+/// </lang>
+extend Ray {
+    /// <lang name="fr">
+    /// <summary>Le point du rayon à une distance donnée de son origine.</summary>
+    /// <param name="ray">Le rayon.</param>
+    /// <param name="t">La distance le long du rayon.</param>
+    /// <returns>`origin + direction * t`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The point on the ray at a given distance from its origin.</summary>
+    /// <param name="ray">The ray.</param>
+    /// <param name="t">The distance along the ray.</param>
+    /// <returns>`origin + direction * t`.</returns>
+    /// </lang>
+    gear pure pointAt(this Ray ray, double t): Vector3 =>
+        ray.origin + ray.direction° * t;
+
+    /// <lang name="fr">
+    /// <summary>La distance le long du rayon jusqu'à son intersection avec un plan.</summary>
+    /// <param name="ray">Le rayon.</param>
+    /// <param name="plane">Le plan.</param>
+    /// <returns>La distance `t` de l'intersection, ou null si le rayon est parallèle au plan ou s'en éloigne.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The distance along the ray to its intersection with a plane.</summary>
+    /// <param name="ray">The ray.</param>
+    /// <param name="plane">The plane.</param>
+    /// <returns>The intersection distance `t`, or null if the ray is parallel to the plane or points away from it.</returns>
+    /// </lang>
+    gear pure intersectPlane(this Ray ray, Plane plane): double? {
+        const double slope: plane.normal.dot(ray.direction°);
+
+        if (abs(slope) <= EPSILON) {
+            return null;
+        }
+
+        const double t: -plane.signedDistance(ray.origin) / slope;
+
+        return t < 0.0 ? null : t;
+    }
+}
+
+// --- Boîte alignée sur les axes ---
+
+/// <lang name="fr">
+/// <summary>Une boîte alignée sur les axes, définie par ses deux coins opposés.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An axis-aligned box defined by two opposite corners.</summary>
+/// </lang>
+mold AABB3 {
+    /// <lang name="fr">
+    /// <summary>Le coin aux plus petites coordonnées.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The corner with the smallest coordinates.</summary>
+    /// </lang>
+    Vector3 min;
+    /// <lang name="fr">
+    /// <summary>Le coin aux plus grandes coordonnées.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The corner with the largest coordinates.</summary>
+    /// </lang>
+    Vector3 max;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations d'une boîte alignée sur les axes.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on an axis-aligned box.</summary>
+/// </lang>
+extend AABB3 {
+    /// <lang name="fr">
+    /// <summary>Dit si un point est dans la boîte, bords compris.</summary>
+    /// <param name="box">La boîte.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Vrai si le point est dans la boîte ou sur sa surface.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether a point is inside the box, including its boundary.</summary>
+    /// <param name="box">The box.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>True if the point is inside the box or on its surface.</returns>
+    /// </lang>
+    gear pure contains(this AABB3 box, Vector3 p): bool =>
+        p.x >= box.min.x and p.x <= box.max.x and
+        p.y >= box.min.y and p.y <= box.max.y and
+        p.z >= box.min.z and p.z <= box.max.z;
+
+    /// <lang name="fr">
+    /// <summary>Le centre de la boîte.</summary>
+    /// <param name="box">La boîte.</param>
+    /// <returns>Le milieu des deux coins.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The center of the box.</summary>
+    /// <param name="box">The box.</param>
+    /// <returns>The midpoint of the two corners.</returns>
+    /// </lang>
+    gear pure center(this AABB3 box): Vector3 =>
+        (box.min + box.max) * 0.5;
+
+    /// <lang name="fr">
+    /// <summary>Les dimensions de la boîte.</summary>
+    /// <param name="box">La boîte.</param>
+    /// <returns>La différence entre le coin maximal et le coin minimal.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The dimensions of the box.</summary>
+    /// <param name="box">The box.</param>
+    /// <returns>The difference between the maximum and minimum corners.</returns>
+    /// </lang>
+    gear pure size(this AABB3 box): Vector3 =>
+        box.max - box.min;
+
+    /// <lang name="fr">
+    /// <summary>Dit si deux boîtes se recouvrent ; le simple contact compte.</summary>
+    /// <param name="a">La première boîte.</param>
+    /// <param name="b">La seconde boîte.</param>
+    /// <returns>Vrai si les boîtes se recouvrent sur les trois axes.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether two boxes overlap; touching counts as overlap.</summary>
+    /// <param name="a">The first box.</param>
+    /// <param name="b">The second box.</param>
+    /// <returns>True if the boxes overlap along all three axes.</returns>
+    /// </lang>
+    gear pure intersects(this AABB3 a, AABB3 b): bool =>
+        a.min.x <= b.max.x and a.max.x >= b.min.x and
+        a.min.y <= b.max.y and a.max.y >= b.min.y and
+        a.min.z <= b.max.z and a.max.z >= b.min.z;
+
+    /// <lang name="fr">
+    /// <summary>La plus petite boîte qui contient les deux boîtes.</summary>
+    /// <param name="a">La première boîte.</param>
+    /// <param name="b">La seconde boîte.</param>
+    /// <returns>La boîte englobante.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The smallest box containing both boxes.</summary>
+    /// <param name="a">The first box.</param>
+    /// <param name="b">The second box.</param>
+    /// <returns>The bounding box.</returns>
+    /// </lang>
+    gear pure merge(this AABB3 a, AABB3 b): AABB3 => {
+        min: {x: min(a.min.x, b.min.x), y: min(a.min.y, b.min.y), z: min(a.min.z, b.min.z)},
+        max: {x: max(a.max.x, b.max.x), y: max(a.max.y, b.max.y), z: max(a.max.z, b.max.z)}
+    };
+
+    /// <lang name="fr">
+    /// <summary>Le point de la boîte le plus proche d'un point donné ; ce point lui-même s'il est dans la boîte.</summary>
+    /// <param name="box">La boîte.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Le point du volume de la boîte le plus proche de `p`.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The point in the box closest to a given point; the point itself if it is inside the box.</summary>
+    /// <param name="box">The box.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>The point in the box's volume closest to `p`.</returns>
+    /// </lang>
+    gear pure closestPoint(this AABB3 box, Vector3 p): Vector3 => {
+        x: clamp(p.x, box.min.x, box.max.x),
+        y: clamp(p.y, box.min.y, box.max.y),
+        z: clamp(p.z, box.min.z, box.max.z)
+    };
+}
+
+// --- Sphère ---
+
+/// <lang name="fr">
+/// <summary>Une sphère définie par son centre et son rayon.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A sphere defined by its center and radius.</summary>
+/// </lang>
+mold Sphere {
+    /// <lang name="fr">
+    /// <summary>Le centre de la sphère.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The center of the sphere.</summary>
+    /// </lang>
+    Vector3 center;
+    /// <lang name="fr">
+    /// <summary>Le rayon de la sphère.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The radius of the sphere.</summary>
+    /// </lang>
+    double radius;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations d'une sphère.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on a sphere.</summary>
+/// </lang>
+extend Sphere {
+    /// <lang name="fr">
+    /// <summary>Dit si un point est dans la sphère, surface comprise.</summary>
+    /// <param name="s">La sphère.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Vrai si la distance du point au centre est inférieure ou égale au rayon.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether a point is inside the sphere, including its surface.</summary>
+    /// <param name="s">The sphere.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>True if the distance from the point to the center is less than or equal to the radius.</returns>
+    /// </lang>
+    gear pure contains(this Sphere s, Vector3 p): bool =>
+        s.center.distanceSquared(p) <= s.radius * s.radius;
+
+    /// <lang name="fr">
+    /// <summary>Dit si deux sphères se recouvrent ; le simple contact compte.</summary>
+    /// <param name="a">La première sphère.</param>
+    /// <param name="b">La seconde sphère.</param>
+    /// <returns>Vrai si la distance entre les centres est inférieure ou égale à la somme des rayons.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether two spheres overlap; touching counts as overlap.</summary>
+    /// <param name="a">The first sphere.</param>
+    /// <param name="b">The second sphere.</param>
+    /// <returns>True if the distance between the centers is less than or equal to the sum of the radii.</returns>
+    /// </lang>
+    gear pure intersects(this Sphere a, Sphere b): bool {
+        const double reach: a.radius + b.radius;
+        return a.center.distanceSquared(b.center) <= reach * reach;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Dit si une sphère et une boîte se recouvrent ; le simple contact compte.</summary>
+    /// <param name="s">La sphère.</param>
+    /// <param name="box">La boîte.</param>
+    /// <returns>Vrai si le point de la boîte le plus proche du centre est dans la sphère.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether a sphere and a box overlap; touching counts as overlap.</summary>
+    /// <param name="s">The sphere.</param>
+    /// <param name="box">The box.</param>
+    /// <returns>True if the point in the box closest to the center is inside the sphere.</returns>
+    /// </lang>
+    gear pure intersectsBox(this Sphere s, AABB3 box): bool =>
+        s.center.distanceSquared(box.closestPoint(s.center)) <= s.radius * s.radius;
+}
+
+// --- Quaternion : rotation sans verrou de cardan ---
+
+/// <lang name="fr">
+/// <summary>Un quaternion `x, y, z, w`, utilisé comme rotation sans verrou de cardan (de longueur 1 pour une rotation).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A quaternion `x, y, z, w`, used for rotation without gimbal lock (length 1 for a rotation).</summary>
+/// </lang>
+mold Quaternion {
+    /// <lang name="fr">
+    /// <summary>La première composante imaginaire.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The first imaginary component.</summary>
+    /// </lang>
+    double x;
+    /// <lang name="fr">
+    /// <summary>La deuxième composante imaginaire.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The second imaginary component.</summary>
+    /// </lang>
+    double y;
+    /// <lang name="fr">
+    /// <summary>La troisième composante imaginaire.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The third imaginary component.</summary>
+    /// </lang>
+    double z;
+    /// <lang name="fr">
+    /// <summary>La composante réelle.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The real component.</summary>
+    /// </lang>
+    double w;
+
+    /// <lang name="fr">
+    /// <summary>Le produit de Hamilton : `a * b` applique `b` puis `a`.</summary>
+    /// <param name="a">Le quaternion appliqué en second.</param>
+    /// <param name="b">Le quaternion appliqué en premier.</param>
+    /// <returns>Le quaternion composé.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The Hamilton product: `a * b` applies `b` first, then `a`.</summary>
+    /// <param name="a">The quaternion applied second.</param>
+    /// <param name="b">The quaternion applied first.</param>
+    /// <returns>The composed quaternion.</returns>
+    /// </lang>
+    pure Quaternion *(Quaternion a, Quaternion b) {
+        return {
+            x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+            y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+            z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+            w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+        };
+    }
+
+    /// <lang name="fr">
+    /// <summary>Égalité de deux quaternions, composante par composante.</summary>
+    /// <param name="a">Le premier quaternion.</param>
+    /// <param name="b">Le second quaternion.</param>
+    /// <returns>Vrai si les quatre composantes sont égales.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Component-wise equality of two quaternions.</summary>
+    /// <param name="a">The first quaternion.</param>
+    /// <param name="b">The second quaternion.</param>
+    /// <returns>True if all four components are equal.</returns>
+    /// </lang>
+    pure bool eq(Quaternion a, Quaternion b) {
+        return a.x eq b.x and a.y eq b.y and a.z eq b.z and a.w eq b.w;
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Constante et opérations d'un quaternion.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The constant and operations for a quaternion.</summary>
+/// </lang>
+extend Quaternion {
+    /// <lang name="fr">
+    /// <summary>La rotation identité (aucune rotation).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The identity rotation (no rotation).</summary>
+    /// </lang>
+    const Quaternion IDENTITY: {x: 0.0, y: 0.0, z: 0.0, w: 1.0};
+
+    /// <lang name="fr">
+    /// <summary>Le produit scalaire de deux quaternions.</summary>
+    /// <param name="a">Le premier quaternion.</param>
+    /// <param name="b">Le second quaternion.</param>
+    /// <returns>La somme des produits des composantes de même nom.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The dot product of two quaternions.</summary>
+    /// <param name="a">The first quaternion.</param>
+    /// <param name="b">The second quaternion.</param>
+    /// <returns>The sum of the products of corresponding components.</returns>
+    /// </lang>
+    gear pure dot(this Quaternion a, Quaternion b): double =>
+        a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+
+    /// <lang name="fr">
+    /// <summary>Le carré de la norme du quaternion.</summary>
+    /// <param name="q">Le quaternion.</param>
+    /// <returns>Le produit scalaire du quaternion par lui-même.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The squared norm of the quaternion.</summary>
+    /// <param name="q">The quaternion.</param>
+    /// <returns>The dot product of the quaternion with itself.</returns>
+    /// </lang>
+    gear pure lengthSquared(this Quaternion q): double =>
+        q.dot(q);
+
+    /// <lang name="fr">
+    /// <summary>Le conjugué du quaternion, qui est l'inverse d'une rotation unitaire.</summary>
+    /// <param name="q">Le quaternion.</param>
+    /// <returns>Le quaternion aux composantes `x`, `y` et `z` opposées.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The conjugate of the quaternion, which is the inverse of a unit rotation.</summary>
+    /// <param name="q">The quaternion.</param>
+    /// <returns>The quaternion with its `x`, `y`, and `z` components negated.</returns>
+    /// </lang>
+    gear pure conjugate(this Quaternion q): Quaternion =>
+        {x: -q.x, y: -q.y, z: -q.z, w: q.w};
+}

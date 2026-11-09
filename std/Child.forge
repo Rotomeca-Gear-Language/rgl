@@ -1,0 +1,204 @@
+forge: gears
+description: "Processus enfants qui restent ouverts : écrire sur leur entrée, lire leurs sorties au fil de l'eau, attendre leur fin ou les arrêter"
+
+/// <lang name="fr"><summary>Un processus enfant lancé par `startChild` : un identifiant qui ne vaut que dans ce programme. Il garde ses trois flux ouverts jusqu'à `releaseChild` : après `childWait` (ou `killChild`), appelle `releaseChild` pour fermer ce qui reste.</summary></lang>
+/// <lang name="en"><summary>A child process started by `startChild`: an identifier that only has meaning in this program. It keeps its three streams open until `releaseChild`: after `childWait` (or `killChild`), call `releaseChild` to close what remains.</summary></lang>
+mold ChildProcess {
+    /// <lang name="fr"><summary>L'identifiant du processus.</summary></lang>
+    /// <lang name="en"><summary>The process identifier.</summary></lang>
+    long id;
+}
+
+/// <lang name="fr"><summary>Ce qu'une lecture d'un flux d'un processus enfant a donné.</summary></lang>
+/// <lang name="en"><summary>What a read of a child process stream gave.</summary></lang>
+mold ChildChunk {
+    /// <lang name="fr"><summary>Le texte lu (une ligne entière, sans son retour à la ligne, pour `childReadLine`) ; vide s'il n'y a rien.</summary></lang>
+    /// <lang name="en"><summary>The text read (a whole line, without its line break, for `childReadLine`); empty when nothing.</summary></lang>
+    string text;
+    /// <lang name="fr"><summary>Vrai si le délai est passé sans rien lire.</summary></lang>
+    /// <lang name="en"><summary>True when the delay passed without reading anything.</summary></lang>
+    bool timedOut;
+    /// <lang name="fr"><summary>Vrai si le flux est fermé et vidé : le processus n'écrira plus rien.</summary></lang>
+    /// <lang name="en"><summary>True when the stream is closed and drained: the process will write nothing more.</summary></lang>
+    bool closed;
+}
+
+/// <lang name="fr"><summary>Lance un processus (usage interne).</summary><param name="cwd">Le dossier de travail (vide : celui de ce programme).</param><param name="program">L'exécutable.</param><param name="args">Les arguments.</param><returns>L'identifiant, ou un nombre négatif : -1 introuvable, -2 refusé, -3 échec.</returns></lang>
+/// <lang name="en"><summary>Starts a process (internal use).</summary><param name="cwd">The working folder (empty: this program's).</param><param name="program">The executable.</param><param name="args">The arguments.</param><returns>The identifier, or a negative number: -1 not found, -2 denied, -3 failure.</returns></lang>
+@trusted
+gear _startChild(string cwd, string program, [string] args): long => cpp {
+    #include <rgl/standard/child.hpp>
+    #include <vector>
+    rgl_return rgl(rgl_arg_cwd cwd, rgl_arg_program program, rgl_arg_args args) {
+        std::vector<rgl::standard::string> list;
+        for (std::size_t i = 0; i < args.size(); ++i) list.push_back(args[i]);
+        return rgl::standard::child::start(program, list, cwd);
+    }
+}(string cwd: cwd, string program: program, [string] args: args): long;
+
+/// <lang name="fr">
+/// <summary>Lance un programme avec ses arguments, ses trois flux ouverts : on lui écrit par `childWrite`, on lit sa sortie par `childRead` ou `childReadLine`. Un programme nommé `rgl` est refusé.</summary>
+/// <param name="program">L'exécutable (cherché dans le `PATH` s'il n'a pas de dossier).</param>
+/// <param name="args">Les arguments, sans le nom du programme.</param>
+/// <returns>Le processus, `null` s'il est introuvable ou refusé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Starts a program with its arguments and its three streams open: it is written to with `childWrite`, its output is read with `childRead` or `childReadLine`. A program named `rgl` is refused.</summary>
+/// <param name="program">The executable (searched in the `PATH` when it has no folder).</param>
+/// <param name="args">The arguments, without the program name.</param>
+/// <returns>The process, or `null` when it is not found or refused.</returns>
+/// </lang>
+gear startChild(string program, [string] args): ChildProcess? {
+    const long id: _startChild('', program, args);
+    return id > 0 ? {id} : null;
+}
+
+/// <lang name="fr"><summary>Comme `startChild`, dans un dossier de travail donné.</summary><param name="cwd">Le dossier de travail.</param><param name="program">L'exécutable.</param><param name="args">Les arguments.</param><returns>Le processus, `null` s'il est introuvable ou refusé.</returns></lang>
+/// <lang name="en"><summary>Like `startChild`, in a given working folder.</summary><param name="cwd">The working folder.</param><param name="program">The executable.</param><param name="args">The arguments.</param><returns>The process, or `null` when it is not found or refused.</returns></lang>
+gear startChildIn(string cwd, string program, [string] args): ChildProcess? {
+    const long id: _startChild(cwd, program, args);
+    return id > 0 ? {id} : null;
+}
+
+/// <lang name="fr"><summary>Écrit des octets sur l'entrée du processus (usage interne).</summary><param name="id">Le processus.</param><param name="data">Les octets.</param><returns>Vrai si tout est écrit.</returns></lang>
+/// <lang name="en"><summary>Writes bytes to the process input (internal use).</summary><param name="id">The process.</param><param name="data">The bytes.</param><returns>True when everything is written.</returns></lang>
+@trusted
+gear _childWrite(long id, bytes data): bool => cpp {
+    #include <rgl/standard/child.hpp>
+    #include <vector>
+    rgl_return rgl(rgl_arg_id id, rgl_arg_data data) {
+        std::vector<char> raw(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) raw[i] = static_cast<char>(data[i]);
+        return rgl::standard::child::write(id, raw.data(), raw.size());
+    }
+}(long id: id, bytes data: data): bool;
+
+/// <lang name="fr"><summary>Écrit un texte (en UTF-8) sur l'entrée standard du processus.</summary><param name="child">Le processus.</param><param name="text">Le texte.</param><returns>Vrai si tout est écrit, faux si l'entrée est fermée ou si l'écriture échoue.</returns></lang>
+/// <lang name="en"><summary>Writes a text (as UTF-8) to the process standard input.</summary><param name="child">The process.</param><param name="text">The text.</param><returns>True when everything is written, false when the input is closed or writing fails.</returns></lang>
+gear childWrite(ChildProcess child, string text): bool => _childWrite(child.id, text as bytes);
+
+/// <lang name="fr"><summary>Écrit des octets sur l'entrée standard du processus.</summary><param name="child">Le processus.</param><param name="data">Les octets.</param><returns>Vrai si tout est écrit.</returns></lang>
+/// <lang name="en"><summary>Writes bytes to the process standard input.</summary><param name="child">The process.</param><param name="data">The bytes.</param><returns>True when everything is written.</returns></lang>
+gear childWriteBytes(ChildProcess child, bytes data): bool => _childWrite(child.id, data);
+
+/// <lang name="fr"><summary>Ferme l'entrée standard du processus : il voit la fin de son entrée (beaucoup de programmes n'écrivent leur résultat qu'alors).</summary><param name="child">Le processus.</param></lang>
+/// <lang name="en"><summary>Closes the process standard input: it sees the end of its input (many programs only write their result then).</summary><param name="child">The process.</param></lang>
+@trusted
+gear closeChildInput(ChildProcess child): void => cpp {
+    #include <rgl/standard/child.hpp>
+    rgl_return rgl(rgl_arg_child child) { rgl::standard::child::close_input(child.rgl_f_id); }
+}(ChildProcess child: child): void;
+
+/// <lang name="fr"><summary>Lit un flux d'un processus (usage interne).</summary><param name="id">Le processus.</param><param name="error">Vrai pour la sortie d'erreur, faux pour la sortie.</param><param name="line">Vrai pour une ligne entière, faux pour ce qui est disponible.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>L'état (`data`, `timeout` ou `closed`) puis le texte.</returns></lang>
+/// <lang name="en"><summary>Reads a process stream (internal use).</summary><param name="id">The process.</param><param name="error">True for the error output, false for the output.</param><param name="line">True for a whole line, false for what is available.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The status (`data`, `timeout` or `closed`) then the text.</returns></lang>
+@trusted
+gear _childRead(long id, bool error, bool line, uint timeoutMs): [string] => cpp {
+    #include <rgl/standard/child.hpp>
+    #include <string>
+    rgl_return rgl(rgl_arg_id id, bool error, bool line, rgl_arg_timeoutMs timeoutMs) {
+        namespace child = rgl::standard::child;
+        std::string text;
+        const auto which = error ? child::stream::err : child::stream::out;
+        const auto status = line ? child::read_line(id, which, timeoutMs, text) : child::read(id, which, timeoutMs, 65536, text);
+        rgl_return result;
+        result.push(rgl::standard::string(status == child::read_status::data ? "data" : status == child::read_status::timeout ? "timeout" : "closed"));
+        result.push(child::to_text(text));
+        return result;
+    }
+}(long id: id, bool error: error, bool line: line, uint timeoutMs: timeoutMs): [string];
+
+/// <lang name="fr"><summary>Ce qu'une lecture en octets d'un flux d'un processus enfant a donné.</summary></lang>
+/// <lang name="en"><summary>What a bytes read of a child process stream gave.</summary></lang>
+mold ChildBytes {
+    /// <lang name="fr"><summary>Les octets lus, tels quels ; vides s'il n'y a rien.</summary></lang>
+    /// <lang name="en"><summary>The bytes read, as they are; empty when nothing.</summary></lang>
+    bytes data;
+    /// <lang name="fr"><summary>Vrai si le délai est passé sans rien lire.</summary></lang>
+    /// <lang name="en"><summary>True when the delay passed without reading anything.</summary></lang>
+    bool timedOut;
+    /// <lang name="fr"><summary>Vrai si le flux est fermé et vidé.</summary></lang>
+    /// <lang name="en"><summary>True when the stream is closed and drained.</summary></lang>
+    bool closed;
+}
+
+/// <lang name="fr"><summary>Lit des octets d'un flux d'un processus (usage interne).</summary><param name="id">Le processus.</param><param name="error">Vrai pour la sortie d'erreur.</param><param name="limit">Le nombre maximal d'octets.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Un octet d'état (0 données, 1 délai, 2 fermé) suivi des octets lus.</returns></lang>
+/// <lang name="en"><summary>Reads bytes from a process stream (internal use).</summary><param name="id">The process.</param><param name="error">True for the error output.</param><param name="limit">The maximal number of bytes.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>A status byte (0 data, 1 timeout, 2 closed) followed by the bytes read.</returns></lang>
+@trusted
+gear _childReadBytes(long id, bool error, uint limit, uint timeoutMs): bytes => cpp {
+    #include <rgl/standard/child.hpp>
+    #include <string>
+    rgl_return rgl(rgl_arg_id id, bool error, rgl_arg_limit limit, rgl_arg_timeoutMs timeoutMs) {
+        namespace child = rgl::standard::child;
+        std::string data;
+        const auto status = child::read(id, error ? child::stream::err : child::stream::out, timeoutMs, limit == 0 ? 65536 : limit, data);
+        rgl_return result;
+        result.reserve(data.size() + 1);
+        result.push(static_cast<std::uint8_t>(status == child::read_status::data ? 0 : status == child::read_status::timeout ? 1 : 2));
+        for (const char c : data) result.push(static_cast<std::uint8_t>(c));
+        return result;
+    }
+}(long id: id, bool error: error, uint limit: limit, uint timeoutMs: timeoutMs): bytes;
+
+/// <lang name="fr"><summary>Construit ce qu'une lecture en octets a donné (usage interne).</summary><param name="raw">L'octet d'état puis les octets lus.</param><returns>Le résultat.</returns></lang>
+/// <lang name="en"><summary>Builds what a bytes read gave (internal use).</summary><param name="raw">The status byte then the bytes read.</param><returns>The result.</returns></lang>
+gear pure _bytesChunk(bytes raw): ChildBytes => {data: raw.slice(1, raw.length as long), timedOut: raw[0] eq 1, closed: raw[0] eq 2};
+
+/// <lang name="fr"><summary>Lit des octets de la sortie standard du processus, tels quels : pour une sortie binaire (`gzip -c`, une image). Rend dès qu'il y a quelque chose.</summary><param name="child">Le processus.</param><param name="limit">Le nombre maximal d'octets lus d'un coup (0 : 65536).</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Les octets lus, ou `timedOut`, ou `closed` quand le processus n'écrira plus rien.</returns></lang>
+/// <lang name="en"><summary>Reads bytes from the process standard output, as they are: for a binary output (`gzip -c`, an image). Returns as soon as there is something.</summary><param name="child">The process.</param><param name="limit">The maximal number of bytes read at once (0: 65536).</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The bytes read, or `timedOut`, or `closed` when the process will write nothing more.</returns></lang>
+gear childReadBytes(ChildProcess child, uint limit: 0, uint timeoutMs: 0): ChildBytes => _bytesChunk(_childReadBytes(child.id, false, limit, timeoutMs));
+
+/// <lang name="fr"><summary>Comme `childReadBytes`, sur la sortie d'erreur du processus.</summary><param name="child">Le processus.</param><param name="limit">Le nombre maximal d'octets lus d'un coup (0 : 65536).</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Les octets lus, ou `timedOut`, ou `closed`.</returns></lang>
+/// <lang name="en"><summary>Like `childReadBytes`, on the process error output.</summary><param name="child">The process.</param><param name="limit">The maximal number of bytes read at once (0: 65536).</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The bytes read, or `timedOut`, or `closed`.</returns></lang>
+gear childReadErrorBytes(ChildProcess child, uint limit: 0, uint timeoutMs: 0): ChildBytes => _bytesChunk(_childReadBytes(child.id, true, limit, timeoutMs));
+
+/// <lang name="fr"><summary>Construit ce qu'une lecture a donné (usage interne).</summary><param name="parts">L'état puis le texte.</param><returns>Le résultat.</returns></lang>
+/// <lang name="en"><summary>Builds what a read gave (internal use).</summary><param name="parts">The status then the text.</param><returns>The result.</returns></lang>
+gear pure _chunk([string] parts): ChildChunk => {text: parts[1], timedOut: parts[0] eq 'timeout', closed: parts[0] eq 'closed'};
+
+/// <lang name="fr"><summary>Lit ce que le processus a écrit sur sa sortie standard, sans attendre plus qu'il n'en faut : dès qu'il y a quelque chose, c'est rendu. Un caractère coupé entre deux lectures est abîmé ; préfère `childReadLine` pour du texte.</summary><param name="child">Le processus.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Le texte lu, ou `timedOut`, ou `closed` quand le processus n'écrira plus rien.</returns></lang>
+/// <lang name="en"><summary>Reads what the process wrote on its standard output, waiting no longer than needed: as soon as there is something, it is returned. A character split between two reads is damaged; prefer `childReadLine` for text.</summary><param name="child">The process.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The text read, or `timedOut`, or `closed` when the process will write nothing more.</returns></lang>
+gear childRead(ChildProcess child, uint timeoutMs: 0): ChildChunk => _chunk(_childRead(child.id, false, false, timeoutMs));
+
+/// <lang name="fr"><summary>Lit une ligne entière de la sortie standard du processus (sans son retour à la ligne) ; à la fin, ce qui reste sans retour à la ligne est rendu comme dernière ligne.</summary><param name="child">Le processus.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>La ligne, ou `timedOut`, ou `closed` quand il n'y en a plus.</returns></lang>
+/// <lang name="en"><summary>Reads a whole line of the process standard output (without its line break); at the end, what remains without a line break is returned as the last line.</summary><param name="child">The process.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The line, or `timedOut`, or `closed` when there are no more.</returns></lang>
+gear childReadLine(ChildProcess child, uint timeoutMs: 0): ChildChunk => _chunk(_childRead(child.id, false, true, timeoutMs));
+
+/// <lang name="fr"><summary>Comme `childRead`, sur la sortie d'erreur du processus.</summary><param name="child">Le processus.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Le texte lu, ou `timedOut`, ou `closed`.</returns></lang>
+/// <lang name="en"><summary>Like `childRead`, on the process error output.</summary><param name="child">The process.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The text read, or `timedOut`, or `closed`.</returns></lang>
+gear childReadError(ChildProcess child, uint timeoutMs: 0): ChildChunk => _chunk(_childRead(child.id, true, false, timeoutMs));
+
+/// <lang name="fr"><summary>Comme `childReadLine`, sur la sortie d'erreur du processus.</summary><param name="child">Le processus.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>La ligne, ou `timedOut`, ou `closed`.</returns></lang>
+/// <lang name="en"><summary>Like `childReadLine`, on the process error output.</summary><param name="child">The process.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The line, or `timedOut`, or `closed`.</returns></lang>
+gear childReadErrorLine(ChildProcess child, uint timeoutMs: 0): ChildChunk => _chunk(_childRead(child.id, true, true, timeoutMs));
+
+/// <lang name="fr"><summary>Attend la fin du processus (usage interne).</summary><param name="id">Le processus.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Le code de sortie ; `null` si le processus tourne encore au bout du délai.</returns></lang>
+/// <lang name="en"><summary>Waits for the process to end (internal use).</summary><param name="id">The process.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The exit code; `null` when the process is still running when the delay ends.</returns></lang>
+@trusted
+gear _childWait(long id, uint timeoutMs): int? => cpp {
+    #include <rgl/standard/child.hpp>
+    rgl_return rgl(rgl_arg_id id, rgl_arg_timeoutMs timeoutMs) {
+        std::int32_t code = 0;
+        if (!rgl::standard::child::wait(id, timeoutMs, code)) return rgl_return{};
+        return rgl_return(code);
+    }
+}(long id: id, uint timeoutMs: timeoutMs): int?;
+
+/// <lang name="fr"><summary>Attend la fin du processus.</summary><param name="child">Le processus.</param><param name="timeoutMs">Le délai en millisecondes ; 0 attend sans limite.</param><returns>Le code de sortie ; `null` si le processus tourne encore au bout du délai.</returns></lang>
+/// <lang name="en"><summary>Waits for the process to end.</summary><param name="child">The process.</param><param name="timeoutMs">The delay in milliseconds; 0 waits without limit.</param><returns>The exit code; `null` when the process is still running when the delay ends.</returns></lang>
+gear childWait(ChildProcess child, uint timeoutMs: 0): int? => _childWait(child.id, timeoutMs);
+
+/// <lang name="fr"><summary>Arrête le processus tout de suite, sans lui laisser le temps de finir. Appelle ensuite `childWait` puis `releaseChild`.</summary><param name="child">Le processus.</param></lang>
+/// <lang name="en"><summary>Stops the process right away, without letting it finish. Then call `childWait` and `releaseChild`.</summary><param name="child">The process.</param></lang>
+@trusted
+gear killChild(ChildProcess child): void => cpp {
+    #include <rgl/standard/child.hpp>
+    rgl_return rgl(rgl_arg_child child) { rgl::standard::child::kill(child.rgl_f_id); }
+}(ChildProcess child: child): void;
+
+/// <lang name="fr"><summary>Oublie le processus et ferme ses flux. L'identifiant ne vaut plus rien ensuite.</summary><param name="child">Le processus.</param></lang>
+/// <lang name="en"><summary>Forgets the process and closes its streams. The identifier is worthless afterwards.</summary><param name="child">The process.</param></lang>
+@trusted
+gear releaseChild(ChildProcess child): void => cpp {
+    #include <rgl/standard/child.hpp>
+    rgl_return rgl(rgl_arg_child child) { rgl::standard::child::release(child.rgl_f_id); }
+}(ChildProcess child: child): void;

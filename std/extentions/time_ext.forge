@@ -1,0 +1,391 @@
+forge: extend
+description: 'Dates et durées'
+
+namespace std/time;
+
+use <Time> only {dateTime, daysInMonth, localOffset};
+
+/// <lang name="fr">
+/// <summary>Le nombre de jours entiers entre le 1er janvier 1970 et le jour d'une date (négatif avant).</summary>
+/// <param name="d">La date.</param>
+/// <returns>Le jour de la date, compté depuis 1970-01-01.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The number of whole days between January 1, 1970 and the day of a date (negative before that).</summary>
+/// <param name="d">The date.</param>
+/// <returns>The day of the date, counted from 1970-01-01.</returns>
+/// </lang>
+gear pure _timeDays(datetime d): long {
+    const long ms: d as long;
+    return ms % 86400000 < 0 ? ms / 86400000 - 1 : ms / 86400000;
+}
+
+/// <lang name="fr">
+/// <summary>Le nombre de millisecondes écoulées depuis minuit, dans le jour d'une date.</summary>
+/// <param name="d">La date.</param>
+/// <returns>De 0 à 86399999.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The number of milliseconds since midnight within the day of a date.</summary>
+/// <param name="d">The date.</param>
+/// <returns>From 0 to 86399999.</returns>
+/// </lang>
+gear pure _timeMilliseconds(datetime d): long => (d as long) - _timeDays(d) * 86400000;
+
+/// <lang name="fr">
+/// <summary>L'année, le mois et le jour d'un nombre de jours depuis 1970-01-01 (calendrier grégorien).</summary>
+/// <param name="days">Les jours depuis 1970-01-01.</param>
+/// <returns>L'année, le mois (de 1 à 12) et le jour (de 1 à 31).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The year, month, and day for a number of days since 1970-01-01 (Gregorian calendar).</summary>
+/// <param name="days">Days since 1970-01-01.</param>
+/// <returns>The year, month (1 to 12), and day (1 to 31).</returns>
+/// </lang>
+gear pure _timeCivil(long days): (long, long, long) {
+    const long z: days + 719468;
+    const long era: (z >= 0 ? z : z - 146096) / 146097;
+    const long doe: z - era * 146097;
+    const long yoe: (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const long doy: doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const long mp: (5 * doy + 2) / 153;
+    const long day: doy - (153 * mp + 2) / 5 + 1;
+    const long month: mp < 10 ? mp + 3 : mp - 9;
+    const long year: yoe + era * 400 + (month <= 2 ? 1 : 0);
+    return (year, month, day);
+}
+
+/// <lang name="fr">
+/// <summary>Les morceaux d'une date (UTC) ; l'année, le mois et le jour suivent le calendrier grégorien.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The components of a date (UTC); the year, month, and day follow the Gregorian calendar.</summary>
+/// </lang>
+extend datetime {
+    /// <lang name="fr">
+    /// <summary>L'année de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>L'année, par exemple 2026.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The year of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The year, for example 2026.</returns>
+    /// </lang>
+    gear pure year(this datetime d): long => _timeCivil(_timeDays(d)).Item1;
+
+    /// <lang name="fr">
+    /// <summary>Le mois de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>Le mois, de 1 (janvier) à 12.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The month of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The month, from 1 (January) to 12.</returns>
+    /// </lang>
+    gear pure month(this datetime d): long => _timeCivil(_timeDays(d)).Item2;
+
+    /// <lang name="fr">
+    /// <summary>Le jour du mois de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>Le jour, de 1 à 31.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The day of the month of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The day, from 1 to 31.</returns>
+    /// </lang>
+    gear pure day(this datetime d): long => _timeCivil(_timeDays(d)).Item3;
+
+    /// <lang name="fr">
+    /// <summary>L'heure de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>L'heure, de 0 à 23.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The hour of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The hour, from 0 to 23.</returns>
+    /// </lang>
+    gear pure hour(this datetime d): long => _timeMilliseconds(d) / 3600000;
+
+    /// <lang name="fr">
+    /// <summary>La minute de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>La minute, de 0 à 59.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The minute of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The minute, from 0 to 59.</returns>
+    /// </lang>
+    gear pure minute(this datetime d): long => _timeMilliseconds(d) / 60000 % 60;
+
+    /// <lang name="fr">
+    /// <summary>La seconde de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>La seconde, de 0 à 59.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The second of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The second, from 0 to 59.</returns>
+    /// </lang>
+    gear pure second(this datetime d): long => _timeMilliseconds(d) / 1000 % 60;
+
+    /// <lang name="fr">
+    /// <summary>La milliseconde de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>La milliseconde, de 0 à 999.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The millisecond of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The millisecond, from 0 to 999.</returns>
+    /// </lang>
+    gear pure millisecond(this datetime d): long => _timeMilliseconds(d) % 1000;
+
+    /// <lang name="fr">
+    /// <summary>Le jour de la semaine de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>De 1 (lundi) à 7 (dimanche), comme ISO 8601.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The day of the week of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>From 1 (Monday) to 7 (Sunday), as in ISO 8601.</returns>
+    /// </lang>
+    gear pure dayOfWeek(this datetime d): long => (_timeDays(d) % 7 + 10) % 7 + 1;
+
+    /// <lang name="fr">
+    /// <summary>Le rang du jour dans l'année de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>De 1 (le 1er janvier) à 365, ou 366 une année bissextile.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The day of the year of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>From 1 (January 1) to 365, or 366 in a leap year.</returns>
+    /// </lang>
+    gear pure dayOfYear(this datetime d): long {
+        const long days: _timeDays(d);
+        const long year: _timeCivil(days).Item1;
+        const long previousYear: year - 1;
+        const long era: (previousYear >= 0 ? previousYear : previousYear - 399) / 400;
+        const long yoe: previousYear - era * 400;
+        const long doy: yoe * 365 + yoe / 4 - yoe / 100 + 306;
+        return days - (era * 146097 + doy - 719468) + 1;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Minuit (UTC) du jour de la date.</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>La même date à 00:00:00.000.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Midnight (UTC) on the day of the date.</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The same date at 00:00:00.000.</returns>
+    /// </lang>
+    gear pure startOfDay(this datetime d): datetime => (_timeDays(d) * 86400000) as datetime;
+}
+
+/// <lang name="fr">
+/// <summary>Mesures et mise en forme des durées.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Measuring and formatting durations.</summary>
+/// </lang>
+extend duration {
+    /// <lang name="fr">
+    /// <summary>La durée en secondes, avec les fractions.</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>Les secondes.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The duration in seconds, with fractions.</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>The seconds.</returns>
+    /// </lang>
+    gear pure totalSeconds(this duration d): double => ((d as long) as double) / 1000.0;
+
+    /// <lang name="fr">
+    /// <summary>La durée en minutes, avec les fractions.</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>Les minutes.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The duration in minutes, with fractions.</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>The minutes.</returns>
+    /// </lang>
+    gear pure totalMinutes(this duration d): double => ((d as long) as double) / 60000.0;
+
+    /// <lang name="fr">
+    /// <summary>La durée en heures, avec les fractions.</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>Les heures.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The duration in hours, with fractions.</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>The hours.</returns>
+    /// </lang>
+    gear pure totalHours(this duration d): double => ((d as long) as double) / 3600000.0;
+
+    /// <lang name="fr">
+    /// <summary>La durée en jours de 24 heures, avec les fractions.</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>Les jours.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The duration in 24-hour days, with fractions.</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>The days.</returns>
+    /// </lang>
+    gear pure totalDays(this duration d): double => ((d as long) as double) / 86400000.0;
+
+    /// <lang name="fr">
+    /// <summary>Indique si la durée est négative.</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>`true` pour une durée négative.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the duration is negative.</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>`true` for a negative duration.</returns>
+    /// </lang>
+    gear pure isNegative(this duration d): bool => (d as long) < 0;
+
+    /// <lang name="fr">
+    /// <summary>La durée sans son signe.</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>La durée positive.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The duration without its sign.</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>The positive duration.</returns>
+    /// </lang>
+    gear pure abs(this duration d): duration => (d as long) < 0 ? -d : d;
+
+    /// <lang name="fr">
+    /// <summary>Écrit la durée pour un humain : `1h 2min 3s 4ms` (`0ms` si elle est nulle).</summary>
+    /// <param name="d">La durée.</param>
+    /// <returns>Le texte.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the duration for a human: `1h 2min 3s 4ms` (`0ms` when it is zero).</summary>
+    /// <param name="d">The duration.</param>
+    /// <returns>The text.</returns>
+    /// </lang>
+    gear pure toText(this duration d): string {
+        const long total: d as long;
+        const long ms: total < 0 ? -total : total;
+        const string text: (_durationUnit(ms / 86400000, 'd') + _durationUnit(ms / 3600000 % 24, 'h') + _durationUnit(ms / 60000 % 60, 'min') + _durationUnit(ms / 1000 % 60, 's') + _durationUnit(ms % 1000, 'ms')).trim();
+        return (total < 0 ? '-' : '') + (text.isEmpty() ? '0ms' : text);
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Une quantité suivie de son unité et d'une espace, ou rien si elle est nulle (usage interne).</summary>
+/// <param name="count">La quantité.</param>
+/// <param name="unit">L'unité.</param>
+/// <returns>Le texte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A quantity followed by its unit and a space, or nothing when it is zero (internal use).</summary>
+/// <param name="count">The quantity.</param>
+/// <param name="unit">The unit.</param>
+/// <returns>The text.</returns>
+/// </lang>
+gear pure _durationUnit(long count, string unit): string => count eq 0 ? '' : `{count}{unit} `;
+
+/// <lang name="fr">
+/// <summary>Calendrier, fuseau du système et mise en forme des dates.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Calendar, system time zone and date formatting.</summary>
+/// </lang>
+extend datetime {
+    /// <lang name="fr">
+    /// <summary>Ajoute des mois (négatifs pour reculer) ; un jour qui n'existe pas dans le mois d'arrivée est ramené à son dernier jour (31 janvier + 1 mois = 28 ou 29 février).</summary>
+    /// <param name="d">La date.</param>
+    /// <param name="months">Le nombre de mois.</param>
+    /// <returns>La nouvelle date, à la même heure.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds months (negative to go back); a day that does not exist in the target month is brought back to its last day (January 31 + 1 month = February 28 or 29).</summary>
+    /// <param name="d">The date.</param>
+    /// <param name="months">The number of months.</param>
+    /// <returns>The new date, at the same time of day.</returns>
+    /// </lang>
+    gear pure addMonths(this datetime d, long months): datetime {
+        const long total: d.year() * 12 + (d.month() - 1) + months;
+        const long year: total / 12;
+        const long month: total % 12 + 1;
+        const long last: daysInMonth(year, month);
+        const long day: d.day() > last ? last : d.day();
+        return dateTime(year, month, day, d.hour(), d.minute(), d.second(), d.millisecond()) ?? d;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Ajoute des années (le 29 février d'une année non bissextile devient le 28).</summary>
+    /// <param name="d">La date.</param>
+    /// <param name="years">Le nombre d'années.</param>
+    /// <returns>La nouvelle date.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds years (February 29 of a non-leap year becomes the 28th).</summary>
+    /// <param name="d">The date.</param>
+    /// <param name="years">The number of years.</param>
+    /// <returns>The new date.</returns>
+    /// </lang>
+    gear pure addYears(this datetime d, long years): datetime => d.addMonths(years * 12);
+
+    /// <lang name="fr">
+    /// <summary>L'heure locale du système, écrite comme une date (les champs `hour`, `day`… sont alors ceux de l'heure locale).</summary>
+    /// <param name="d">La date.</param>
+    /// <returns>La date décalée du fuseau du système.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The system's local time, written as a date (the `hour`, `day`… fields are then those of local time).</summary>
+    /// <param name="d">The date.</param>
+    /// <returns>The date shifted by the system time zone.</returns>
+    /// </lang>
+    gear toLocal(this datetime d): datetime => d + localOffset(d);
+
+    /// <lang name="fr">
+    /// <summary>L'inverse de `toLocal` : une heure locale écrite comme une date redevient un instant UTC.</summary>
+    /// <param name="local">La date en heure locale.</param>
+    /// <returns>L'instant UTC.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The inverse of `toLocal`: a local time written as a date becomes a UTC instant again.</summary>
+    /// <param name="local">The date in local time.</param>
+    /// <returns>The UTC instant.</returns>
+    /// </lang>
+    gear toUtc(this datetime local): datetime => local - localOffset(local);
+
+    /// <lang name="fr">
+    /// <summary>Écrit la date d'après un modèle : `yyyy` année, `MM` mois, `dd` jour, `HH` heure, `mm` minute, `ss` seconde, `SSS` millisecondes ; le reste est recopié.</summary>
+    /// <param name="d">La date.</param>
+    /// <param name="pattern">Le modèle, par exemple `dd/MM/yyyy HH:mm`.</param>
+    /// <returns>Le texte.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Writes the date from a pattern: `yyyy` year, `MM` month, `dd` day, `HH` hour, `mm` minute, `ss` second, `SSS` milliseconds; everything else is copied.</summary>
+    /// <param name="d">The date.</param>
+    /// <param name="pattern">The pattern, for example `dd/MM/yyyy HH:mm`.</param>
+    /// <returns>The text.</returns>
+    /// </lang>
+    gear pure format(this datetime d, string pattern): string =>
+        pattern.replaceAll('yyyy', `{d.year()}`.padStart(4, '0'))
+            .replaceAll('MM', `{d.month()}`.padStart(2, '0'))
+            .replaceAll('dd', `{d.day()}`.padStart(2, '0'))
+            .replaceAll('HH', `{d.hour()}`.padStart(2, '0'))
+            .replaceAll('mm', `{d.minute()}`.padStart(2, '0'))
+            .replaceAll('ss', `{d.second()}`.padStart(2, '0'))
+            .replaceAll('SSS', `{d.millisecond()}`.padStart(3, '0'));
+}

@@ -1,0 +1,4 @@
+gear salut(string nom, string suffixe: "!", string fin: `{nom}?`): string => `{nom}{suffixe}{fin}`;
+gear log(string message, string caller: __CALLER__, uint line: __LINE__): void { }
+
+!train |> done;

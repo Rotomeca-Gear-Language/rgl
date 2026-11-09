@@ -1,0 +1,54 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "RGL dans Paper",
+  "scopeName": "source.rgl.embedded.paper",
+  "injectionSelector": "L:text.html - meta.embedded.block.rgl.paper - meta.embedded.expression.rgl.paper",
+  "patterns": [
+    {
+      "name": "meta.embedded.block.rgl.paper",
+      "begin": "(@rgl)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.rgl.paper" },
+        "2": { "name": "punctuation.section.block.begin.rgl" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.rgl" }
+      },
+      "patterns": [
+        { "include": "#nested-braces" },
+        { "include": "source.rgl" }
+      ]
+    },
+    {
+      "name": "meta.embedded.expression.rgl.paper",
+      "begin": "@@",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.embedded.begin.paper" }
+      },
+      "end": "@@",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.paper" }
+      },
+      "patterns": [
+        { "include": "source.rgl" }
+      ]
+    }
+  ],
+  "repository": {
+    "nested-braces": {
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.block.begin.rgl" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.rgl" }
+      },
+      "patterns": [
+        { "include": "#nested-braces" },
+        { "include": "source.rgl" }
+      ]
+    }
+  }
+}

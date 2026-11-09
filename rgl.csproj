@@ -1,0 +1,59 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Rgl</RootNamespace>
+    <Version>0.0.1</Version>
+    <PackageLicenseExpression>EUPL-1.2</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- tools/ : script autonome (fetch-tools.cs) et chaîne Zig, hors du compilateur -->
+    <Compile Remove="tools/**" />
+    <None Remove="tools/**" />
+    <!-- tests/ : projet de tests séparé, référencé par la solution -->
+    <Compile Remove="tests/**" />
+    <None Remove="tests/**" />
+    <!-- analyzers/ : analyseurs Roslyn de développement, branchés ci-dessous comme analyseurs -->
+    <Compile Remove="analyzers/**" />
+    <None Remove="analyzers/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- RGLDEV001 : signale les [Todo] à la compilation en Debug -->
+    <ProjectReference Include="analyzers/Rgl.Analyzers/Rgl.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="rgl.Tests" />
+  </ItemGroup>
+
+  <!-- Icône de rgl.exe, et icône par défaut des programmes compilés (voir assets/generate-icons.ps1). -->
+  <PropertyGroup>
+    <ApplicationIcon>assets/rgl.ico</ApplicationIcon>
+    <!-- Le .pdb du compilateur ne se livre pas : dotnet publish ne le copie pas. -->
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="assets/rgl-item.ico" LogicalName="Rgl.Assets.rgl-item.ico" />
+    <!-- La bibliothèque standard : les .forge de std/, lus par SourceGraph comme un dossier de fichiers. -->
+    <EmbeddedResource Include="std/**/*.forge" LogicalName="Rgl.Std/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="runtime/browser/paper.js" LogicalName="Rgl.Paper.paper.js" />
+    <!-- Le runtime C++ lié aux programmes compilés : extrait dans le cache par EmbeddedRuntime. -->
+    <EmbeddedResource Include="runtime/include/**" LogicalName="Rgl.Runtime/include/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="runtime/src/*.cpp" LogicalName="Rgl.Runtime/src/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="runtime/third_party/**" LogicalName="Rgl.Runtime/third_party/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Les versions de Zig et d'OpenSSL que `rgl setup` installe. -->
+    <EmbeddedResource Include="tools/toolchain.json" LogicalName="Rgl.Toolchain.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rotomeca.Core" Version="1.0.2" />
+    <PackageReference Include="Rotomeca.Rop" Version="1.0.0" />
+    <PackageReference Include="Rotomeca.Utils" Version="1.1.1" />
+  </ItemGroup>
+
+</Project>

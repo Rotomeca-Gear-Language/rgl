@@ -1,0 +1,139 @@
+forge: gears
+description: "L'asynchrone : attendre plusieurs promesses ensemble"
+
+use <Errors> only {AsyncException, AsyncKind};
+
+export {whenAll, timeout, retry};
+
+/// <lang name="fr">
+/// <summary>
+/// Attend toutes les promesses d'un tableau et rend leurs résultats, dans l'ordre du tableau. Les promesses tournent déjà : `whenAll` ne fait
+/// qu'attendre, donc la durée totale est celle de la plus longue. Une promesse qui échoue (annulée, erreur) donne son erreur à sa place dans le
+/// tableau ; les autres résultats sont là quand même.
+/// </summary>
+///
+/// <typeparam name="T">Type de la valeur des promesses.</typeparam>
+/// <param name="promises">Les promesses à attendre.</param>
+/// <returns>Le résultat de chaque promesse (`T ! AsyncException`), dans l'ordre.</returns>
+/// <example><code language="rgl">
+/// var a: lent(1);
+/// var b: lent(2);
+/// [int ! AsyncException] vide: [];
+/// var tous: await std.whenAll([a, b]) ?? vide;
+/// </code></example>
+/// </lang>
+/// <lang name="en">
+/// <summary>
+/// Waits for every promise in an array and returns their results in array order. The promises are already running: `whenAll` only
+/// waits, so the total duration is that of the slowest promise. A failed promise (cancellation or error) places its error at its position in the
+/// array; the other results are still returned.
+/// </summary>
+///
+/// <typeparam name="T">The type of the values produced by the promises.</typeparam>
+/// <param name="promises">The promises to wait for.</param>
+/// <returns>Each promise's result (`T ! AsyncException`), in order.</returns>
+/// <example><code language="rgl">
+/// var a: lent(1);
+/// var b: lent(2);
+/// [int ! AsyncException] vide: [];
+/// var tous: await std.whenAll([a, b]) ?? vide;
+/// </code></example>
+/// </lang>
+@async
+gear whenAll<T>([Promise<T>] promises): [T ! AsyncException] {
+    [T ! AsyncException] none: [];
+    return await _gather(promises, 0, none) ?? none;
+}
+
+/// <lang name="fr">
+/// <summary>Attend les promesses à partir de `index` et ajoute leur résultat à `collected`.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Waits for the promises starting at `index` and appends their results to `collected`.</summary>
+/// </lang>
+@async
+gear _gather<T>([Promise<T>] promises, uint index, [T ! AsyncException] collected): [T ! AsyncException] {
+    if (index >= promises.length) {
+        return collected;
+    }
+    var result: await promises[index];
+    return await _gather(promises, index + 1, [...collected, result]) ?? collected;
+}
+
+/// <lang name="fr">
+/// <summary>Une promesse qui échoue avec le genre `Timeout` une fois la durée écoulée (usage interne).</summary>
+/// <typeparam name="T">Type de la valeur promise.</typeparam>
+/// <param name="limit">La durée.</param>
+/// <returns>L'erreur de délai dépassé.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A promise that fails with the `Timeout` kind once the duration has elapsed (internal use).</summary>
+/// <typeparam name="T">The promised value type.</typeparam>
+/// <param name="limit">The duration.</param>
+/// <returns>The timeout error.</returns>
+/// </lang>
+@async
+gear _deadline<T>(duration limit): T {
+    await sleep(limit);
+    return err({message: 'délai dépassé', kind: AsyncKind.Timeout});
+}
+
+/// <lang name="fr">
+/// <summary>Rend le résultat de la promesse si elle finit avant la durée, sinon une erreur de genre `Timeout`. La promesse d'origine n'est pas annulée : elle continue en arrière-plan.</summary>
+/// <typeparam name="T">Type de la valeur promise.</typeparam>
+/// <param name="promise">La promesse à surveiller.</param>
+/// <param name="limit">Le délai maximal.</param>
+/// <returns>Une promesse du même type.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Returns the promise's result when it finishes before the duration, otherwise an error of the `Timeout` kind. The original promise is not cancelled: it keeps running in the background.</summary>
+/// <typeparam name="T">The promised value type.</typeparam>
+/// <param name="promise">The promise to watch.</param>
+/// <param name="limit">The maximal delay.</param>
+/// <returns>A promise of the same type.</returns>
+/// </lang>
+gear timeout<T>(Promise<T> promise, duration limit): Promise<T> => whenAny([promise, _deadline<T>(limit)]);
+
+/// <lang name="fr">
+/// <summary>Indique si un résultat est une réussite (usage interne).</summary>
+/// <typeparam name="T">Type de la valeur promise.</typeparam>
+/// <param name="result">Le résultat.</param>
+/// <returns>`true` pour une réussite.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks whether a result is a success (internal use).</summary>
+/// <typeparam name="T">The promised value type.</typeparam>
+/// <param name="result">The result.</param>
+/// <returns>`true` for a success.</returns>
+/// </lang>
+gear pure _isOk<T>(T ! AsyncException result): bool =>
+    match (result) {
+        ok value |> true;
+        err failure |> false;
+    };
+
+/// <lang name="fr">
+/// <summary>Relance l'action tant qu'elle échoue, jusqu'à `attempts` essais, avec une pause entre deux essais.</summary>
+/// <typeparam name="T">Type de la valeur promise.</typeparam>
+/// <param name="attempts">Le nombre maximal d'essais (au moins un est fait).</param>
+/// <param name="delay">La pause entre deux essais.</param>
+/// <param name="action">Ce qui démarre un essai et rend sa promesse.</param>
+/// <returns>Le résultat du premier essai réussi, sinon celui du dernier.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Runs the action again while it fails, up to `attempts` tries, with a pause between tries.</summary>
+/// <typeparam name="T">The promised value type.</typeparam>
+/// <param name="attempts">The maximal number of tries (at least one is made).</param>
+/// <param name="delay">The pause between two tries.</param>
+/// <param name="action">What starts a try and returns its promise.</param>
+/// <returns>The result of the first successful try, otherwise that of the last.</returns>
+/// </lang>
+@async
+gear retry<T>(uint attempts, duration delay, () => Promise<T> action): T {
+    var result: await action();
+    if (_isOk(result) or attempts <= 1) {
+        return result;
+    }
+    await sleep(delay);
+    return await retry(attempts - 1, delay, action);
+}

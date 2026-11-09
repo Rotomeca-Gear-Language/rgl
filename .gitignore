@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────
+# RGL — chaîne de compilation C++ (Zig)
+# Installée par fetch-tools.cs, jamais versionnée.
+# Seuls tools/toolchain.json (la version figée) et le script d'installation sont suivis.
+# ─────────────────────────────────────────────
+tools/*
+!tools/toolchain.json
+!tools/fetch-tools.cs
+!tools/README.md
+
+# ─────────────────────────────────────────────
+# RGL — sorties du compilateur
+# ─────────────────────────────────────────────
+# C++ généré, binaires produits et cache local de projet
+out/
+build/
+dist/
+# … sauf le dossier de sources du compilateur (Git est insensible à la casse sous Windows)
+!/Build/
+.rgl/
+*.rgl.map
+
+# Tests golden : résultats obtenus lors d'un échec (comparés aux fichiers attendus)
+*.actual
+*.received.*
+rgltests
+
+# ─────────────────────────────────────────────
+# .NET / C#
+# ─────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rm64/
+artifacts/
+publish/
+*.nupkg
+*.snupkg
+
+# Résultats de tests et couverture
+[Tt]est[Rr]esults/
+coverage/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+
+# Fichiers utilisateur des IDE
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+.vs/
+.idea/
+*.DotSettings.user
+*.Backup.tmp
+_ReSharper*/
+
+# VS Code : on garde les réglages partagés, pas le reste
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# ─────────────────────────────────────────────
+# Systèmes d'exploitation
+# ─────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+*.swp
+
+# Syncthing (si le dépôt se trouve dans un dossier synchronisé)
+.stfolder
+.stversions/
+*.sync-conflict-*
+# Extension VS Code : dépendances installées par npm
+editors/vscode/node_modules/
+editors/vscode/*.vsix

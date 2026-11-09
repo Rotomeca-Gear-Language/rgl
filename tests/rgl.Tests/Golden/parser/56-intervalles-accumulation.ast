@@ -1,0 +1,61 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=test pure=false parameters=2
+    Parameter 2:11 name=notes
+      ArrayType 2:11
+        PrimitiveType 2:12 type=int
+    Parameter 2:24 name=n
+      PrimitiveType 2:24 type=int
+    PrimitiveType 2:32 type=void
+    BlockStatement 2:37
+      VarDeclaration 3:5 keyword=var name=a
+        RangeExpression 3:12 exclusive=false
+          LiteralExpression 3:13 kind=IntegerLiteral text=0
+          LiteralExpression 3:16 kind=IntegerLiteral text=10
+      VarDeclaration 4:5 keyword=var name=b
+        RangeExpression 4:12 exclusive=true
+          LiteralExpression 4:13 kind=IntegerLiteral text=0
+          NameExpression 4:17 name=n
+          LiteralExpression 4:22 kind=IntegerLiteral text=2
+      VarDeclaration 5:5 keyword=var name=c
+        RangeExpression 5:12 exclusive=false
+          LiteralExpression 5:13 kind=IntegerLiteral text=10
+          LiteralExpression 5:17 kind=IntegerLiteral text=0
+      VarDeclaration 6:5 keyword=var name=d
+        RangeExpression 6:12 exclusive=true
+          NameExpression 6:13 name=n
+          UnaryExpression 6:16 op=-
+            LiteralExpression 6:18 kind=IntegerLiteral text=5
+          UnaryExpression 6:23 op=-
+            LiteralExpression 6:24 kind=IntegerLiteral text=1
+      VarDeclaration 7:5 keyword=var name=total
+        FoldExpression 7:16
+          NameExpression 7:16 name=notes
+          LiteralExpression 7:26 kind=IntegerLiteral text=0
+          EachTarget 7:33
+            LambdaExpression 7:33 parameters=2
+              LambdaParameter 7:34 name=acc
+              LambdaParameter 7:39 name=x
+              BinaryExpression 7:45 op=+
+                NameExpression 7:45 name=acc
+                NameExpression 7:51 name=x
+      VarDeclaration 8:5 keyword=var name=pairs
+        FoldExpression 8:16
+          EachExpression 8:16 strict=false
+            NameExpression 8:16 name=notes
+            EachTarget 8:26 name=doubler
+          LiteralExpression 8:38 kind=IntegerLiteral text=0
+          EachTarget 8:45 name=ajouter
+            LiteralExpression 8:53 kind=IntegerLiteral text=1
+  TrainDeclaration 10:1 unguarded=false parameters=none
+    ArrayExpression 10:7
+      LiteralExpression 10:8 kind=IntegerLiteral text=1
+      LiteralExpression 10:11 kind=IntegerLiteral text=2
+    Pipeline 10:14
+      EachStep 10:14 strict=false
+        EachTarget 10:18 name=verifier
+      FoldStep 10:27
+        LiteralExpression 10:31 kind=IntegerLiteral text=0
+        EachTarget 10:38 name=compter
+        Rail 10:46
+          CallStep 10:50 gear=rapport
+      CallStep 10:62 gear=fin

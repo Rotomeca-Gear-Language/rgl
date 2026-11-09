@@ -1,0 +1,5 @@
+// Un bloc non fermé, et une instruction inconnue dans un bloc.
+{
+    var a: 1;
+    |> done;
+    a <- 2;

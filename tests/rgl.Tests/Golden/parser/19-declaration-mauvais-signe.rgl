@@ -1,0 +1,5 @@
+// La valeur initiale suit « : », pas « <- » ni « = » ; la valeur est lue quand même.
+var a <- 5;
+int b = 6;
+var c 7;
+train |> done;

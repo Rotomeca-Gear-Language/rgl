@@ -1,0 +1,25 @@
+CompilationUnit 1:1
+  GearDeclaration 2:1 kind=gear name=lire pure=false parameters=0
+    PrimitiveType 2:14 type=int
+    BlockStatement 2:18
+      ReturnStatement 3:5
+        CallExpression 3:12
+          NameExpression 3:12 name=lireNombre
+  GearDeclaration 6:1 kind=gear name=boucle pure=false parameters=0
+    PrimitiveType 6:16 type=void
+    BlockStatement 6:21
+      VarDeclaration 7:5 keyword=none name=continue
+        PrimitiveType 7:5 type=bool
+        LiteralExpression 7:20 kind=FalseKeyword text=false
+      ExpressionStatement 8:5
+        MissingExpression 8:5
+      VarDeclaration 9:5 keyword=var name=a
+        LiteralExpression 9:12 kind=IntegerLiteral text=1
+  GearDeclaration 12:1 kind=gear name=suivant pure=false parameters=0
+    PrimitiveType 12:17 type=void
+    BlockStatement 12:22
+      VarDeclaration 13:5 keyword=var name=b
+        LiteralExpression 13:12 kind=IntegerLiteral text=2
+  TrainDeclaration 14:1 unguarded=true parameters=none
+    Pipeline 14:8
+      DoneStep 14:11

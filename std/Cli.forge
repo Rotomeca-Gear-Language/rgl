@@ -1,0 +1,277 @@
+forge: gears
+description: "Analyse des arguments de la ligne de commande : options longues et courtes, drapeaux, valeurs par défaut, aide générée"
+
+use <Errors> only {ParseError};
+
+/// <lang name="fr">
+/// <summary>Une option que le programme reconnaît : un drapeau (`--verbose`) ou une option à valeur (`--port 80`).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An option the program recognizes: a flag (`--verbose`) or an option with a value (`--port 80`).</summary>
+/// </lang>
+mold CliOption {
+    /// <lang name="fr"><summary>Le nom long, sans les deux tirets (`port` pour `--port`).</summary></lang>
+    /// <lang name="en"><summary>The long name, without the two dashes (`port` for `--port`).</summary></lang>
+    string name;
+    /// <lang name="fr"><summary>La lettre courte, sans le tiret (`p` pour `-p`), ou `null`.</summary></lang>
+    /// <lang name="en"><summary>The short letter, without the dash (`p` for `-p`), or `null`.</summary></lang>
+    string? shortName;
+    /// <lang name="fr"><summary>La description montrée par `usage`.</summary></lang>
+    /// <lang name="en"><summary>The description shown by `usage`.</summary></lang>
+    string description;
+    /// <lang name="fr"><summary>Vrai si l'option attend une valeur, faux pour un drapeau.</summary></lang>
+    /// <lang name="en"><summary>True when the option expects a value, false for a flag.</summary></lang>
+    bool takesValue;
+    /// <lang name="fr"><summary>La valeur prise quand l'option n'est pas donnée, ou `null`.</summary></lang>
+    /// <lang name="en"><summary>The value used when the option is not given, or `null`.</summary></lang>
+    string? defaultValue;
+    /// <lang name="fr"><summary>Vrai si l'option doit être donnée (et n'a pas de valeur par défaut).</summary></lang>
+    /// <lang name="en"><summary>True when the option must be given (and has no default value).</summary></lang>
+    bool required;
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'un programme accepte sur sa ligne de commande.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>What a program accepts on its command line.</summary>
+/// </lang>
+mold CliSpec {
+    /// <lang name="fr"><summary>Le nom du programme, pour la ligne d'usage.</summary></lang>
+    /// <lang name="en"><summary>The program name, for the usage line.</summary></lang>
+    string program;
+    /// <lang name="fr"><summary>Ce que fait le programme, en une phrase.</summary></lang>
+    /// <lang name="en"><summary>What the program does, in one sentence.</summary></lang>
+    string description;
+    /// <lang name="fr"><summary>Les options reconnues.</summary></lang>
+    /// <lang name="en"><summary>The recognized options.</summary></lang>
+    [CliOption] options;
+}
+
+/// <lang name="fr">
+/// <summary>Le résultat de l'analyse : les options données et les arguments qui n'en sont pas.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The result of the parsing: the options given and the arguments that are not options.</summary>
+/// </lang>
+mold CliArguments {
+    /// <lang name="fr"><summary>Les options données (et celles qui ont une valeur par défaut), par nom long ; un drapeau vaut `true`.</summary></lang>
+    /// <lang name="en"><summary>The options given (and those with a default value), by long name; a flag is `true`.</summary></lang>
+    [string:string] values;
+    /// <lang name="fr"><summary>Les arguments qui ne sont pas des options, dans l'ordre (tout ce qui suit `--` en fait partie).</summary></lang>
+    /// <lang name="en"><summary>The arguments that are not options, in order (everything after `--` is one).</summary></lang>
+    [string] positional;
+}
+
+/// <lang name="fr">
+/// <summary>L'état de l'analyse en cours (usage interne).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The state of the parsing in progress (internal use).</summary>
+/// </lang>
+mold _CliState {
+    /// <lang name="fr"><summary>Les options lues jusqu'ici.</summary></lang>
+    /// <lang name="en"><summary>The options read so far.</summary></lang>
+    [string:string] values;
+    /// <lang name="fr"><summary>Les arguments sans option lus jusqu'ici.</summary></lang>
+    /// <lang name="en"><summary>The non-option arguments read so far.</summary></lang>
+    [string] positional;
+    /// <lang name="fr"><summary>Vrai quand l'argument suivant a déjà été pris comme valeur.</summary></lang>
+    /// <lang name="en"><summary>True when the next argument was already taken as a value.</summary></lang>
+    bool skip;
+    /// <lang name="fr"><summary>Vrai après `--` : plus rien n'est une option.</summary></lang>
+    /// <lang name="en"><summary>True after `--`: nothing is an option anymore.</summary></lang>
+    bool afterSeparator;
+    /// <lang name="fr"><summary>Le message de la première erreur, ou `null`.</summary></lang>
+    /// <lang name="en"><summary>The message of the first error, or `null`.</summary></lang>
+    string? error;
+    /// <lang name="fr"><summary>L'argument en cause dans cette erreur.</summary></lang>
+    /// <lang name="en"><summary>The argument involved in that error.</summary></lang>
+    string? errorInput;
+}
+
+/// <lang name="fr">
+/// <summary>Décrit une option à valeur : `option('port', 'Le port', 'p', '8080')`.</summary>
+/// <param name="name">Le nom long, sans tirets.</param>
+/// <param name="description">La description pour `usage`.</param>
+/// <param name="shortName">La lettre courte, sans tiret.</param>
+/// <param name="defaultValue">La valeur prise quand l'option est absente.</param>
+/// <param name="required">Vrai si l'option doit être donnée.</param>
+/// <returns>L'option décrite.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Describes an option with a value: `option('port', 'The port', 'p', '8080')`.</summary>
+/// <param name="name">The long name, without dashes.</param>
+/// <param name="description">The description for `usage`.</param>
+/// <param name="shortName">The short letter, without a dash.</param>
+/// <param name="defaultValue">The value used when the option is absent.</param>
+/// <param name="required">True when the option must be given.</param>
+/// <returns>The described option.</returns>
+/// </lang>
+gear pure option(string name, string description, string? shortName: null, string? defaultValue: null, bool required: false): CliOption =>
+    {name, shortName, description, takesValue: true, defaultValue, required};
+
+/// <lang name="fr">
+/// <summary>Décrit un drapeau, une option sans valeur : `flag('verbose', 'Plus de détails', 'v')`.</summary>
+/// <param name="name">Le nom long, sans tirets.</param>
+/// <param name="description">La description pour `usage`.</param>
+/// <param name="shortName">La lettre courte, sans tiret ; les lettres de plusieurs drapeaux se regroupent (`-vq`).</param>
+/// <returns>Le drapeau décrit.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Describes a flag, an option without a value: `flag('verbose', 'More details', 'v')`.</summary>
+/// <param name="name">The long name, without dashes.</param>
+/// <param name="description">The description for `usage`.</param>
+/// <param name="shortName">The short letter, without a dash; the letters of several flags can be grouped (`-vq`).</param>
+/// <returns>The described flag.</returns>
+/// </lang>
+gear pure flag(string name, string description, string? shortName: null): CliOption =>
+    {name, shortName, description, takesValue: false, required: false};
+
+/// <lang name="fr"><summary>L'option de ce nom long, ou `null` (usage interne).</summary><param name="spec">Ce que le programme accepte.</param><param name="name">Le nom long.</param><returns>L'option trouvée.</returns></lang>
+/// <lang name="en"><summary>The option with that long name, or `null` (internal use).</summary><param name="spec">What the program accepts.</param><param name="name">The long name.</param><returns>The option found.</returns></lang>
+gear pure _cliLong(CliSpec spec, string name): CliOption? => spec.options.find((o) => o.name eq name);
+
+/// <lang name="fr"><summary>L'option de cette lettre courte, ou `null` (usage interne).</summary><param name="spec">Ce que le programme accepte.</param><param name="letter">La lettre.</param><returns>L'option trouvée.</returns></lang>
+/// <lang name="en"><summary>The option with that short letter, or `null` (internal use).</summary><param name="spec">What the program accepts.</param><param name="letter">The letter.</param><returns>The option found.</returns></lang>
+gear pure _cliShort(CliSpec spec, string letter): CliOption? => spec.options.find((o) => (o.shortName ?? '') eq letter);
+
+/// <lang name="fr"><summary>L'état avec une erreur de plus (usage interne).</summary><param name="state">L'état courant.</param><param name="message">Le message de l'erreur.</param><param name="input">L'argument en cause.</param><returns>Le nouvel état.</returns></lang>
+/// <lang name="en"><summary>The state with an error added (internal use).</summary><param name="state">The current state.</param><param name="message">The error message.</param><param name="input">The argument involved.</param><returns>The new state.</returns></lang>
+gear pure _cliError(_CliState state, string message, string input): _CliState => {...state, error: message, errorInput: input};
+
+/// <lang name="fr"><summary>Lit une option longue `--nom`, `--nom=valeur` ou `--nom valeur` (usage interne).</summary><param name="spec">Ce que le programme accepte.</param><param name="args">Tous les arguments.</param><param name="index">Le rang de l'option.</param><param name="state">L'état courant.</param><returns>Le nouvel état.</returns></lang>
+/// <lang name="en"><summary>Reads a long option `--name`, `--name=value` or `--name value` (internal use).</summary><param name="spec">What the program accepts.</param><param name="args">All the arguments.</param><param name="index">The option's position.</param><param name="state">The current state.</param><returns>The new state.</returns></lang>
+gear pure _cliLongOption(CliSpec spec, [string] args, long index, _CliState state): _CliState {
+    const string arg: args[index];
+    const (string before, string after, bool found) pair: arg.substring(2, arg.length as long).splitOnce('=');
+    const CliOption? known: _cliLong(spec, pair.before);
+    if (known eq null) { return _cliError(state, `option inconnue : --{pair.before}`, arg); }
+    const CliOption option: known;
+    if (not option.takesValue) {
+        if (pair.found) { return _cliError(state, `l'option --{option.name} n'attend pas de valeur`, arg); }
+        return {...state, values: state.values.put(option.name, 'true')};
+    }
+    if (pair.found) { return {...state, values: state.values.put(option.name, pair.after)}; }
+    if (index + 1 >= (args.length as long)) { return _cliError(state, `l'option --{option.name} attend une valeur`, arg); }
+    return {...state, values: state.values.put(option.name, args[index + 1]), skip: true};
+}
+
+/// <lang name="fr"><summary>Lit des lettres courtes groupées : `-v`, `-vq`, `-p 80`, `-p80` ou `-p=80` (usage interne).</summary><param name="spec">Ce que le programme accepte.</param><param name="args">Tous les arguments.</param><param name="index">Le rang de l'argument.</param><param name="state">L'état courant.</param><param name="cluster">Les lettres qui restent à lire, sans le tiret.</param><returns>Le nouvel état.</returns></lang>
+/// <lang name="en"><summary>Reads grouped short letters: `-v`, `-vq`, `-p 80`, `-p80` or `-p=80` (internal use).</summary><param name="spec">What the program accepts.</param><param name="args">All the arguments.</param><param name="index">The argument's position.</param><param name="state">The current state.</param><param name="cluster">The letters left to read, without the dash.</param><returns>The new state.</returns></lang>
+gear pure _cliShortCluster(CliSpec spec, [string] args, long index, _CliState state, string cluster): _CliState {
+    const string arg: args[index];
+    const string letter: cluster.substring(0, 1);
+    const string rest: cluster.substring(1, cluster.length as long);
+    const CliOption? known: _cliShort(spec, letter);
+    if (known eq null) { return _cliError(state, `option inconnue : -{letter}`, arg); }
+    const CliOption option: known;
+    if (not option.takesValue) {
+        const _CliState next: {...state, values: state.values.put(option.name, 'true')};
+        return rest eq '' ? next : _cliShortCluster(spec, args, index, next, rest);
+    }
+    if (rest not eq '') {
+        const string given: rest.startsWith('=') ? rest.substring(1, rest.length as long) : rest;
+        return {...state, values: state.values.put(option.name, given)};
+    }
+    if (index + 1 >= (args.length as long)) { return _cliError(state, `l'option -{letter} attend une valeur`, arg); }
+    return {...state, values: state.values.put(option.name, args[index + 1]), skip: true};
+}
+
+/// <lang name="fr"><summary>Lit l'argument de rang `index` (usage interne).</summary><param name="spec">Ce que le programme accepte.</param><param name="args">Tous les arguments.</param><param name="index">Le rang à lire.</param><param name="state">L'état courant.</param><returns>Le nouvel état.</returns></lang>
+/// <lang name="en"><summary>Reads the argument at position `index` (internal use).</summary><param name="spec">What the program accepts.</param><param name="args">All the arguments.</param><param name="index">The position to read.</param><param name="state">The current state.</param><returns>The new state.</returns></lang>
+gear pure _cliStep(CliSpec spec, [string] args, long index, _CliState state): _CliState {
+    if (state.skip) { return {...state, skip: false}; }
+    const string arg: args[index];
+    if (state.afterSeparator) { return {...state, positional: [...state.positional, arg]}; }
+    if (arg eq '--') { return {...state, afterSeparator: true}; }
+    if (arg.startsWith('--')) { return _cliLongOption(spec, args, index, state); }
+    if (arg.length > 1 and arg.startsWith('-') and not arg.substring(1, 2).isDigit()) {
+        return _cliShortCluster(spec, args, index, state, arg.substring(1, arg.length as long));
+    }
+    return {...state, positional: [...state.positional, arg]};
+}
+
+/// <lang name="fr">
+/// <summary>Analyse les arguments d'un programme : `--port 80`, `--port=80`, `-p 80`, `-p80`, drapeaux (`--verbose`, `-v`, `-vq`), `--` pour finir les options, le reste est positionnel. Les valeurs par défaut sont appliquées, et une option obligatoire absente est une erreur.</summary>
+/// <param name="args">Les arguments, tels que les reçoit le train d'entrée.</param>
+/// <param name="spec">Ce que le programme accepte.</param>
+/// <returns>Les arguments lus, ou une erreur (option inconnue, valeur manquante, option obligatoire absente) dont `input` est l'argument en cause.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Parses a program's arguments: `--port 80`, `--port=80`, `-p 80`, `-p80`, flags (`--verbose`, `-v`, `-vq`), `--` to end the options, the rest is positional. Default values are applied, and a missing required option is an error.</summary>
+/// <param name="args">The arguments, as the entry train receives them.</param>
+/// <param name="spec">What the program accepts.</param>
+/// <returns>The parsed arguments, or an error (unknown option, missing value, missing required option) whose `input` is the argument involved.</returns>
+/// </lang>
+gear pure parseArguments([string] args, CliSpec spec): CliArguments ! ParseError {
+    const _CliState start: {values: [:], positional: [], skip: false, afterSeparator: false};
+    const _CliState scanned: [0..<(args.length as long)] |+> start with (state, i) => {
+        const _CliState next: _cliStep(spec, args, i, state);
+        if (next.error not eq null) { done next; }
+        return next;
+    };
+    const _CliState completed: spec.options |+> scanned with (state, option) => {
+        if (state.error not eq null or state.values.has(option.name)) { return state; }
+        if (option.defaultValue not eq null) { return {...state, values: state.values.put(option.name, option.defaultValue ?? '')}; }
+        if (option.required) { return _cliError(state, `l'option --{option.name} est obligatoire`, ''); }
+        return state;
+    };
+    if (completed.error not eq null) { return err({message: completed.error ?? '', input: completed.errorInput ?? ''}); }
+    return ok({values: completed.values, positional: completed.positional});
+}
+
+/// <lang name="fr">
+/// <summary>Le texte d'aide d'un programme : une ligne d'usage, sa description et une ligne par option, alignées.</summary>
+/// <param name="spec">Ce que le programme accepte.</param>
+/// <returns>Le texte, sans retour à la ligne final.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A program's help text: a usage line, its description and one line per option, aligned.</summary>
+/// <param name="spec">What the program accepts.</param>
+/// <returns>The text, without a trailing newline.</returns>
+/// </lang>
+gear pure usage(CliSpec spec): string {
+    const [string] lefts: spec.options ||> (o) => {
+        const string letter: o.shortName eq null ? '    ' : `-{o.shortName ?? ''}, `;
+        const string hint: o.takesValue ? ' <valeur>' : '';
+        return `{letter}--{o.name}{hint}`;
+    };
+    const long none: 0;
+    const long width: lefts |+> none with (acc, left) => (left.length as long) > acc ? (left.length as long) : acc;
+    const [string] lines: spec.options ||> (o, i) => {
+        const string byDefault: o.defaultValue eq null ? '' : ` (défaut : {o.defaultValue ?? ''})`;
+        const string needed: o.required ? ' (obligatoire)' : '';
+        return `  {lefts[i].padEnd((width + 2) as uint)}{o.description}{byDefault}{needed}`;
+    };
+    const string header: `Usage : {spec.program} [options] [arguments]\n{spec.description}`;
+    return lines.length eq 0 ? header : `{header}\n\nOptions :\n{lines.join("\n")}`;
+}
+
+/// <lang name="fr">
+/// <summary>Lecture des arguments analysés.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reading the parsed arguments.</summary>
+/// </lang>
+extend CliArguments {
+    /// <lang name="fr"><summary>Vrai si l'option a été donnée (ou a une valeur par défaut) : un drapeau présent, une option qui a une valeur.</summary><param name="arguments">Les arguments analysés.</param><param name="name">Le nom long de l'option.</param><returns>`true` si l'option est là.</returns></lang>
+    /// <lang name="en"><summary>True when the option was given (or has a default value): a flag that is present, an option that has a value.</summary><param name="arguments">The parsed arguments.</param><param name="name">The option's long name.</param><returns>`true` when the option is there.</returns></lang>
+    gear pure has(this CliArguments arguments, string name): bool => arguments.values.has(name);
+
+    /// <lang name="fr"><summary>La valeur d'une option, en texte.</summary><param name="arguments">Les arguments analysés.</param><param name="name">Le nom long de l'option.</param><returns>La valeur, `null` si l'option est absente.</returns></lang>
+    /// <lang name="en"><summary>The value of an option, as text.</summary><param name="arguments">The parsed arguments.</param><param name="name">The option's long name.</param><returns>The value, or `null` when the option is absent.</returns></lang>
+    gear pure value(this CliArguments arguments, string name): string? => arguments.values.has(name) ? arguments.values[name] : null;
+
+    /// <lang name="fr"><summary>La valeur d'une option, ou celle donnée si elle est absente.</summary><param name="arguments">Les arguments analysés.</param><param name="name">Le nom long de l'option.</param><param name="fallback">La valeur de repli.</param><returns>La valeur.</returns></lang>
+    /// <lang name="en"><summary>The value of an option, or the given one when it is absent.</summary><param name="arguments">The parsed arguments.</param><param name="name">The option's long name.</param><param name="fallback">The fallback value.</param><returns>The value.</returns></lang>
+    gear pure valueOr(this CliArguments arguments, string name, string fallback): string => arguments.values.has(name) ? arguments.values[name] : fallback;
+
+    /// <lang name="fr"><summary>La valeur d'une option lue comme un entier.</summary><param name="arguments">Les arguments analysés.</param><param name="name">Le nom long de l'option.</param><returns>L'entier, `null` si l'option est absente ou n'est pas un entier.</returns></lang>
+    /// <lang name="en"><summary>The value of an option read as an integer.</summary><param name="arguments">The parsed arguments.</param><param name="name">The option's long name.</param><returns>The integer, or `null` when the option is absent or not an integer.</returns></lang>
+    gear pure intValue(this CliArguments arguments, string name): int? => arguments.values.has(name) ? arguments.values[name].toInt() : null;
+
+    /// <lang name="fr"><summary>La valeur d'une option lue comme un nombre à virgule.</summary><param name="arguments">Les arguments analysés.</param><param name="name">Le nom long de l'option.</param><returns>Le nombre, `null` si l'option est absente ou n'est pas un nombre.</returns></lang>
+    /// <lang name="en"><summary>The value of an option read as a floating-point number.</summary><param name="arguments">The parsed arguments.</param><param name="name">The option's long name.</param><returns>The number, or `null` when the option is absent or not a number.</returns></lang>
+    gear pure doubleValue(this CliArguments arguments, string name): double? => arguments.values.has(name) ? arguments.values[name].toDouble() : null;
+}

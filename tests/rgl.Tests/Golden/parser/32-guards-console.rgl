@@ -1,0 +1,32 @@
+// Guards, emits, console et as! : guard avec done et fail, emit, écriture et lecture, rail.
+guard positif(int n): int {
+    if (n < 0) {
+        fail "négatif";
+    }
+    done;
+}
+
+guard nombre(string texte): int => texte as! int;
+
+gear demander(string question): string {
+    question -> console;
+    var reponse <- console;
+    reponse <- console;
+    `{reponse}\n` -> console;
+    return reponse;
+}
+
+guard verifier(): void {
+    fail;
+}
+
+emit afficher(int n): void {
+    n * 2 -> console;
+}
+
+emit signaler(Exception e): uint {
+    `Erreur : {e}` -> console;
+    return 2;
+}
+
+train "42" |> nombre |> positif !> [signaler] |> afficher;

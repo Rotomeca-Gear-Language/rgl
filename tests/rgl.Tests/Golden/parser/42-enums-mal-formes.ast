@@ -1,0 +1,12 @@
+CompilationUnit 1:1
+  EnumDeclaration 2:1 name=<manquant>
+    EnumVariant 2:8 name=A
+  EnumDeclaration 3:1 name=B
+    EnumVariant 3:10 name=X
+  EnumDeclaration 4:1 name=C
+    PrimitiveType 4:9 type=int
+    EnumVariant 4:15 name=Z
+      MissingExpression 4:18
+  TrainDeclaration 5:1 unguarded=true parameters=none
+    Pipeline 5:8
+      DoneStep 5:11

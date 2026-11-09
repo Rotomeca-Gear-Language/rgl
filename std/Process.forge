@@ -1,0 +1,98 @@
+forge: mold
+description: "Ce que `spawn` renvoie : le résultat d'un processus enfant, ou la raison pour laquelle il n'a pas pu s'exécuter"
+
+/// <lang name="fr">
+/// <summary>Pourquoi un processus enfant n'a pas pu s'exécuter jusqu'au bout.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Why a child process could not run to completion.</summary>
+/// </lang>
+enum SpawnFailure {
+    /// <lang name="fr">
+    /// <summary>L'exécutable est introuvable (ni dans le chemin donné, ni dans le `PATH`).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The executable was not found (neither at the given path nor in `PATH`).</summary>
+    /// </lang>
+    ExecNotFound,
+
+    /// <lang name="fr">
+    /// <summary>Le système refuse de lancer l'exécutable, ou le programme est `rgl` : un processus RGL ne relance pas le compilateur.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The system refuses to launch the executable, or the program is `rgl`: an RGL process cannot relaunch the compiler.</summary>
+    /// </lang>
+    PermissionDenied,
+
+    /// <lang name="fr">
+    /// <summary>Le processus a dépassé l'option `timeout` : il a été tué, et sa sortie est perdue.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The process exceeded the `timeout` option: it was killed, and its output was lost.</summary>
+    /// </lang>
+    Timeout,
+
+    /// <lang name="fr">
+    /// <summary>Toute autre erreur du système (tube, mémoire, chemin de travail invalide…).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Any other system error (pipe, memory, invalid working directory, etc.).</summary>
+    /// </lang>
+    IoError,
+}
+
+/// <lang name="fr">
+/// <summary>Ce qu'un processus enfant a fait : son code de sortie et ce qu'il a écrit.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>What a child process did: its exit code and output.</summary>
+/// </lang>
+mold ProcessResult {
+    /// <lang name="fr">
+    /// <summary>Le code de sortie du processus ; 0 en général pour dire « réussi ».</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The process exit code; usually 0 indicates success.</summary>
+    /// </lang>
+    int exitCode;
+
+    /// <lang name="fr">
+    /// <summary>Ce que le processus a écrit sur sa sortie standard (vide si `stdout` n'est pas `pipe`) ; un octet qui n'est pas de l'UTF-8 est remplacé par `�`.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>What the process wrote to standard output (empty if `stdout` is not `pipe`); a byte that is not valid UTF-8 is replaced with `�`.</summary>
+    /// </lang>
+    string stdout;
+
+    /// <lang name="fr">
+    /// <summary>Ce que le processus a écrit sur sa sortie d'erreur (vide si `stderr` n'est pas `pipe`) ; un octet qui n'est pas de l'UTF-8 est remplacé par `�`.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>What the process wrote to standard error (empty if `stderr` is not `pipe`); a byte that is not valid UTF-8 is replaced with `�`.</summary>
+    /// </lang>
+    string stderr;
+}
+
+/// <lang name="fr">
+/// <summary>L'échec du lancement d'un processus enfant.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A failure to launch a child process.</summary>
+/// </lang>
+mold SpawnError {
+    /// <lang name="fr">
+    /// <summary>La raison de l'échec.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The reason for the failure.</summary>
+    /// </lang>
+    SpawnFailure kind;
+
+    /// <lang name="fr">
+    /// <summary>Le détail, en français.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The details, in French.</summary>
+    /// </lang>
+    string message;
+}

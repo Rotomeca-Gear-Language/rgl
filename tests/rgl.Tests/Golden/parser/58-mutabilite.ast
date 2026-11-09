@@ -1,0 +1,80 @@
+CompilationUnit 1:1
+  MoldDeclaration 3:1 name=Vec2
+    MoldField 3:13 name=x
+      PrimitiveType 3:13 type=float
+    MoldField 3:22 name=y
+      PrimitiveType 3:22 type=float
+  GearDeclaration 5:1 kind=gear name=bouger pure=false parameters=2
+    Parameter 5:13 name=v mut=true
+      NamedType 5:17 name=Vec2
+    Parameter 5:25 name=dx
+      PrimitiveType 5:25 type=float
+    PrimitiveType 5:36 type=void
+    BlockStatement 5:41
+      FieldAssignmentStatement 6:5 op=+<-
+        MemberAccessExpression 6:5 member=x
+          NameExpression 6:5 name=v
+        NameExpression 6:13 name=dx
+  GearDeclaration 9:1 kind=gear name=g pure=false parameters=0
+    PrimitiveType 9:11 type=void
+    BlockStatement 9:16
+      VarDeclaration 10:5 keyword=var name=ps mut=true
+        ArrayExpression 10:17
+          LiteralExpression 10:18 kind=IntegerLiteral text=1
+          LiteralExpression 10:21 kind=IntegerLiteral text=2
+      VarDeclaration 11:5 keyword=none name=liste mut=true
+        ArrayType 11:9
+          NamedType 11:10 name=Vec2
+        ArrayExpression 11:23
+      VarDeclaration 12:5 keyword=none name=n
+        PrimitiveType 12:5 type=int
+        LiteralExpression 12:12 kind=IntegerLiteral text=3
+      VarDeclaration 13:5 keyword=none name=valeur
+        NullableType 13:6
+          UnionType 13:6
+            PrimitiveType 13:6 type=int
+            PrimitiveType 13:12 type=string
+        LiteralExpression 13:29 kind=NullKeyword text=null
+      FieldAssignmentStatement 14:5
+        MemberAccessExpression 14:5 member=x
+          IndexExpression 14:5
+            NameExpression 14:5 name=liste
+            LiteralExpression 14:11 kind=IntegerLiteral text=0
+        LiteralExpression 14:19 kind=FloatLiteral text=1.0
+      FieldAssignmentStatement 15:5 op=*<-
+        MemberAccessExpression 15:5 member=y
+          IndexExpression 15:5
+            NameExpression 15:5 name=liste
+            NameExpression 15:11 name=n
+        LiteralExpression 15:20 kind=FloatLiteral text=2.0
+      ExpressionStatement 16:5
+        CallExpression 16:5
+          NameExpression 16:5 name=bouger
+          IndexExpression 16:12
+            NameExpression 16:12 name=liste
+            LiteralExpression 16:18 kind=IntegerLiteral text=0
+          LiteralExpression 16:22 kind=FloatLiteral text=1.0
+      ExpressionStatement 17:5
+        EachExpression 17:5 strict=false
+          NameExpression 17:5 name=liste
+          EachTarget 17:15
+            LambdaExpression 17:15 parameters=1
+              LambdaParameter 17:16 name=v mut=true
+              BlockStatement 17:26
+                FieldAssignmentStatement 17:28
+                  MemberAccessExpression 17:28 member=x
+                    NameExpression 17:28 name=v
+                  LiteralExpression 17:35 kind=FloatLiteral text=0.0
+      ExpressionStatement 18:5
+        EachExpression 18:5 strict=false
+          NameExpression 18:5 name=liste
+          EachTarget 18:15
+            LambdaExpression 18:15 parameters=2
+              LambdaParameter 18:16 name=v mut=true
+                NamedType 18:20 name=Vec2
+              LambdaParameter 18:28 name=i
+                PrimitiveType 18:28 type=int
+              NameExpression 18:38 name=i
+  TrainDeclaration 20:1 unguarded=true parameters=none
+    Pipeline 20:8
+      DoneStep 20:11

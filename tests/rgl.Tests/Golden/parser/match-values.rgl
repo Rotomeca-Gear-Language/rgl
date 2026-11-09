@@ -1,0 +1,3 @@
+gear taille(int n): string => match (n) { case 1, 2 |> "petit"; case eval $ > 10 |> "grand"; default |> "moyen"; };
+
+!train |> done;

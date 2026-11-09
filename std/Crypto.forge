@@ -1,0 +1,968 @@
+forge: gears
+description: "Empreintes (SHA-256, SHA-512, SHA-1, MD5, CRC32, HMAC), dérivation de clés (PBKDF2), mots de passe, identifiants (UUID) et octets aléatoires"
+
+use <Text> only {hexEncode, hexDecode};
+
+/// <lang name="fr">
+/// <summary>L'empreinte SHA-256 d'octets, en hexadécimal minuscule (64 caractères).</summary>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>L'empreinte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The SHA-256 digest of bytes, in lowercase hexadecimal (64 characters).</summary>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The digest.</returns>
+/// </lang>
+@trusted
+gear pure sha256(bytes data): string => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    static rgl::standard::string to_hex(const std::uint8_t* bytes, std::size_t count) {
+        static const char digits[] = "0123456789abcdef";
+        std::string text;
+        text.reserve(count * 2);
+        for (std::size_t i = 0; i < count; ++i) { text += digits[bytes[i] >> 4]; text += digits[bytes[i] & 15]; }
+        return rgl::standard::string(text.c_str(), text.size());
+    }
+    static std::vector<std::uint8_t> to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+    static std::uint32_t rotl(std::uint32_t v, int n) { return (v << n) | (v >> (32 - n)); }
+    static std::uint32_t rotr(std::uint32_t v, int n) { return (v >> n) | (v << (32 - n)); }
+
+    static std::array<std::uint8_t, 32> sha256_bytes(const std::vector<std::uint8_t>& message) {
+        static const std::uint32_t k[64] = {
+            0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+            0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+            0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+            0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2};
+        std::uint32_t h[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+        std::vector<std::uint8_t> data = message;
+        const std::uint64_t bits = static_cast<std::uint64_t>(message.size()) * 8;
+        data.push_back(0x80);
+        while (data.size() % 64 != 56) data.push_back(0);
+        for (int i = 7; i >= 0; --i) data.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
+        for (std::size_t offset = 0; offset < data.size(); offset += 64) {
+            std::uint32_t w[64];
+            for (int i = 0; i < 16; ++i) w[i] = (std::uint32_t(data[offset + i * 4]) << 24) | (std::uint32_t(data[offset + i * 4 + 1]) << 16) | (std::uint32_t(data[offset + i * 4 + 2]) << 8) | std::uint32_t(data[offset + i * 4 + 3]);
+            for (int i = 16; i < 64; ++i) {
+                const std::uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
+                const std::uint32_t s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
+                w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+            }
+            std::uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+            for (int i = 0; i < 64; ++i) {
+                const std::uint32_t s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+                const std::uint32_t ch = (e & f) ^ (~e & g);
+                const std::uint32_t t1 = hh + s1 + ch + k[i] + w[i];
+                const std::uint32_t s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+                const std::uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
+                const std::uint32_t t2 = s0 + maj;
+                hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+            }
+            h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+        }
+        std::array<std::uint8_t, 32> out;
+        for (int i = 0; i < 8; ++i) { out[i * 4] = static_cast<std::uint8_t>(h[i] >> 24); out[i * 4 + 1] = static_cast<std::uint8_t>(h[i] >> 16); out[i * 4 + 2] = static_cast<std::uint8_t>(h[i] >> 8); out[i * 4 + 3] = static_cast<std::uint8_t>(h[i]); }
+        return out;
+    }
+    rgl_return rgl(rgl_arg_data data) {
+        const auto digest = sha256_bytes(to_vector(data));
+        return to_hex(digest.data(), digest.size());
+    }
+}(bytes data: data): string;
+
+/// <lang name="fr">
+/// <summary>L'empreinte SHA-256 d'un texte (ses octets UTF-8), en hexadécimal minuscule.</summary>
+/// <param name="text">Le texte.</param>
+/// <returns>L'empreinte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The SHA-256 digest of a text (its UTF-8 bytes), in lowercase hexadecimal.</summary>
+/// <param name="text">The text.</param>
+/// <returns>The digest.</returns>
+/// </lang>
+gear pure sha256(string text): string => sha256(text as bytes);
+
+/// <lang name="fr">
+/// <summary>Le code d'authentification HMAC-SHA256, en hexadécimal minuscule.</summary>
+/// <param name="key">La clé secrète.</param>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>Le code.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The HMAC-SHA256 authentication code, in lowercase hexadecimal.</summary>
+/// <param name="key">The secret key.</param>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The code.</returns>
+/// </lang>
+@trusted
+gear pure hmacSha256(bytes key, bytes data): string => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    static rgl::standard::string to_hex(const std::uint8_t* bytes, std::size_t count) {
+        static const char digits[] = "0123456789abcdef";
+        std::string text;
+        text.reserve(count * 2);
+        for (std::size_t i = 0; i < count; ++i) { text += digits[bytes[i] >> 4]; text += digits[bytes[i] & 15]; }
+        return rgl::standard::string(text.c_str(), text.size());
+    }
+    static std::vector<std::uint8_t> to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+    static std::uint32_t rotl(std::uint32_t v, int n) { return (v << n) | (v >> (32 - n)); }
+    static std::uint32_t rotr(std::uint32_t v, int n) { return (v >> n) | (v << (32 - n)); }
+
+    static std::array<std::uint8_t, 32> sha256_bytes(const std::vector<std::uint8_t>& message) {
+        static const std::uint32_t k[64] = {
+            0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+            0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+            0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+            0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2};
+        std::uint32_t h[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+        std::vector<std::uint8_t> data = message;
+        const std::uint64_t bits = static_cast<std::uint64_t>(message.size()) * 8;
+        data.push_back(0x80);
+        while (data.size() % 64 != 56) data.push_back(0);
+        for (int i = 7; i >= 0; --i) data.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
+        for (std::size_t offset = 0; offset < data.size(); offset += 64) {
+            std::uint32_t w[64];
+            for (int i = 0; i < 16; ++i) w[i] = (std::uint32_t(data[offset + i * 4]) << 24) | (std::uint32_t(data[offset + i * 4 + 1]) << 16) | (std::uint32_t(data[offset + i * 4 + 2]) << 8) | std::uint32_t(data[offset + i * 4 + 3]);
+            for (int i = 16; i < 64; ++i) {
+                const std::uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
+                const std::uint32_t s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
+                w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+            }
+            std::uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+            for (int i = 0; i < 64; ++i) {
+                const std::uint32_t s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+                const std::uint32_t ch = (e & f) ^ (~e & g);
+                const std::uint32_t t1 = hh + s1 + ch + k[i] + w[i];
+                const std::uint32_t s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+                const std::uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
+                const std::uint32_t t2 = s0 + maj;
+                hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+            }
+            h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+        }
+        std::array<std::uint8_t, 32> out;
+        for (int i = 0; i < 8; ++i) { out[i * 4] = static_cast<std::uint8_t>(h[i] >> 24); out[i * 4 + 1] = static_cast<std::uint8_t>(h[i] >> 16); out[i * 4 + 2] = static_cast<std::uint8_t>(h[i] >> 8); out[i * 4 + 3] = static_cast<std::uint8_t>(h[i]); }
+        return out;
+    }
+    rgl_return rgl(rgl_arg_key key, rgl_arg_data data) {
+        std::vector<std::uint8_t> k = to_vector(key);
+        if (k.size() > 64) { const auto h = sha256_bytes(k); k.assign(h.begin(), h.end()); }
+        k.resize(64, 0);
+        std::vector<std::uint8_t> inner(64), outer(64);
+        for (int i = 0; i < 64; ++i) { inner[i] = k[i] ^ 0x36; outer[i] = k[i] ^ 0x5c; }
+        const auto body = to_vector(data);
+        inner.insert(inner.end(), body.begin(), body.end());
+        const auto innerDigest = sha256_bytes(inner);
+        outer.insert(outer.end(), innerDigest.begin(), innerDigest.end());
+        const auto digest = sha256_bytes(outer);
+        return to_hex(digest.data(), digest.size());
+    }
+}(bytes key: key, bytes data: data): string;
+
+/// <lang name="fr">
+/// <summary>L'empreinte SHA-1 d'octets, en hexadécimal minuscule (40 caractères). SHA-1 n'est plus sûr contre un adversaire : à réserver à la compatibilité.</summary>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>L'empreinte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The SHA-1 digest of bytes, in lowercase hexadecimal (40 characters). SHA-1 is no longer safe against an adversary: keep it for compatibility.</summary>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The digest.</returns>
+/// </lang>
+@trusted
+gear pure sha1(bytes data): string => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    static rgl::standard::string to_hex(const std::uint8_t* bytes, std::size_t count) {
+        static const char digits[] = "0123456789abcdef";
+        std::string text;
+        text.reserve(count * 2);
+        for (std::size_t i = 0; i < count; ++i) { text += digits[bytes[i] >> 4]; text += digits[bytes[i] & 15]; }
+        return rgl::standard::string(text.c_str(), text.size());
+    }
+    static std::vector<std::uint8_t> to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+    static std::uint32_t rotl(std::uint32_t v, int n) { return (v << n) | (v >> (32 - n)); }
+    static std::uint32_t rotr(std::uint32_t v, int n) { return (v >> n) | (v << (32 - n)); }
+    rgl_return rgl(rgl_arg_data data) {
+        std::vector<std::uint8_t> bytes = to_vector(data);
+        const std::uint64_t bits = static_cast<std::uint64_t>(bytes.size()) * 8;
+        bytes.push_back(0x80);
+        while (bytes.size() % 64 != 56) bytes.push_back(0);
+        for (int i = 7; i >= 0; --i) bytes.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
+        std::uint32_t h[5] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
+        for (std::size_t offset = 0; offset < bytes.size(); offset += 64) {
+            std::uint32_t w[80];
+            for (int i = 0; i < 16; ++i) w[i] = (std::uint32_t(bytes[offset + i * 4]) << 24) | (std::uint32_t(bytes[offset + i * 4 + 1]) << 16) | (std::uint32_t(bytes[offset + i * 4 + 2]) << 8) | std::uint32_t(bytes[offset + i * 4 + 3]);
+            for (int i = 16; i < 80; ++i) w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+            std::uint32_t a = h[0], b = h[1], c = h[2], d2 = h[3], e = h[4];
+            for (int i = 0; i < 80; ++i) {
+                std::uint32_t f, k;
+                if (i < 20) { f = (b & c) | (~b & d2); k = 0x5A827999; }
+                else if (i < 40) { f = b ^ c ^ d2; k = 0x6ED9EBA1; }
+                else if (i < 60) { f = (b & c) | (b & d2) | (c & d2); k = 0x8F1BBCDC; }
+                else { f = b ^ c ^ d2; k = 0xCA62C1D6; }
+                const std::uint32_t t = rotl(a, 5) + f + e + k + w[i];
+                e = d2; d2 = c; c = rotl(b, 30); b = a; a = t;
+            }
+            h[0] += a; h[1] += b; h[2] += c; h[3] += d2; h[4] += e;
+        }
+        std::uint8_t digest[20];
+        for (int i = 0; i < 5; ++i) { digest[i * 4] = static_cast<std::uint8_t>(h[i] >> 24); digest[i * 4 + 1] = static_cast<std::uint8_t>(h[i] >> 16); digest[i * 4 + 2] = static_cast<std::uint8_t>(h[i] >> 8); digest[i * 4 + 3] = static_cast<std::uint8_t>(h[i]); }
+        return to_hex(digest, 20);
+    }
+}(bytes data: data): string;
+
+/// <lang name="fr">
+/// <summary>L'empreinte MD5 d'octets, en hexadécimal minuscule (32 caractères). MD5 n'est plus sûr : à réserver à la compatibilité (sommes de contrôle).</summary>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>L'empreinte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The MD5 digest of bytes, in lowercase hexadecimal (32 characters). MD5 is no longer safe: keep it for compatibility (checksums).</summary>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The digest.</returns>
+/// </lang>
+@trusted
+gear pure md5(bytes data): string => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    static rgl::standard::string to_hex(const std::uint8_t* bytes, std::size_t count) {
+        static const char digits[] = "0123456789abcdef";
+        std::string text;
+        text.reserve(count * 2);
+        for (std::size_t i = 0; i < count; ++i) { text += digits[bytes[i] >> 4]; text += digits[bytes[i] & 15]; }
+        return rgl::standard::string(text.c_str(), text.size());
+    }
+    static std::vector<std::uint8_t> to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+    static std::uint32_t rotl(std::uint32_t v, int n) { return (v << n) | (v >> (32 - n)); }
+    static std::uint32_t rotr(std::uint32_t v, int n) { return (v >> n) | (v << (32 - n)); }
+    rgl_return rgl(rgl_arg_data data) {
+        static const int shifts[64] = {7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21};
+        std::uint32_t k[64];
+        for (int i = 0; i < 64; ++i) k[i] = static_cast<std::uint32_t>(std::floor(std::fabs(std::sin(i + 1.0)) * 4294967296.0));
+        std::vector<std::uint8_t> bytes = to_vector(data);
+        const std::uint64_t bits = static_cast<std::uint64_t>(bytes.size()) * 8;
+        bytes.push_back(0x80);
+        while (bytes.size() % 64 != 56) bytes.push_back(0);
+        for (int i = 0; i < 8; ++i) bytes.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
+        std::uint32_t a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+        for (std::size_t offset = 0; offset < bytes.size(); offset += 64) {
+            std::uint32_t m[16];
+            for (int i = 0; i < 16; ++i) m[i] = std::uint32_t(bytes[offset + i * 4]) | (std::uint32_t(bytes[offset + i * 4 + 1]) << 8) | (std::uint32_t(bytes[offset + i * 4 + 2]) << 16) | (std::uint32_t(bytes[offset + i * 4 + 3]) << 24);
+            std::uint32_t a = a0, b = b0, c = c0, d2 = d0;
+            for (int i = 0; i < 64; ++i) {
+                std::uint32_t f, g;
+                if (i < 16) { f = (b & c) | (~b & d2); g = i; }
+                else if (i < 32) { f = (d2 & b) | (~d2 & c); g = (5 * i + 1) % 16; }
+                else if (i < 48) { f = b ^ c ^ d2; g = (3 * i + 5) % 16; }
+                else { f = c ^ (b | ~d2); g = (7 * i) % 16; }
+                f = f + a + k[i] + m[g];
+                a = d2; d2 = c; c = b; b = b + rotl(f, shifts[i]);
+            }
+            a0 += a; b0 += b; c0 += c; d0 += d2;
+        }
+        std::uint8_t digest[16];
+        const std::uint32_t parts[4] = {a0, b0, c0, d0};
+        for (int i = 0; i < 4; ++i) for (int j = 0; j < 4; ++j) digest[i * 4 + j] = static_cast<std::uint8_t>(parts[i] >> (j * 8));
+        return to_hex(digest, 16);
+    }
+}(bytes data: data): string;
+
+/// <lang name="fr">
+/// <summary>La somme de contrôle CRC-32 (celle de zip, gzip et PNG).</summary>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>La somme de contrôle.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The CRC-32 checksum (the one of zip, gzip and PNG).</summary>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The checksum.</returns>
+/// </lang>
+@trusted
+gear pure crc32(bytes data): uint => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    rgl_return rgl(rgl_arg_data data) {
+        std::uint32_t crc = 0xFFFFFFFFu;
+        for (std::size_t i = 0; i < data.size(); ++i) {
+            crc ^= data[i];
+            for (int bit = 0; bit < 8; ++bit) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+        }
+        return ~crc;
+    }
+}(bytes data: data): uint;
+
+/// <lang name="fr">
+/// <summary>Des octets aléatoires venant du générateur du système (utilisable pour des clés et des jetons).</summary>
+/// <param name="count">Le nombre d'octets.</param>
+/// <returns>Les octets.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Random bytes from the system generator (usable for keys and tokens).</summary>
+/// <param name="count">The number of bytes.</param>
+/// <returns>The bytes.</returns>
+/// </lang>
+@trusted
+gear randomBytes(uint count): bytes => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    #include <random>
+    rgl_return rgl(rgl_arg_count count) {
+        std::random_device device;
+        rgl_return result;
+        result.reserve(count);
+        for (std::uint32_t i = 0; i < count; ++i) result.push(static_cast<std::uint8_t>(device() & 0xFFu));
+        return result;
+    }
+}(uint count: count): bytes;
+
+/// <lang name="fr">
+/// <summary>Un identifiant UUID version 4 (aléatoire), en minuscules avec ses tirets : `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.</summary>
+/// <returns>L'identifiant.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>A version 4 (random) UUID, in lowercase with its dashes: `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.</summary>
+/// <returns>The identifier.</returns>
+/// </lang>
+@trusted
+gear uuid4(): string => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    #include <random>
+    static rgl::standard::string to_hex(const std::uint8_t* bytes, std::size_t count) {
+        static const char digits[] = "0123456789abcdef";
+        std::string text;
+        text.reserve(count * 2);
+        for (std::size_t i = 0; i < count; ++i) { text += digits[bytes[i] >> 4]; text += digits[bytes[i] & 15]; }
+        return rgl::standard::string(text.c_str(), text.size());
+    }
+    static std::vector<std::uint8_t> to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        std::vector<std::uint8_t> bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+    static std::uint32_t rotl(std::uint32_t v, int n) { return (v << n) | (v >> (32 - n)); }
+    static std::uint32_t rotr(std::uint32_t v, int n) { return (v >> n) | (v << (32 - n)); }
+    rgl_return rgl() {
+        std::random_device device;
+        std::uint8_t bytes[16];
+        for (int i = 0; i < 16; ++i) bytes[i] = static_cast<std::uint8_t>(device() & 0xFFu);
+        bytes[6] = static_cast<std::uint8_t>((bytes[6] & 0x0F) | 0x40);
+        bytes[8] = static_cast<std::uint8_t>((bytes[8] & 0x3F) | 0x80);
+        const auto hex = to_hex(bytes, 16);
+        std::string text(hex.data(), hex.size());
+        text.insert(20, "-"); text.insert(16, "-"); text.insert(12, "-"); text.insert(8, "-");
+        return rgl::standard::string(text.c_str(), text.size());
+    }
+}(): string;
+
+/// <lang name="fr">
+/// <summary>Compare deux suites d'octets sans que la durée dépende de l'endroit où elles diffèrent (pour comparer des codes ou des jetons).</summary>
+/// <param name="left">La première suite.</param>
+/// <param name="right">La seconde suite.</param>
+/// <returns>`true` si elles sont identiques.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Compares two byte sequences without the duration depending on where they differ (to compare codes or tokens).</summary>
+/// <param name="left">The first sequence.</param>
+/// <param name="right">The second sequence.</param>
+/// <returns>`true` when they are identical.</returns>
+/// </lang>
+@trusted
+gear pure constantTimeEquals(bytes left, bytes right): bool => cpp {
+    #include <cstdint>
+    #include <string>
+    #include <vector>
+    #include <array>
+    #include <cmath>
+    rgl_return rgl(rgl_arg_left left, rgl_arg_right right) {
+        if (left.size() != right.size()) return false;
+        std::uint8_t difference = 0;
+        for (std::size_t i = 0; i < left.size(); ++i) difference |= static_cast<std::uint8_t>(left[i] ^ right[i]);
+        return difference == 0;
+    }
+}(bytes left: left, bytes right: right): bool;
+
+/// <lang name="fr">
+/// <summary>Calcul interne de la famille SHA-2 : empreinte SHA-512, HMAC-SHA512 et PBKDF2 (usage interne).</summary>
+/// <param name="operation">`sha512`, `hmac512`, `pbkdf2-256` ou `pbkdf2-512`.</param>
+/// <param name="first">Le message (`sha512`), la clé (`hmac512`) ou le mot de passe (`pbkdf2-*`).</param>
+/// <param name="second">Le message (`hmac512`) ou le sel (`pbkdf2-*`) ; ignoré pour `sha512`.</param>
+/// <param name="iterations">Le nombre d'itérations de PBKDF2.</param>
+/// <param name="length">La longueur voulue, en octets, de la clé dérivée.</param>
+/// <returns>Les octets calculés, vides si l'opération est inconnue.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Internal SHA-2 family computation: SHA-512 digest, HMAC-SHA512 and PBKDF2 (internal use).</summary>
+/// <param name="operation">`sha512`, `hmac512`, `pbkdf2-256` or `pbkdf2-512`.</param>
+/// <param name="first">The message (`sha512`), the key (`hmac512`) or the password (`pbkdf2-*`).</param>
+/// <param name="second">The message (`hmac512`) or the salt (`pbkdf2-*`); ignored for `sha512`.</param>
+/// <param name="iterations">The number of PBKDF2 iterations.</param>
+/// <param name="length">The wanted length, in bytes, of the derived key.</param>
+/// <returns>The computed bytes, empty when the operation is unknown.</returns>
+/// </lang>
+@trusted
+gear pure _sha2(string operation, bytes first, bytes second, uint iterations, uint length): bytes => cpp {
+    #include <cstdint>
+    #include <cstring>
+    #include <string>
+    #include <vector>
+    using Bytes = std::vector<std::uint8_t>;
+    static Bytes to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        Bytes bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+    static std::uint32_t rotr32(std::uint32_t v, int n) { return (v >> n) | (v << (32 - n)); }
+    static std::uint64_t rotr64(std::uint64_t v, int n) { return (v >> n) | (v << (64 - n)); }
+
+    static Bytes sha256(const Bytes& message) {
+        static const std::uint32_t k[64] = {
+            0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+            0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+            0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+            0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2};
+        std::uint32_t h[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+        Bytes data = message;
+        const std::uint64_t bits = static_cast<std::uint64_t>(message.size()) * 8;
+        data.push_back(0x80);
+        while (data.size() % 64 != 56) data.push_back(0);
+        for (int i = 7; i >= 0; --i) data.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
+        for (std::size_t offset = 0; offset < data.size(); offset += 64) {
+            std::uint32_t w[64];
+            for (int i = 0; i < 16; ++i) w[i] = (std::uint32_t(data[offset + i * 4]) << 24) | (std::uint32_t(data[offset + i * 4 + 1]) << 16) | (std::uint32_t(data[offset + i * 4 + 2]) << 8) | std::uint32_t(data[offset + i * 4 + 3]);
+            for (int i = 16; i < 64; ++i) {
+                const std::uint32_t s0 = rotr32(w[i - 15], 7) ^ rotr32(w[i - 15], 18) ^ (w[i - 15] >> 3);
+                const std::uint32_t s1 = rotr32(w[i - 2], 17) ^ rotr32(w[i - 2], 19) ^ (w[i - 2] >> 10);
+                w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+            }
+            std::uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+            for (int i = 0; i < 64; ++i) {
+                const std::uint32_t s1 = rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25);
+                const std::uint32_t ch = (e & f) ^ (~e & g);
+                const std::uint32_t t1 = hh + s1 + ch + k[i] + w[i];
+                const std::uint32_t s0 = rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22);
+                const std::uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
+                const std::uint32_t t2 = s0 + maj;
+                hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+            }
+            h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+        }
+        Bytes out(32);
+        for (int i = 0; i < 8; ++i) for (int j = 0; j < 4; ++j) out[i * 4 + j] = static_cast<std::uint8_t>(h[i] >> (24 - j * 8));
+        return out;
+    }
+
+    static Bytes sha512(const Bytes& message) {
+        static const std::uint64_t k[80] = {
+            0x428a2f98d728ae22ULL,0x7137449123ef65cdULL,0xb5c0fbcfec4d3b2fULL,0xe9b5dba58189dbbcULL,0x3956c25bf348b538ULL,0x59f111f1b605d019ULL,0x923f82a4af194f9bULL,0xab1c5ed5da6d8118ULL,
+            0xd807aa98a3030242ULL,0x12835b0145706fbeULL,0x243185be4ee4b28cULL,0x550c7dc3d5ffb4e2ULL,0x72be5d74f27b896fULL,0x80deb1fe3b1696b1ULL,0x9bdc06a725c71235ULL,0xc19bf174cf692694ULL,
+            0xe49b69c19ef14ad2ULL,0xefbe4786384f25e3ULL,0x0fc19dc68b8cd5b5ULL,0x240ca1cc77ac9c65ULL,0x2de92c6f592b0275ULL,0x4a7484aa6ea6e483ULL,0x5cb0a9dcbd41fbd4ULL,0x76f988da831153b5ULL,
+            0x983e5152ee66dfabULL,0xa831c66d2db43210ULL,0xb00327c898fb213fULL,0xbf597fc7beef0ee4ULL,0xc6e00bf33da88fc2ULL,0xd5a79147930aa725ULL,0x06ca6351e003826fULL,0x142929670a0e6e70ULL,
+            0x27b70a8546d22ffcULL,0x2e1b21385c26c926ULL,0x4d2c6dfc5ac42aedULL,0x53380d139d95b3dfULL,0x650a73548baf63deULL,0x766a0abb3c77b2a8ULL,0x81c2c92e47edaee6ULL,0x92722c851482353bULL,
+            0xa2bfe8a14cf10364ULL,0xa81a664bbc423001ULL,0xc24b8b70d0f89791ULL,0xc76c51a30654be30ULL,0xd192e819d6ef5218ULL,0xd69906245565a910ULL,0xf40e35855771202aULL,0x106aa07032bbd1b8ULL,
+            0x19a4c116b8d2d0c8ULL,0x1e376c085141ab53ULL,0x2748774cdf8eeb99ULL,0x34b0bcb5e19b48a8ULL,0x391c0cb3c5c95a63ULL,0x4ed8aa4ae3418acbULL,0x5b9cca4f7763e373ULL,0x682e6ff3d6b2b8a3ULL,
+            0x748f82ee5defb2fcULL,0x78a5636f43172f60ULL,0x84c87814a1f0ab72ULL,0x8cc702081a6439ecULL,0x90befffa23631e28ULL,0xa4506cebde82bde9ULL,0xbef9a3f7b2c67915ULL,0xc67178f2e372532bULL,
+            0xca273eceea26619cULL,0xd186b8c721c0c207ULL,0xeada7dd6cde0eb1eULL,0xf57d4f7fee6ed178ULL,0x06f067aa72176fbaULL,0x0a637dc5a2c898a6ULL,0x113f9804bef90daeULL,0x1b710b35131c471bULL,
+            0x28db77f523047d84ULL,0x32caab7b40c72493ULL,0x3c9ebe0a15c9bebcULL,0x431d67c49c100d4cULL,0x4cc5d4becb3e42b6ULL,0x597f299cfc657e2aULL,0x5fcb6fab3ad6faecULL,0x6c44198c4a475817ULL};
+        std::uint64_t h[8] = {0x6a09e667f3bcc908ULL,0xbb67ae8584caa73bULL,0x3c6ef372fe94f82bULL,0xa54ff53a5f1d36f1ULL,0x510e527fade682d1ULL,0x9b05688c2b3e6c1fULL,0x1f83d9abfb41bd6bULL,0x5be0cd19137e2179ULL};
+        Bytes data = message;
+        const std::uint64_t bits = static_cast<std::uint64_t>(message.size()) * 8;
+        data.push_back(0x80);
+        while (data.size() % 128 != 112) data.push_back(0);
+        for (int i = 0; i < 8; ++i) data.push_back(0);
+        for (int i = 7; i >= 0; --i) data.push_back(static_cast<std::uint8_t>(bits >> (i * 8)));
+        for (std::size_t offset = 0; offset < data.size(); offset += 128) {
+            std::uint64_t w[80];
+            for (int i = 0; i < 16; ++i) {
+                w[i] = 0;
+                for (int j = 0; j < 8; ++j) w[i] = (w[i] << 8) | data[offset + i * 8 + j];
+            }
+            for (int i = 16; i < 80; ++i) {
+                const std::uint64_t s0 = rotr64(w[i - 15], 1) ^ rotr64(w[i - 15], 8) ^ (w[i - 15] >> 7);
+                const std::uint64_t s1 = rotr64(w[i - 2], 19) ^ rotr64(w[i - 2], 61) ^ (w[i - 2] >> 6);
+                w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+            }
+            std::uint64_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+            for (int i = 0; i < 80; ++i) {
+                const std::uint64_t s1 = rotr64(e, 14) ^ rotr64(e, 18) ^ rotr64(e, 41);
+                const std::uint64_t ch = (e & f) ^ (~e & g);
+                const std::uint64_t t1 = hh + s1 + ch + k[i] + w[i];
+                const std::uint64_t s0 = rotr64(a, 28) ^ rotr64(a, 34) ^ rotr64(a, 39);
+                const std::uint64_t maj = (a & b) ^ (a & c) ^ (b & c);
+                const std::uint64_t t2 = s0 + maj;
+                hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+            }
+            h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+        }
+        Bytes out(64);
+        for (int i = 0; i < 8; ++i) for (int j = 0; j < 8; ++j) out[i * 8 + j] = static_cast<std::uint8_t>(h[i] >> (56 - j * 8));
+        return out;
+    }
+
+    using Hash = Bytes (*)(const Bytes&);
+    static Bytes hmac(Hash hash, std::size_t block, const Bytes& key, const Bytes& message) {
+        Bytes k = key;
+        if (k.size() > block) k = hash(k);
+        k.resize(block, 0);
+        Bytes inner(block), outer(block);
+        for (std::size_t i = 0; i < block; ++i) { inner[i] = k[i] ^ 0x36; outer[i] = k[i] ^ 0x5c; }
+        inner.insert(inner.end(), message.begin(), message.end());
+        const Bytes innerDigest = hash(inner);
+        outer.insert(outer.end(), innerDigest.begin(), innerDigest.end());
+        return hash(outer);
+    }
+    static Bytes pbkdf2(Hash hash, std::size_t block, const Bytes& password, const Bytes& salt, std::uint32_t iterations, std::uint32_t length) {
+        Bytes result;
+        result.reserve(length);
+        for (std::uint32_t index = 1; result.size() < length; ++index) {
+            Bytes message = salt;
+            message.push_back(static_cast<std::uint8_t>(index >> 24)); message.push_back(static_cast<std::uint8_t>(index >> 16));
+            message.push_back(static_cast<std::uint8_t>(index >> 8)); message.push_back(static_cast<std::uint8_t>(index));
+            Bytes u = hmac(hash, block, password, message);
+            Bytes t = u;
+            for (std::uint32_t round = 1; round < iterations; ++round) {
+                u = hmac(hash, block, password, u);
+                for (std::size_t i = 0; i < t.size(); ++i) t[i] ^= u[i];
+            }
+            for (std::size_t i = 0; i < t.size() && result.size() < length; ++i) result.push_back(t[i]);
+        }
+        return result;
+    }
+
+    rgl_return rgl(rgl_arg_operation operation, rgl_arg_first first, rgl_arg_second second, unsigned int iterations, unsigned int length) {
+        const std::string name(operation.data(), operation.size());
+        Bytes bytes;
+        if (name == "sha512") bytes = sha512(to_vector(first));
+        else if (name == "hmac512") bytes = hmac(sha512, 128, to_vector(first), to_vector(second));
+        else if (name == "pbkdf2-256") bytes = pbkdf2(sha256, 64, to_vector(first), to_vector(second), iterations, length);
+        else if (name == "pbkdf2-512") bytes = pbkdf2(sha512, 128, to_vector(first), to_vector(second), iterations, length);
+        rgl_return result;
+        result.reserve(bytes.size());
+        for (const auto b : bytes) result.push(b);
+        return result;
+    }
+}(string operation: operation, bytes first: first, bytes second: second, uint iterations: iterations, uint length: length): bytes;
+
+/// <lang name="fr">
+/// <summary>L'empreinte SHA-512 d'octets, en hexadécimal minuscule (128 caractères).</summary>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>L'empreinte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The SHA-512 digest of bytes, in lowercase hexadecimal (128 characters).</summary>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The digest.</returns>
+/// </lang>
+gear pure sha512(bytes data): string => hexEncode(_sha2('sha512', data, '' as bytes, 0, 0));
+
+/// <lang name="fr">
+/// <summary>L'empreinte SHA-512 d'un texte (ses octets UTF-8), en hexadécimal minuscule.</summary>
+/// <param name="text">Le texte à traiter.</param>
+/// <returns>L'empreinte.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The SHA-512 digest of a text (its UTF-8 bytes), in lowercase hexadecimal.</summary>
+/// <param name="text">The text to process.</param>
+/// <returns>The digest.</returns>
+/// </lang>
+gear pure sha512(string text): string => sha512(text as bytes);
+
+/// <lang name="fr">
+/// <summary>Le code d'authentification HMAC-SHA512, en hexadécimal minuscule.</summary>
+/// <param name="key">La clé secrète.</param>
+/// <param name="data">Les octets à traiter.</param>
+/// <returns>Le code.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>The HMAC-SHA512 authentication code, in lowercase hexadecimal.</summary>
+/// <param name="key">The secret key.</param>
+/// <param name="data">The bytes to process.</param>
+/// <returns>The code.</returns>
+/// </lang>
+gear pure hmacSha512(bytes key, bytes data): string => hexEncode(_sha2('hmac512', key, data, 0, 0));
+
+/// <lang name="fr">
+/// <summary>Dérive une clé d'un mot de passe par PBKDF2-HMAC-SHA256 (RFC 8018).</summary>
+/// <param name="password">Le mot de passe.</param>
+/// <param name="salt">Le sel, propre à chaque mot de passe.</param>
+/// <param name="iterations">Le nombre d'itérations ; plus il est grand, plus un attaquant est ralenti (600 000 au moins aujourd'hui).</param>
+/// <param name="length">La longueur voulue de la clé, en octets.</param>
+/// <returns>La clé dérivée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Derives a key from a password with PBKDF2-HMAC-SHA256 (RFC 8018).</summary>
+/// <param name="password">The password.</param>
+/// <param name="salt">The salt, specific to each password.</param>
+/// <param name="iterations">The number of iterations; the larger it is, the more an attacker is slowed down (at least 600,000 today).</param>
+/// <param name="length">The wanted key length, in bytes.</param>
+/// <returns>The derived key.</returns>
+/// </lang>
+gear pure pbkdf2Sha256(bytes password, bytes salt, uint iterations, uint length): bytes => _sha2('pbkdf2-256', password, salt, iterations, length);
+
+/// <lang name="fr">
+/// <summary>Dérive une clé d'un mot de passe par PBKDF2-HMAC-SHA512 (RFC 8018).</summary>
+/// <param name="password">Le mot de passe.</param>
+/// <param name="salt">Le sel, propre à chaque mot de passe.</param>
+/// <param name="iterations">Le nombre d'itérations (210 000 au moins aujourd'hui).</param>
+/// <param name="length">La longueur voulue de la clé, en octets.</param>
+/// <returns>La clé dérivée.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Derives a key from a password with PBKDF2-HMAC-SHA512 (RFC 8018).</summary>
+/// <param name="password">The password.</param>
+/// <param name="salt">The salt, specific to each password.</param>
+/// <param name="iterations">The number of iterations (at least 210,000 today).</param>
+/// <param name="length">The wanted key length, in bytes.</param>
+/// <returns>The derived key.</returns>
+/// </lang>
+gear pure pbkdf2Sha512(bytes password, bytes salt, uint iterations, uint length): bytes => _sha2('pbkdf2-512', password, salt, iterations, length);
+
+/// <lang name="fr">
+/// <summary>Prépare un mot de passe à stocker : PBKDF2-HMAC-SHA256, un sel aléatoire neuf, le tout écrit `pbkdf2-sha256$itérations$sel$clé` (sel et clé en hexadécimal).</summary>
+/// <param name="password">Le mot de passe.</param>
+/// <param name="iterations">Le nombre d'itérations (600 000 par défaut).</param>
+/// <returns>Le texte à ranger ; `verifyPassword` sait le relire.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Prepares a password for storage: PBKDF2-HMAC-SHA256, a fresh random salt, all written `pbkdf2-sha256$iterations$salt$key` (salt and key in hexadecimal).</summary>
+/// <param name="password">The password.</param>
+/// <param name="iterations">The number of iterations (600,000 by default).</param>
+/// <returns>The text to store; `verifyPassword` can read it back.</returns>
+/// </lang>
+gear hashPassword(string password, uint iterations: 600000): string {
+    const bytes salt: randomBytes(16);
+    const bytes key: pbkdf2Sha256(password as bytes, salt, iterations, 32);
+    return `pbkdf2-sha256${iterations}${hexEncode(salt)}${hexEncode(key)}`;
+}
+
+/// <lang name="fr">
+/// <summary>Vérifie un mot de passe contre le texte rangé par `hashPassword`, en temps constant.</summary>
+/// <param name="password">Le mot de passe proposé.</param>
+/// <param name="stored">Le texte rangé.</param>
+/// <returns>`true` si le mot de passe correspond ; `false` aussi si le texte rangé est illisible.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Checks a password against the text stored by `hashPassword`, in constant time.</summary>
+/// <param name="password">The proposed password.</param>
+/// <param name="stored">The stored text.</param>
+/// <returns>`true` when the password matches; also `false` when the stored text is unreadable.</returns>
+/// </lang>
+gear pure verifyPassword(string password, string stored): bool {
+    const [string] parts: stored.split('$');
+    if (parts.length not eq 4 or parts[0] not eq 'pbkdf2-sha256') { return false; }
+    const int? iterations: parts[1].toInt();
+    const bytes? salt: hexDecode(parts[2]);
+    const bytes? expected: hexDecode(parts[3]);
+    if (iterations eq null or salt eq null or expected eq null) { return false; }
+    const bytes target: expected ?? ('' as bytes);
+    const bytes actual: pbkdf2Sha256(password as bytes, salt ?? ('' as bytes), (iterations ?? 0) as uint, target.length);
+    return constantTimeEquals(actual, target);
+}
+
+/// <lang name="fr">
+/// <summary>Calcul interne du chiffrement AES-GCM (usage interne) : l'implémentation est écrite à la main, sans bibliothèque ; AES (clés de 128, 192 ou 256 bits) s'appuie sur des tables, donc il n'est pas protégé contre une observation fine du cache du processeur par un programme local.</summary>
+/// <param name="operation">`seal` (chiffrer) ou `open` (déchiffrer et vérifier).</param>
+/// <param name="key">La clé : 16, 24 ou 32 octets.</param>
+/// <param name="nonce">Le nonce : 12 octets, jamais réutilisé avec la même clé.</param>
+/// <param name="data">Le texte clair (`seal`) ou le texte chiffré suivi de sa balise de 16 octets (`open`).</param>
+/// <param name="aad">Des données associées, authentifiées mais pas chiffrées.</param>
+/// <returns>Un octet d'état (1 réussi, 0 refusé) suivi du résultat : texte chiffré puis balise (`seal`), ou texte clair (`open`).</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Internal AES-GCM computation (internal use): the implementation is hand-written, with no library; AES (128, 192 or 256-bit keys) relies on tables, so it is not protected against fine observation of the processor cache by a local program.</summary>
+/// <param name="operation">`seal` (encrypt) or `open` (decrypt and verify).</param>
+/// <param name="key">The key: 16, 24 or 32 bytes.</param>
+/// <param name="nonce">The nonce: 12 bytes, never reused with the same key.</param>
+/// <param name="data">The plaintext (`seal`) or the ciphertext followed by its 16-byte tag (`open`).</param>
+/// <param name="aad">Associated data, authenticated but not encrypted.</param>
+/// <returns>A status byte (1 succeeded, 0 refused) followed by the result: ciphertext then tag (`seal`), or plaintext (`open`).</returns>
+/// </lang>
+@trusted
+gear pure _aesGcm(string operation, bytes key, bytes nonce, bytes data, bytes aad): bytes => cpp {
+    #include <cstdint>
+    #include <cstring>
+    #include <string>
+    #include <vector>
+    using Bytes = std::vector<std::uint8_t>;
+    static Bytes to_vector(const rgl::standard::array<std::uint8_t>& data) {
+        Bytes bytes(data.size());
+        for (std::size_t i = 0; i < data.size(); ++i) bytes[i] = data[i];
+        return bytes;
+    }
+
+    static std::uint8_t sbox[256];
+    static bool sbox_ready = false;
+    static std::uint8_t rotl8(std::uint8_t v, int n) { return static_cast<std::uint8_t>((v << n) | (v >> (8 - n))); }
+    static std::uint8_t xtime(std::uint8_t v) { return static_cast<std::uint8_t>((v << 1) ^ ((v & 0x80) ? 0x1b : 0)); }
+    static void init_sbox() {
+        if (sbox_ready) return;
+        std::uint8_t p = 1, q = 1;
+        do {
+            p = static_cast<std::uint8_t>(p ^ (p << 1) ^ ((p & 0x80) ? 0x1b : 0));
+            q = static_cast<std::uint8_t>(q ^ (q << 1));
+            q = static_cast<std::uint8_t>(q ^ (q << 2));
+            q = static_cast<std::uint8_t>(q ^ (q << 4));
+            if (q & 0x80) q = static_cast<std::uint8_t>(q ^ 0x09);
+            const std::uint8_t x = static_cast<std::uint8_t>(q ^ rotl8(q, 1) ^ rotl8(q, 2) ^ rotl8(q, 3) ^ rotl8(q, 4));
+            sbox[p] = static_cast<std::uint8_t>(x ^ 0x63);
+        } while (p != 1);
+        sbox[0] = 0x63;
+        sbox_ready = true;
+    }
+
+    struct Aes {
+        std::uint8_t round_keys[240];
+        int rounds = 0;
+        explicit Aes(const Bytes& key) {
+            init_sbox();
+            const int words = static_cast<int>(key.size() / 4);
+            rounds = words + 6;
+            std::memcpy(round_keys, key.data(), key.size());
+            std::uint8_t rcon = 1;
+            for (int i = words; i < 4 * (rounds + 1); ++i) {
+                std::uint8_t temp[4];
+                std::memcpy(temp, round_keys + 4 * (i - 1), 4);
+                if (i % words == 0) {
+                    const std::uint8_t first = temp[0];
+                    temp[0] = static_cast<std::uint8_t>(sbox[temp[1]] ^ rcon);
+                    temp[1] = sbox[temp[2]];
+                    temp[2] = sbox[temp[3]];
+                    temp[3] = sbox[first];
+                    rcon = xtime(rcon);
+                } else if (words > 6 && i % words == 4) {
+                    for (auto& t : temp) t = sbox[t];
+                }
+                for (int j = 0; j < 4; ++j) round_keys[4 * i + j] = static_cast<std::uint8_t>(round_keys[4 * (i - words) + j] ^ temp[j]);
+            }
+        }
+        void encrypt(const std::uint8_t in[16], std::uint8_t out[16]) const {
+            std::uint8_t s[16];
+            for (int i = 0; i < 16; ++i) s[i] = static_cast<std::uint8_t>(in[i] ^ round_keys[i]);
+            for (int round = 1; round <= rounds; ++round) {
+                std::uint8_t t[16];
+                for (int c = 0; c < 4; ++c)
+                    for (int r = 0; r < 4; ++r) t[r + 4 * c] = sbox[s[r + 4 * ((c + r) % 4)]];
+                if (round < rounds) {
+                    for (int c = 0; c < 4; ++c) {
+                        const std::uint8_t a0 = t[4 * c], a1 = t[4 * c + 1], a2 = t[4 * c + 2], a3 = t[4 * c + 3];
+                        s[4 * c] = static_cast<std::uint8_t>(xtime(a0) ^ (xtime(a1) ^ a1) ^ a2 ^ a3);
+                        s[4 * c + 1] = static_cast<std::uint8_t>(a0 ^ xtime(a1) ^ (xtime(a2) ^ a2) ^ a3);
+                        s[4 * c + 2] = static_cast<std::uint8_t>(a0 ^ a1 ^ xtime(a2) ^ (xtime(a3) ^ a3));
+                        s[4 * c + 3] = static_cast<std::uint8_t>((xtime(a0) ^ a0) ^ a1 ^ a2 ^ xtime(a3));
+                    }
+                } else std::memcpy(s, t, 16);
+                for (int i = 0; i < 16; ++i) s[i] = static_cast<std::uint8_t>(s[i] ^ round_keys[16 * round + i]);
+            }
+            std::memcpy(out, s, 16);
+        }
+    };
+
+    static void gf_multiply(std::uint8_t x[16], const std::uint8_t h[16]) {
+        std::uint8_t z[16] = {0};
+        std::uint8_t v[16];
+        std::memcpy(v, h, 16);
+        for (int i = 0; i < 128; ++i) {
+            if ((x[i / 8] >> (7 - i % 8)) & 1) for (int j = 0; j < 16; ++j) z[j] ^= v[j];
+            const bool lsb = (v[15] & 1) != 0;
+            for (int j = 15; j > 0; --j) v[j] = static_cast<std::uint8_t>((v[j] >> 1) | (v[j - 1] << 7));
+            v[0] = static_cast<std::uint8_t>(v[0] >> 1);
+            if (lsb) v[0] ^= 0xe1;
+        }
+        std::memcpy(x, z, 16);
+    }
+
+    static void ghash_blocks(std::uint8_t y[16], const std::uint8_t h[16], const Bytes& data) {
+        for (std::size_t offset = 0; offset < data.size(); offset += 16) {
+            const std::size_t count = data.size() - offset < 16 ? data.size() - offset : 16;
+            for (std::size_t i = 0; i < count; ++i) y[i] ^= data[offset + i];
+            gf_multiply(y, h);
+        }
+    }
+
+    static void tag_of(const Aes& aes, const Bytes& nonce, const Bytes& aad, const Bytes& cipher, std::uint8_t tag[16]) {
+        std::uint8_t h[16] = {0};
+        aes.encrypt(h, h);
+        std::uint8_t y[16] = {0};
+        ghash_blocks(y, h, aad);
+        ghash_blocks(y, h, cipher);
+        std::uint8_t lengths[16];
+        const std::uint64_t aad_bits = static_cast<std::uint64_t>(aad.size()) * 8, cipher_bits = static_cast<std::uint64_t>(cipher.size()) * 8;
+        for (int i = 0; i < 8; ++i) {
+            lengths[i] = static_cast<std::uint8_t>(aad_bits >> (56 - 8 * i));
+            lengths[8 + i] = static_cast<std::uint8_t>(cipher_bits >> (56 - 8 * i));
+        }
+        for (int i = 0; i < 16; ++i) y[i] ^= lengths[i];
+        gf_multiply(y, h);
+        std::uint8_t j0[16];
+        std::memcpy(j0, nonce.data(), 12);
+        j0[12] = 0; j0[13] = 0; j0[14] = 0; j0[15] = 1;
+        std::uint8_t mask[16];
+        aes.encrypt(j0, mask);
+        for (int i = 0; i < 16; ++i) tag[i] = static_cast<std::uint8_t>(y[i] ^ mask[i]);
+    }
+
+    static Bytes counter_mode(const Aes& aes, const Bytes& nonce, const Bytes& input) {
+        Bytes output(input.size());
+        std::uint8_t block[16], stream[16];
+        std::memcpy(block, nonce.data(), 12);
+        std::uint32_t counter = 2;
+        for (std::size_t offset = 0; offset < input.size(); offset += 16, ++counter) {
+            block[12] = static_cast<std::uint8_t>(counter >> 24); block[13] = static_cast<std::uint8_t>(counter >> 16);
+            block[14] = static_cast<std::uint8_t>(counter >> 8); block[15] = static_cast<std::uint8_t>(counter);
+            aes.encrypt(block, stream);
+            const std::size_t count = input.size() - offset < 16 ? input.size() - offset : 16;
+            for (std::size_t i = 0; i < count; ++i) output[offset + i] = static_cast<std::uint8_t>(input[offset + i] ^ stream[i]);
+        }
+        return output;
+    }
+
+    rgl_return rgl(rgl_arg_operation operation, rgl_arg_key key, rgl_arg_nonce nonce, rgl_arg_data data, rgl_arg_aad aad) {
+        rgl_return result;
+        const auto refuse = [&]() { rgl_return failed; failed.push(0); return failed; };
+        const Bytes k = to_vector(key), n = to_vector(nonce), d = to_vector(data), a = to_vector(aad);
+        if ((k.size() != 16 && k.size() != 24 && k.size() != 32) || n.size() != 12) return refuse();
+        const Aes aes(k);
+        const std::string name(operation.data(), operation.size());
+        if (name == "seal") {
+            const Bytes cipher = counter_mode(aes, n, d);
+            std::uint8_t tag[16];
+            tag_of(aes, n, a, cipher, tag);
+            result.push(1);
+            for (const auto b : cipher) result.push(b);
+            for (const auto b : tag) result.push(b);
+            return result;
+        }
+        if (name == "open" && d.size() >= 16) {
+            const Bytes cipher(d.begin(), d.end() - 16);
+            std::uint8_t tag[16];
+            tag_of(aes, n, a, cipher, tag);
+            std::uint8_t difference = 0;
+            for (int i = 0; i < 16; ++i) difference |= static_cast<std::uint8_t>(tag[i] ^ d[d.size() - 16 + i]);
+            if (difference != 0) return refuse();
+            const Bytes plain = counter_mode(aes, n, cipher);
+            result.push(1);
+            for (const auto b : plain) result.push(b);
+            return result;
+        }
+        return refuse();
+    }
+}(string operation: operation, bytes key: key, bytes nonce: nonce, bytes data: data, bytes aad: aad): bytes;
+
+/// <lang name="fr">
+/// <summary>Chiffre avec AES-GCM, un chiffrement authentifié : le résultat ne peut être ni lu ni modifié sans la clé. Le nonce se donne : c'est le contrôle fin (le même nonce ne doit JAMAIS servir deux fois avec la même clé) ; pour un usage courant, `aesEncrypt` le tire au hasard.</summary>
+/// <param name="key">La clé : 16, 24 ou 32 octets (AES-128, 192 ou 256).</param>
+/// <param name="nonce">Le nonce : 12 octets.</param>
+/// <param name="plaintext">Les octets à chiffrer.</param>
+/// <param name="aad">Des données associées, authentifiées mais pas chiffrées (vides au besoin).</param>
+/// <returns>Le texte chiffré suivi de la balise d'authentification de 16 octets ; `null` si la clé ou le nonce n'ont pas la bonne longueur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Encrypts with AES-GCM, an authenticated encryption: the result can be neither read nor modified without the key. The nonce is given: this is the fine-grained control (the same nonce must NEVER be used twice with the same key); for everyday use, `aesEncrypt` draws it at random.</summary>
+/// <param name="key">The key: 16, 24 or 32 bytes (AES-128, 192 or 256).</param>
+/// <param name="nonce">The nonce: 12 bytes.</param>
+/// <param name="plaintext">The bytes to encrypt.</param>
+/// <param name="aad">Associated data, authenticated but not encrypted (empty if needed).</param>
+/// <returns>The ciphertext followed by the 16-byte authentication tag; `null` when the key or the nonce has the wrong length.</returns>
+/// </lang>
+gear pure aesGcmSeal(bytes key, bytes nonce, bytes plaintext, bytes aad): bytes? {
+    const bytes raw: _aesGcm('seal', key, nonce, plaintext, aad);
+    if (raw.length < 1 or raw[0] eq 0) { return null; }
+    return raw.slice(1, raw.length);
+}
+
+/// <lang name="fr">
+/// <summary>Déchiffre avec AES-GCM et vérifie la balise : un texte modifié, une mauvaise clé, un mauvais nonce ou de mauvaises données associées sont refusés.</summary>
+/// <param name="key">La clé.</param>
+/// <param name="nonce">Le nonce utilisé pour chiffrer.</param>
+/// <param name="sealed">Le texte chiffré suivi de sa balise de 16 octets.</param>
+/// <param name="aad">Les données associées données au chiffrement.</param>
+/// <returns>Les octets en clair, `null` si quoi que ce soit ne correspond pas.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Decrypts with AES-GCM and checks the tag: a modified text, a wrong key, a wrong nonce or wrong associated data are refused.</summary>
+/// <param name="key">The key.</param>
+/// <param name="nonce">The nonce used to encrypt.</param>
+/// <param name="sealed">The ciphertext followed by its 16-byte tag.</param>
+/// <param name="aad">The associated data given when encrypting.</param>
+/// <returns>The plaintext bytes, or `null` when anything does not match.</returns>
+/// </lang>
+gear pure aesGcmOpen(bytes key, bytes nonce, bytes sealed, bytes aad): bytes? {
+    const bytes raw: _aesGcm('open', key, nonce, sealed, aad);
+    if (raw.length < 1 or raw[0] eq 0) { return null; }
+    return raw.slice(1, raw.length);
+}
+
+/// <lang name="fr">
+/// <summary>Chiffre avec AES-GCM et un nonce tiré au hasard : le résultat est le nonce (12 octets), le texte chiffré puis la balise (16 octets), que `aesDecrypt` relit. Une clé se dérive d'un mot de passe par `pbkdf2Sha256(motDePasse as bytes, sel, 600000, 32)`, ou se tire au hasard par `randomBytes(32)`.</summary>
+/// <param name="key">La clé : 16, 24 ou 32 octets.</param>
+/// <param name="plaintext">Les octets à chiffrer.</param>
+/// <returns>Les octets chiffrés, `null` si la clé n'a pas la bonne longueur.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Encrypts with AES-GCM and a randomly drawn nonce: the result is the nonce (12 bytes), the ciphertext and then the tag (16 bytes), which `aesDecrypt` reads back. A key is derived from a password with `pbkdf2Sha256(password as bytes, salt, 600000, 32)`, or drawn at random with `randomBytes(32)`.</summary>
+/// <param name="key">The key: 16, 24 or 32 bytes.</param>
+/// <param name="plaintext">The bytes to encrypt.</param>
+/// <returns>The encrypted bytes, or `null` when the key has the wrong length.</returns>
+/// </lang>
+gear aesEncrypt(bytes key, bytes plaintext): bytes? {
+    const bytes nonce: randomBytes(12);
+    const bytes? sealed: aesGcmSeal(key, nonce, plaintext, '' as bytes);
+    if (sealed eq null) { return null; }
+    return [...nonce, ...(sealed ?? ('' as bytes))];
+}
+
+/// <lang name="fr">
+/// <summary>Déchiffre ce que `aesEncrypt` a produit.</summary>
+/// <param name="key">La clé.</param>
+/// <param name="packed">Le nonce, le texte chiffré et la balise.</param>
+/// <returns>Les octets en clair, `null` si la clé est mauvaise ou si les octets ont été modifiés.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Decrypts what `aesEncrypt` produced.</summary>
+/// <param name="key">The key.</param>
+/// <param name="packed">The nonce, the ciphertext and the tag.</param>
+/// <returns>The plaintext bytes, or `null` when the key is wrong or the bytes were modified.</returns>
+/// </lang>
+gear aesDecrypt(bytes key, bytes packed): bytes? {
+    if (packed.length < 28) { return null; }
+    return aesGcmOpen(key, packed.slice(0, 12), packed.slice(12, packed.length), '' as bytes);
+}

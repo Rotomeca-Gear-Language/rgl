@@ -1,0 +1,6 @@
+24-templates-mal-formes.rgl:5:8: erreur[E021]: template non fermé : « ` » fermant manquant
+24-templates-mal-formes.rgl:2:15: erreur[E045]: « } » sans « { » dans le template
+24-templates-mal-formes.rgl:3:15: erreur[E032]: expression attendue entre les accolades
+24-templates-mal-formes.rgl:4:17: erreur[E030]: « } » attendu après l'expression interpolée
+24-templates-mal-formes.rgl:5:17: erreur[E045]: « { » sans « } » dans le template
+24-templates-mal-formes.rgl:6:1: erreur[E030]: « ; » attendu à la fin de la déclaration

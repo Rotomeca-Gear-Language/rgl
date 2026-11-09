@@ -1,0 +1,4 @@
+55-boucles-mal-formees.rgl:2:20: erreur[E030]: nombre entier attendu entre les chevrons
+55-boucles-mal-formees.rgl:2:33: erreur[E030]: nombre entier attendu entre les chevrons
+55-boucles-mal-formees.rgl:2:43: erreur[E030]: « > » attendu pour fermer la limite
+55-boucles-mal-formees.rgl:2:49: erreur[E030]: numéro attendu après « ^ »

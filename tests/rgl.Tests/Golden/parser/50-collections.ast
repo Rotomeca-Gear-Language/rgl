@@ -1,0 +1,117 @@
+CompilationUnit 1:1
+  MoldDeclaration 2:1 name=Equipe
+    MoldField 2:15 name=noms
+      ArrayType 2:15
+        PrimitiveType 2:16 type=string
+    MoldField 2:30 name=scores
+      ArrayType 2:30 kind=Fixed
+        PrimitiveType 2:31 type=int
+        LiteralExpression 2:35 kind=IntegerLiteral text=3
+    MoldField 2:46 name=tours
+      ArrayType 2:46 kind=Bounded
+        PrimitiveType 2:47 type=int
+        LiteralExpression 2:51 kind=IntegerLiteral text=1
+        LiteralExpression 2:54 kind=IntegerLiteral text=5
+    MoldField 2:64 name=chefs
+      ArrayType 2:64 kind=NonEmpty
+        PrimitiveType 2:65 type=string
+    MoldField 2:81 name=ages
+      DictionaryType 2:81
+        PrimitiveType 2:82 type=string
+        PrimitiveType 2:89 type=int
+    MoldField 2:100 name=paire
+      TupleType 2:100
+        TupleTypeElement 2:101
+          PrimitiveType 2:101 type=int
+        TupleTypeElement 2:106
+          PrimitiveType 2:106 type=string
+    MoldField 2:121 name=point
+      TupleType 2:121
+        TupleTypeElement 2:122 name=x
+          PrimitiveType 2:122 type=int
+        TupleTypeElement 2:129 name=y
+          PrimitiveType 2:129 type=int
+  GearDeclaration 4:1 kind=gear name=demo pure=false parameters=0
+    PrimitiveType 4:14 type=uint
+    BlockStatement 4:19
+      VarDeclaration 5:5 keyword=var name=nums
+        ArrayExpression 5:15
+          LiteralExpression 5:16 kind=IntegerLiteral text=1
+          LiteralExpression 5:19 kind=IntegerLiteral text=2
+          LiteralExpression 5:22 kind=IntegerLiteral text=3
+      VarDeclaration 6:5 keyword=var name=plus
+        ArrayExpression 6:15
+          SpreadElement 6:16
+            NameExpression 6:19 name=nums
+          LiteralExpression 6:25 kind=IntegerLiteral text=4
+          SpreadElement 6:28
+            NameExpression 6:31 name=nums
+      VarDeclaration 7:5 keyword=none name=vide
+        ArrayType 7:5
+          PrimitiveType 7:6 type=int
+        ArrayExpression 7:17
+      VarDeclaration 8:5 keyword=var name=ages
+        DictionaryExpression 8:15
+          DictionaryEntry 8:16
+            LiteralExpression 8:16 kind=StringLiteral text="Alix"
+            LiteralExpression 8:24 kind=IntegerLiteral text=12
+          DictionaryEntry 8:28
+            LiteralExpression 8:28 kind=StringLiteral text="Zoé"
+            LiteralExpression 8:35 kind=IntegerLiteral text=7
+      VarDeclaration 9:5 keyword=none name=aucun
+        DictionaryType 9:5
+          PrimitiveType 9:6 type=string
+          PrimitiveType 9:13 type=int
+        DictionaryExpression 9:25
+      VarDeclaration 10:5 keyword=var name=paire
+        TupleExpression 10:16
+          TupleElement 10:17
+            LiteralExpression 10:17 kind=IntegerLiteral text=1
+          TupleElement 10:20
+            LiteralExpression 10:20 kind=StringLiteral text="a"
+      VarDeclaration 11:5 keyword=var name=point
+        TupleExpression 11:16
+          TupleElement 11:17 name=x
+            LiteralExpression 11:20 kind=IntegerLiteral text=1
+          TupleElement 11:23 name=y
+            LiteralExpression 11:26 kind=IntegerLiteral text=2
+      ExpressionStatement 12:5
+        CallExpression 12:5
+          MemberAccessExpression 12:5 member=push
+            NameExpression 12:5 name=nums
+          LiteralExpression 12:15 kind=IntegerLiteral text=4
+      FieldAssignmentStatement 13:5
+        IndexExpression 13:5
+          NameExpression 13:5 name=nums
+          LiteralExpression 13:10 kind=IntegerLiteral text=0
+        LiteralExpression 13:16 kind=IntegerLiteral text=9
+      WriteStatement 14:5 target=console
+        TemplateExpression 14:5
+          TemplateInterpolation 14:6
+            IndexExpression 14:7
+              NameExpression 14:7 name=nums
+              LiteralExpression 14:12 kind=IntegerLiteral text=1
+          TemplateText 14:15 text= 
+          TemplateInterpolation 14:16
+            IndexExpression 14:17
+              NameExpression 14:17 name=ages
+              LiteralExpression 14:22 kind=StringLiteral text="Alix"
+          TemplateText 14:30 text= 
+          TemplateInterpolation 14:31
+            MemberAccessExpression 14:32 member=Item1
+              NameExpression 14:32 name=paire
+          TemplateText 14:44 text= 
+          TemplateInterpolation 14:45
+            MemberAccessExpression 14:46 member=x
+              NameExpression 14:46 name=point
+          TemplateText 14:54 text= 
+          TemplateInterpolation 14:55
+            MemberAccessExpression 14:56 member=length
+              NameExpression 14:56 name=nums
+      ReturnStatement 15:5
+        LiteralExpression 15:12 kind=IntegerLiteral text=0
+  TrainDeclaration 18:1 unguarded=true parameters=none
+    Pipeline 18:8
+      ExitCodeStep 18:11
+        CallExpression 18:13
+          NameExpression 18:13 name=demo

@@ -1,0 +1,496 @@
+{
+  "name": "rgl",
+  "displayName": "RGL",
+  "description": "RGL et composants Paper : coloration, diagnostics, autocomplétion, survol, signatures et navigation.",
+  "version": "0.19.2",
+  "publisher": "rotomeca",
+  "license": "UNLICENSED",
+  "icon": "images/rgl.png",
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "rgl",
+        "aliases": [
+          "RGL",
+          "rgl"
+        ],
+        "extensions": [
+          ".rgl",
+          ".forge"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./images/rgl-file.png",
+          "dark": "./images/rgl-file.png"
+        }
+      },
+      {
+        "id": "html",
+        "extensions": [
+          ".paper"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rgl",
+        "scopeName": "source.rgl",
+        "path": "./syntaxes/rgl.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.cpp": "cpp"
+        }
+      },
+      {
+        "scopeName": "source.rgl.embedded.paper",
+        "path": "./syntaxes/paper.tmLanguage.json",
+        "injectTo": [
+          "text.html.derivative",
+          "text.html.basic"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.rgl.paper": "rgl",
+          "meta.embedded.expression.rgl.paper": "rgl"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "rgl",
+        "path": "./snippets/rgl.code-snippets"
+      }
+    ],
+    "configuration": {
+      "title": "RGL",
+      "properties": {
+        "rgl.compilerPath": {
+          "type": "string",
+          "default": "rgl",
+          "markdownDescription": "Chemin du compilateur `rgl` (ou de `rgl.dll`, lancé avec `dotnet`). Par défaut, `rgl` trouvé dans le `PATH`. Il sert de serveur de langage : diagnostics, autocomplétion avec import automatique, survol, aide à la saisie des appels et accès à la définition."
+        },
+        "rgl.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace les messages échangés avec le serveur de langage (panneau Sortie, canal RGL) : publishDiagnostics, requêtes, réponses."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "rgl.restartServer",
+        "title": "Redémarrer le serveur de langage",
+        "category": "RGL"
+      },
+      {
+        "command": "rgl.editDataset",
+        "title": "Éditer le dataset sous le curseur",
+        "category": "RGL",
+        "icon": "$(table)"
+      },
+      {
+        "command": "rgl.build",
+        "title": "Compiler le projet",
+        "category": "RGL",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "rgl.run",
+        "title": "Exécuter",
+        "category": "RGL",
+        "icon": "$(play)"
+      },
+      {
+        "command": "rgl.runRelease",
+        "title": "Exécuter en release",
+        "category": "RGL"
+      },
+      {
+        "command": "rgl.check",
+        "title": "Vérifier le projet",
+        "category": "RGL",
+        "icon": "$(check)"
+      },
+      {
+        "command": "rgl.debug",
+        "title": "Déboguer le programme",
+        "category": "RGL",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "rgl.newFile",
+        "title": "Nouveau fichier RGL…",
+        "category": "RGL",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "rgl.newBox",
+        "title": "Nouveau dossier Box…",
+        "category": "RGL",
+        "icon": "$(package)"
+      },
+      {
+        "command": "rgl.newTools",
+        "title": "Nouveau dossier Tools…",
+        "category": "RGL",
+        "icon": "$(tools)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "rgl.editDataset",
+          "when": "editorLangId == rgl",
+          "group": "navigation@9"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "rgl.run",
+          "when": "resourceLangId == rgl || resourceExtname == .paper",
+          "group": "navigation@1"
+        },
+        {
+          "command": "rgl.build",
+          "when": "resourceLangId == rgl || resourceExtname == .paper",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rgl.debug",
+          "when": "resourceLangId == rgl || resourceExtname == .paper",
+          "group": "navigation@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "rgl.newFile",
+          "when": "explorerResourceIsFolder",
+          "group": "2_workspace@11"
+        },
+        {
+          "command": "rgl.newBox",
+          "when": "explorerResourceIsFolder",
+          "group": "2_workspace@12"
+        },
+        {
+          "command": "rgl.newTools",
+          "when": "explorerResourceIsFolder",
+          "group": "2_workspace@13"
+        }
+      ],
+      "commandPalette": []
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "ingot",
+        "superType": "type",
+        "description": "Un ingot : un type de marque posé sur un autre type (ingot userId: long;)."
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "rgl",
+        "scopes": {
+          "ingot": [
+            "storage.type.primitive.ingot.rgl",
+            "storage.type.primitive.rgl"
+          ],
+          "struct": [
+            "entity.name.type.struct.rgl",
+            "entity.name.type.rgl"
+          ],
+          "class": [
+            "support.type.error.rgl",
+            "entity.name.type.class.rgl"
+          ],
+          "enum": [
+            "entity.name.type.enum.rgl"
+          ],
+          "enumMember": [
+            "variable.other.enummember.rgl"
+          ],
+          "function": [
+            "entity.name.function.rgl"
+          ],
+          "method": [
+            "entity.name.function.member.rgl"
+          ],
+          "variable": [
+            "variable.other.readwrite.rgl"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.rgl"
+          ],
+          "parameter": [
+            "variable.parameter.rgl"
+          ],
+          "property": [
+            "variable.other.property.rgl"
+          ],
+          "namespace": [
+            "entity.name.namespace.rgl"
+          ],
+          "typeParameter": [
+            "entity.name.type.parameter.rgl"
+          ]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[rgl]": {
+        "editor.quickSuggestions": {
+          "other": true,
+          "comments": false,
+          "strings": false
+        },
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggest.showWords": false,
+        "editor.suggest.snippetsPreventQuickSuggestions": false,
+        "editor.acceptSuggestionOnCommitCharacter": true,
+        "editor.tabCompletion": "on",
+        "editor.parameterHints.enabled": true,
+        "editor.suggestSelection": "first",
+        "editor.semanticHighlighting.enabled": true,
+        "editor.semanticTokenColorCustomizations": {
+          "rules": {
+            "ingot": {
+              "italic": true
+            }
+          }
+        },
+        "editor.tokenColorCustomizations": {
+          "textMateRules": [
+            {
+              "scope": "storage.type.primitive.ingot.rgl",
+              "settings": {
+                "fontStyle": "italic"
+              }
+            }
+          ]
+        },
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "never"
+        }
+      }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": [
+          "rgl.json"
+        ],
+        "url": "./rgl.schema.json"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "rgl",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "compile",
+              "exec",
+              "check"
+            ],
+            "description": "La commande du compilateur : compile, exec ou check."
+          },
+          "file": {
+            "type": "string",
+            "description": "Le fichier .rgl d'entrée, relatif au dossier du projet ; sans lui, le projet du dossier."
+          },
+          "folder": {
+            "type": "string",
+            "description": "Le dossier du projet (option -d), s'il n'est pas le dossier ouvert."
+          },
+          "release": {
+            "type": "boolean",
+            "description": "Compile avec les optimisations (--release)."
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "rgl",
+        "owner": "rgl",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "source": "rgl",
+        "pattern": [
+          {
+            "regexp": "^(error|warning|info)(?:\\[([A-Z]+\\d+)\\])?: (.*)$",
+            "severity": 1,
+            "code": 2,
+            "message": 3
+          },
+          {
+            "regexp": "^\\s*--> (.+):(\\d+):(\\d+)\\s*$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          }
+        ]
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "rgl"
+      },
+      {
+        "language": "html"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "rgl",
+        "label": "RGL",
+        "languages": [
+          "rgl",
+          "html"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "Le fichier .rgl à compiler et lancer (le fichier actif par défaut ; un fichier nom.test.rgl pour un test)."
+              },
+              "program": {
+                "type": "string",
+                "description": "Un exécutable déjà compilé : la compilation est alors sautée."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "Les arguments du programme."
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Le dossier de travail (la racine du projet par défaut)."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "description": "Les variables d'environnement ajoutées."
+              },
+              "stopAtEntry": {
+                "type": "boolean",
+                "default": false,
+                "description": "S'arrêter au début du programme."
+              },
+              "build": {
+                "type": "boolean",
+                "default": true,
+                "description": "Compiler en debug avant de lancer."
+              },
+              "debugger": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "lldb",
+                  "vsdbg",
+                  "gdb"
+                ],
+                "default": "auto",
+                "description": "Le débogueur : lldb (extension CodeLLDB), vsdbg (extension C/C++, Windows) ou gdb (extension C/C++, hors Windows : gdb ne lit pas les PDB que Zig écrit sous Windows). auto : lldb sous Windows, gdb ailleurs."
+              },
+              "debuggerPath": {
+                "type": "string",
+                "description": "Le chemin de gdb, s'il n'est pas dans le PATH (utile seulement avec gdb)."
+              },
+              "stepIntoRuntime": {
+                "type": "boolean",
+                "default": false,
+                "description": "Laisser F11 entrer dans le runtime de RGL (constructeurs de string, symbol…) et la bibliothèque C++ ; faux par défaut : F11 reste dans le code écrit en RGL."
+              },
+              "rglNames": {
+                "type": "boolean",
+                "default": true,
+                "description": "Montrer les noms RGL des variables dans les cadres écrits en RGL (les noms C++ restent dans les cadres C++)."
+              },
+              "rglValues": {
+                "type": "boolean",
+                "default": true,
+                "description": "Afficher les valeurs RGL lisibles (une string \"bonjour\", un symbol §ok, un tableau avec ses éléments) au survol et dans le panneau Variables (lldb)."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "rgl",
+            "request": "launch",
+            "name": "Déboguer le programme RGL"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "RGL : lancer le programme",
+            "description": "Compile en debug et lance le programme sous le débogueur.",
+            "body": {
+              "type": "rgl",
+              "request": "launch",
+              "name": "Déboguer le programme RGL"
+            }
+          }
+        ]
+      }
+    ],
+    "colors": [
+      {
+        "id": "rgl.paperRegionBackground",
+        "description": "Fond du RGL d'une page .paper (blocs @rgl et interpolations @@ … @@).",
+        "defaults": {
+          "dark": "#ffffff14",
+          "light": "#00000010",
+          "highContrast": "#ffffff1f",
+          "highContrastLight": "#00000014"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node test/dataset-model.test.js && node test/webview.test.js && node test/documentation.test.js && node test/native-language.test.js && node test/paper-language.test.js && node test/server-launch.test.js && node test/standard-library.test.js && node test/tasks.test.js && node test/debug.test.js && node test/debug-names.test.js && node test/testing.test.js && node test/paper-regions.test.js && node test/new-file.test.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.1.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rotomeca-Gear-Language/rgl.git"
+  },
+  "devDependencies": {
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.3.2"
+  },
+  "activationEvents": [
+    "onTaskType:rgl",
+    "workspaceContains:**/*.test.rgl"
+  ]
+}

@@ -1,0 +1,18 @@
+// Molds : déclaration, spread, défauts, type anonyme, new, littéral, raccourci, spread de valeur, accès.
+mold Vec2 { double x; double y; }
+mold Vec3 {
+    ...Vec2;
+    double z: 0.0;
+}
+
+gear pure taille({double x, double y} v): double => v.x + v.y;
+
+gear deplacer(Vec3 v): Vec3 {
+    var x: v.x + 1.0;
+    var a: new Vec2 {x: 1.0, y: 2.0};
+    var b: {x, y: a.y, };
+    v.z <- 2.0;
+    return {...v, x};
+}
+
+!train |> done;

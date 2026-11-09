@@ -1,0 +1,39 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=gears description="Exports" metadata=false
+  ExportDeclaration 4:1 names=LIMITE inline=true
+  VarDeclaration 4:8 keyword=const name=LIMITE
+    PrimitiveType 4:14 type=uint
+    LiteralExpression 4:27 kind=IntegerLiteral text=7
+  ExportDeclaration 5:1 names=Row inline=true
+  MoldDeclaration 5:8 name=Row
+    MoldField 5:19 name=id
+      PrimitiveType 5:19 type=uint
+  ExportDeclaration 6:1 names=Rate inline=true
+  MoldDeclaration 6:8 name=Rate error=true
+    MoldField 6:21 name=cause
+      PrimitiveType 6:21 type=string
+  ExportDeclaration 7:1 names=Sens inline=true
+  EnumDeclaration 7:8 name=Sens
+    EnumVariant 7:20 name=Haut
+    EnumVariant 7:26 name=Bas
+  ExportDeclaration 8:1 names=Id inline=true
+  IngotDeclaration 8:8 name=Id
+    PrimitiveType 8:18 type=uint
+  ExportDeclaration 9:1 names=ouvrir inline=true
+  GearDeclaration 9:8 kind=gear name=ouvrir pure=false parameters=1
+    Parameter 9:20 name=n
+      PrimitiveType 9:20 type=uint
+    PrimitiveType 9:29 type=uint
+    NameExpression 9:37 name=n
+  ExportDeclaration 10:1 names=verifier inline=true
+  GearDeclaration 10:8 kind=guard name=verifier pure=false parameters=1
+    Parameter 10:23 name=n
+      PrimitiveType 10:23 type=uint
+    PrimitiveType 10:32 type=uint
+    BlockStatement 10:37
+      DoneStatement 10:39
+  GearDeclaration 11:1 kind=gear name=cache pure=false parameters=0
+    PrimitiveType 11:15 type=uint
+    LiteralExpression 11:23 kind=IntegerLiteral text=1
+  ExportDeclaration 12:1 names=cache
+  ExportDeclaration 13:1 names=ouvrir,Row

@@ -1,0 +1,22 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=a
+    LiteralExpression 2:8 kind=IntegerLiteral text=1
+  VarDeclaration 3:1 keyword=var name=t
+    TemplateExpression 3:8
+      TemplateText 3:9 text=a = 
+      TemplateInterpolation 3:13
+        NameExpression 3:14 name=a
+      TemplateText 3:16 text=, somme = 
+      TemplateInterpolation 3:26
+        BinaryExpression 3:27 op=+
+          NameExpression 3:27 name=a
+          BinaryExpression 3:31 op=*
+            LiteralExpression 3:31 kind=IntegerLiteral text=2
+            LiteralExpression 3:35 kind=IntegerLiteral text=3
+      TemplateText 3:37 text=, 
+      TemplateInterpolation 3:39
+        LiteralExpression 3:40 kind=StringLiteral text="}"
+      TemplateText 3:44 text= \{littéral\}
+  TrainDeclaration 4:1 unguarded=false parameters=none
+    Pipeline 4:7
+      DoneStep 4:10

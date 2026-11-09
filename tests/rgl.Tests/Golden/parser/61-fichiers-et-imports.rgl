@@ -1,0 +1,28 @@
+forge: train
+description: "Commandes de l'outil"
+metadata: {"auteur": "Tommy", "version": 2}
+
+import Geometry;
+import Commandes only {ajouter as add, retirer};
+import Outils only {};
+import file "page.html" as page;
+import [..] file 'commun.txt' as commun;
+
+const uint MAX: 100;
+gear pure propre(string t): string => t;
+
+train ajouter {
+    gear verifier(string t): string => t;
+    train(string texte) texte |> Geometry.lire !> [corriger] |> verifier |> done;
+}
+
+train retirer {
+    train(string texte) texte |> ajouter |> done;
+}
+
+Geometry.Vec2 origine: new Geometry.Vec2 {x: 0, y: 0};
+
+{
+    gear local(uint n): uint => n;
+    !train(uint n) n |> local |> done;
+}

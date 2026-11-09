@@ -1,0 +1,526 @@
+forge: gears
+description: "Formes géométriques en 2D : rectangles, cercles, segments, polygones"
+
+import box Vectors only {Vector2};
+use <Math> only {abs, min, max, sqrt, clamp};
+
+/// <lang name="fr">
+/// <summary>Un rectangle aligné sur les axes.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>An axis-aligned rectangle.</summary>
+/// </lang>
+mold Rect {
+    /// <lang name="fr">
+    /// <summary>L'abscisse du coin de plus petites coordonnées.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The x coordinate of the corner with the smallest coordinates.</summary>
+    /// </lang>
+    double x;
+
+    /// <lang name="fr">
+    /// <summary>L'ordonnée de ce coin.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The y coordinate of that corner.</summary>
+    /// </lang>
+    double y;
+
+    /// <lang name="fr">
+    /// <summary>La largeur (positive).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The width (positive).</summary>
+    /// </lang>
+    double width;
+
+    /// <lang name="fr">
+    /// <summary>La hauteur (positive).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The height (positive).</summary>
+    /// </lang>
+    double height;
+}
+
+/// <lang name="fr">
+/// <summary>Un cercle plein.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A filled circle.</summary>
+/// </lang>
+mold Circle {
+    /// <lang name="fr">
+    /// <summary>Le centre.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The center.</summary>
+    /// </lang>
+    Vector2 center;
+
+    /// <lang name="fr">
+    /// <summary>Le rayon (positif).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The radius (positive).</summary>
+    /// </lang>
+    double radius;
+}
+
+/// <lang name="fr">
+/// <summary>Un segment de droite entre deux points.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A line segment between two points.</summary>
+/// </lang>
+mold Segment {
+    /// <lang name="fr">
+    /// <summary>Le premier point.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The first point.</summary>
+    /// </lang>
+    Vector2 a;
+
+    /// <lang name="fr">
+    /// <summary>Le second point.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The second point.</summary>
+    /// </lang>
+    Vector2 b;
+}
+
+/// <lang name="fr">
+/// <summary>Un polygone simple (sans arête qui se croise), donné par ses sommets dans l'ordre.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>A simple polygon (no crossing edges), given by its vertices in order.</summary>
+/// </lang>
+mold Polygon {
+    /// <lang name="fr">
+    /// <summary>Les sommets ; le dernier se relie au premier.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The vertices; the last one connects to the first.</summary>
+    /// </lang>
+    [Vector2] points;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les Rect.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on Rect.</summary>
+/// </lang>
+extend Rect {
+    /// <lang name="fr">
+    /// <summary>Indique si le point est dans le rectangle (bords compris).</summary>
+    /// <param name="r">Le rectangle.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>`true` si le point est dedans.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the point is inside the rectangle (edges included).</summary>
+    /// <param name="r">The rectangle.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>`true` when the point is inside.</returns>
+    /// </lang>
+    gear pure contains(this Rect r, Vector2 p): bool => p.x >= r.x and p.x <= r.x + r.width and p.y >= r.y and p.y <= r.y + r.height;
+
+    /// <lang name="fr">
+    /// <summary>Indique si deux rectangles se touchent ou se recouvrent.</summary>
+    /// <param name="a">Le premier rectangle.</param>
+    /// <param name="b">Le second rectangle.</param>
+    /// <returns>`true` s'ils se rencontrent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether two rectangles touch or overlap.</summary>
+    /// <param name="a">The first rectangle.</param>
+    /// <param name="b">The second rectangle.</param>
+    /// <returns>`true` when they meet.</returns>
+    /// </lang>
+    gear pure intersects(this Rect a, Rect b): bool => a.x <= b.x + b.width and b.x <= a.x + a.width and a.y <= b.y + b.height and b.y <= a.y + a.height;
+
+    /// <lang name="fr">
+    /// <summary>La partie commune de deux rectangles.</summary>
+    /// <param name="a">Le premier rectangle.</param>
+    /// <param name="b">Le second rectangle.</param>
+    /// <returns>Le rectangle commun, `null` s'ils ne se rencontrent pas.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The common part of two rectangles.</summary>
+    /// <param name="a">The first rectangle.</param>
+    /// <param name="b">The second rectangle.</param>
+    /// <returns>The common rectangle, `null` when they do not meet.</returns>
+    /// </lang>
+    gear pure intersection(this Rect a, Rect b): Rect? {
+        const double left: max(a.x, b.x);
+        const double top: max(a.y, b.y);
+        const double right: min(a.x + a.width, b.x + b.width);
+        const double bottom: min(a.y + a.height, b.y + b.height);
+        if (right < left or bottom < top) { return null; }
+        return {x: left, y: top, width: right - left, height: bottom - top};
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le plus petit rectangle qui contient les deux.</summary>
+    /// <param name="a">Le premier rectangle.</param>
+    /// <param name="b">Le second rectangle.</param>
+    /// <returns>Le rectangle englobant.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The smallest rectangle containing both.</summary>
+    /// <param name="a">The first rectangle.</param>
+    /// <param name="b">The second rectangle.</param>
+    /// <returns>The enclosing rectangle.</returns>
+    /// </lang>
+    gear pure merge(this Rect a, Rect b): Rect {
+        const double left: min(a.x, b.x);
+        const double top: min(a.y, b.y);
+        return {x: left, y: top, width: max(a.x + a.width, b.x + b.width) - left, height: max(a.y + a.height, b.y + b.height) - top};
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le centre du rectangle.</summary>
+    /// <param name="r">Le rectangle.</param>
+    /// <returns>Le centre.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The center of the rectangle.</summary>
+    /// <param name="r">The rectangle.</param>
+    /// <returns>The center.</returns>
+    /// </lang>
+    gear pure center(this Rect r): Vector2 => {x: r.x + r.width / 2.0, y: r.y + r.height / 2.0};
+
+    /// <lang name="fr">
+    /// <summary>L'aire du rectangle.</summary>
+    /// <param name="r">Le rectangle.</param>
+    /// <returns>L'aire.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The area of the rectangle.</summary>
+    /// <param name="r">The rectangle.</param>
+    /// <returns>The area.</returns>
+    /// </lang>
+    gear pure area(this Rect r): double => r.width * r.height;
+
+    /// <lang name="fr">
+    /// <summary>Le périmètre du rectangle.</summary>
+    /// <param name="r">Le rectangle.</param>
+    /// <returns>Le périmètre.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The perimeter of the rectangle.</summary>
+    /// <param name="r">The rectangle.</param>
+    /// <returns>The perimeter.</returns>
+    /// </lang>
+    gear pure perimeter(this Rect r): double => 2.0 * (r.width + r.height);
+
+    /// <lang name="fr">
+    /// <summary>Le rectangle déplacé.</summary>
+    /// <param name="r">Le rectangle.</param>
+    /// <param name="offset">Le déplacement.</param>
+    /// <returns>Le rectangle déplacé.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The rectangle moved.</summary>
+    /// <param name="r">The rectangle.</param>
+    /// <param name="offset">The displacement.</param>
+    /// <returns>The moved rectangle.</returns>
+    /// </lang>
+    gear pure translate(this Rect r, Vector2 offset): Rect => {x: r.x + offset.x, y: r.y + offset.y, width: r.width, height: r.height};
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les Circle.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on Circle.</summary>
+/// </lang>
+extend Circle {
+    /// <lang name="fr">
+    /// <summary>Indique si le point est dans le cercle (bord compris).</summary>
+    /// <param name="c">Le cercle.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>`true` si le point est dedans.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the point is inside the circle (edge included).</summary>
+    /// <param name="c">The circle.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>`true` when the point is inside.</returns>
+    /// </lang>
+    gear pure contains(this Circle c, Vector2 p): bool {
+        const double dx: p.x - c.center.x;
+        const double dy: p.y - c.center.y;
+        return dx * dx + dy * dy <= c.radius * c.radius;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Indique si deux cercles se touchent ou se recouvrent.</summary>
+    /// <param name="a">Le premier cercle.</param>
+    /// <param name="b">Le second cercle.</param>
+    /// <returns>`true` s'ils se rencontrent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether two circles touch or overlap.</summary>
+    /// <param name="a">The first circle.</param>
+    /// <param name="b">The second circle.</param>
+    /// <returns>`true` when they meet.</returns>
+    /// </lang>
+    gear pure intersects(this Circle a, Circle b): bool {
+        const double dx: b.center.x - a.center.x;
+        const double dy: b.center.y - a.center.y;
+        const double reach: a.radius + b.radius;
+        return dx * dx + dy * dy <= reach * reach;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Indique si le cercle touche ou recouvre le rectangle.</summary>
+    /// <param name="c">Le cercle.</param>
+    /// <param name="r">Le rectangle.</param>
+    /// <returns>`true` s'ils se rencontrent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the circle touches or overlaps the rectangle.</summary>
+    /// <param name="c">The circle.</param>
+    /// <param name="r">The rectangle.</param>
+    /// <returns>`true` when they meet.</returns>
+    /// </lang>
+    gear pure intersectsRect(this Circle c, Rect r): bool {
+        const double nearestX: clamp(c.center.x, r.x, r.x + r.width);
+        const double nearestY: clamp(c.center.y, r.y, r.y + r.height);
+        const double dx: c.center.x - nearestX;
+        const double dy: c.center.y - nearestY;
+        return dx * dx + dy * dy <= c.radius * c.radius;
+    }
+
+    /// <lang name="fr">
+    /// <summary>L'aire du cercle.</summary>
+    /// <param name="c">Le cercle.</param>
+    /// <returns>L'aire.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The area of the circle.</summary>
+    /// <param name="c">The circle.</param>
+    /// <returns>The area.</returns>
+    /// </lang>
+    gear pure area(this Circle c): double => 3.141592653589793 * c.radius * c.radius;
+
+    /// <lang name="fr">
+    /// <summary>La circonférence du cercle.</summary>
+    /// <param name="c">Le cercle.</param>
+    /// <returns>La circonférence.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The circumference of the circle.</summary>
+    /// <param name="c">The circle.</param>
+    /// <returns>The circumference.</returns>
+    /// </lang>
+    gear pure circumference(this Circle c): double => 6.283185307179586 * c.radius;
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les Segment.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on Segment.</summary>
+/// </lang>
+extend Segment {
+    /// <lang name="fr">
+    /// <summary>La longueur du segment.</summary>
+    /// <param name="s">Le segment.</param>
+    /// <returns>La longueur.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The length of the segment.</summary>
+    /// <param name="s">The segment.</param>
+    /// <returns>The length.</returns>
+    /// </lang>
+    gear pure length(this Segment s): double {
+        const double dx: s.b.x - s.a.x;
+        const double dy: s.b.y - s.a.y;
+        return sqrt(dx * dx + dy * dy) ?? 0.0;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le milieu du segment.</summary>
+    /// <param name="s">Le segment.</param>
+    /// <returns>Le milieu.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The midpoint of the segment.</summary>
+    /// <param name="s">The segment.</param>
+    /// <returns>The midpoint.</returns>
+    /// </lang>
+    gear pure midpoint(this Segment s): Vector2 => {x: (s.a.x + s.b.x) / 2.0, y: (s.a.y + s.b.y) / 2.0};
+
+    /// <lang name="fr">
+    /// <summary>Le point du segment le plus proche d'un point donné.</summary>
+    /// <param name="s">Le segment.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>Le point le plus proche.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The point of the segment closest to a given point.</summary>
+    /// <param name="s">The segment.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>The closest point.</returns>
+    /// </lang>
+    gear pure closestPoint(this Segment s, Vector2 p): Vector2 {
+        const double dx: s.b.x - s.a.x;
+        const double dy: s.b.y - s.a.y;
+        const double squared: dx * dx + dy * dy;
+        if (squared eq 0.0) { return s.a; }
+        const double t: clamp(((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / squared, 0.0, 1.0);
+        return {x: s.a.x + t * dx, y: s.a.y + t * dy};
+    }
+
+    /// <lang name="fr">
+    /// <summary>La distance d'un point au segment.</summary>
+    /// <param name="s">Le segment.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>La distance.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The distance from a point to the segment.</summary>
+    /// <param name="s">The segment.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>The distance.</returns>
+    /// </lang>
+    gear pure distanceTo(this Segment s, Vector2 p): double {
+        const Vector2 q: s.closestPoint(p);
+        const double dx: p.x - q.x;
+        const double dy: p.y - q.y;
+        return sqrt(dx * dx + dy * dy) ?? 0.0;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le point où deux segments se coupent.</summary>
+    /// <param name="s">Le segment.</param>
+    /// <param name="other">L'autre segment.</param>
+    /// <returns>Le point d'intersection, `null` s'ils sont parallèles ou ne se croisent pas.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The point where two segments cross.</summary>
+    /// <param name="s">The segment.</param>
+    /// <param name="other">The other segment.</param>
+    /// <returns>The intersection point, `null` when they are parallel or do not cross.</returns>
+    /// </lang>
+    gear pure intersection(this Segment s, Segment other): Vector2? {
+        const double rx: s.b.x - s.a.x;
+        const double ry: s.b.y - s.a.y;
+        const double qx: other.b.x - other.a.x;
+        const double qy: other.b.y - other.a.y;
+        const double denominator: rx * qy - ry * qx;
+        if (denominator eq 0.0) { return null; }
+        const double t: ((other.a.x - s.a.x) * qy - (other.a.y - s.a.y) * qx) / denominator;
+        const double u: ((other.a.x - s.a.x) * ry - (other.a.y - s.a.y) * rx) / denominator;
+        if (t < 0.0 or t > 1.0 or u < 0.0 or u > 1.0) { return null; }
+        return {x: s.a.x + t * rx, y: s.a.y + t * ry};
+    }
+}
+
+/// <lang name="fr">
+/// <summary>Opérations sur les Polygon.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Operations on Polygon.</summary>
+/// </lang>
+extend Polygon {
+    /// <lang name="fr">
+    /// <summary>L'aire signée (formule du lacet) : positive si les sommets tournent dans le sens trigonométrique.</summary>
+    /// <param name="polygon">Le polygone.</param>
+    /// <returns>L'aire signée.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The signed area (shoelace formula): positive when the vertices run counterclockwise.</summary>
+    /// <param name="polygon">The polygon.</param>
+    /// <returns>The signed area.</returns>
+    /// </lang>
+    gear pure signedArea(this Polygon polygon): double {
+        const uint n: polygon.points.length;
+        if (n < 3) { return 0.0; }
+        const double twice: [0..<n] |+> 0.0 with (acc, i) => {
+            const Vector2 a: polygon.points[i];
+            const Vector2 b: polygon.points[(i + 1) % n];
+            return acc + (a.x * b.y - b.x * a.y);
+        };
+        return twice / 2.0;
+    }
+
+    /// <lang name="fr">
+    /// <summary>L'aire du polygone.</summary>
+    /// <param name="polygon">Le polygone.</param>
+    /// <returns>L'aire.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The area of the polygon.</summary>
+    /// <param name="polygon">The polygon.</param>
+    /// <returns>The area.</returns>
+    /// </lang>
+    gear pure area(this Polygon polygon): double => abs(polygon.signedArea());
+
+    /// <lang name="fr">
+    /// <summary>Le périmètre du polygone.</summary>
+    /// <param name="polygon">Le polygone.</param>
+    /// <returns>Le périmètre.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The perimeter of the polygon.</summary>
+    /// <param name="polygon">The polygon.</param>
+    /// <returns>The perimeter.</returns>
+    /// </lang>
+    gear pure perimeter(this Polygon polygon): double {
+        const uint n: polygon.points.length;
+        if (n < 2) { return 0.0; }
+        return [0..<n] |+> 0.0 with (acc, i) => {
+            const Vector2 a: polygon.points[i];
+            const Vector2 b: polygon.points[(i + 1) % n];
+            const Segment edge: {a: a, b: b};
+        return acc + edge.length();
+        };
+    }
+
+    /// <lang name="fr">
+    /// <summary>Indique si le point est à l'intérieur du polygone (règle pair/impair).</summary>
+    /// <param name="polygon">Le polygone.</param>
+    /// <param name="p">Le point.</param>
+    /// <returns>`true` si le point est dedans.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Checks whether the point is inside the polygon (even-odd rule).</summary>
+    /// <param name="polygon">The polygon.</param>
+    /// <param name="p">The point.</param>
+    /// <returns>`true` when the point is inside.</returns>
+    /// </lang>
+    gear pure contains(this Polygon polygon, Vector2 p): bool {
+        const uint n: polygon.points.length;
+        return [0..<n] |+> false with (inside, i) => {
+            const Vector2 a: polygon.points[i];
+            const Vector2 b: polygon.points[(i + 1) % n];
+            const bool crosses: (a.y > p.y) not eq (b.y > p.y) and p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x;
+            return crosses ? not inside : inside;
+        };
+    }
+
+    /// <lang name="fr">
+    /// <summary>Le plus petit rectangle qui contient tous les sommets.</summary>
+    /// <param name="polygon">Le polygone.</param>
+    /// <returns>Le rectangle englobant.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The smallest rectangle containing every vertex.</summary>
+    /// <param name="polygon">The polygon.</param>
+    /// <returns>The enclosing rectangle.</returns>
+    /// </lang>
+    gear pure bounds(this Polygon polygon): Rect {
+        if (polygon.points.length eq 0) { return {x: 0.0, y: 0.0, width: 0.0, height: 0.0}; }
+        const Vector2 first: polygon.points[0];
+        const (double, double, double, double) box: polygon.points |+> (first.x, first.y, first.x, first.y) with (acc, v) =>
+            (min(acc.Item1, v.x), min(acc.Item2, v.y), max(acc.Item3, v.x), max(acc.Item4, v.y));
+        return {x: box.Item1, y: box.Item2, width: box.Item3 - box.Item1, height: box.Item4 - box.Item2};
+    }
+}

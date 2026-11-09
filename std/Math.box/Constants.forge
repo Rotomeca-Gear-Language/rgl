@@ -1,0 +1,38 @@
+forge: gears
+description: "Constantes mathématiques de base"
+
+/// <lang name="fr">
+/// <summary>Le nombre pi, rapport de la circonférence d'un cercle à son diamètre (environ 3,14159).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Pi, the ratio of a circle's circumference to its diameter (approximately 3.14159).</summary>
+/// </lang>
+const double PI: 3.141592653589793238462643383279502884;
+/// <lang name="fr">
+/// <summary>Le nombre tau, un tour complet en radians (deux fois pi, environ 6,28318).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Tau, one full turn in radians (twice pi, approximately 6.28318).</summary>
+/// </lang>
+const double TAU: 6.283185307179586476925286766559005768;
+/// <lang name="fr">
+/// <summary>Le nombre d'Euler, base du logarithme népérien (environ 2,71828).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Euler's number, the base of the natural logarithm (approximately 2.71828).</summary>
+/// </lang>
+const double E: 2.718281828459045235360287471352662498;
+/// <lang name="fr">
+/// <summary>Le logarithme népérien de 2 (environ 0,69315).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The natural logarithm of 2 (approximately 0.69315).</summary>
+/// </lang>
+const double LN2: 0.693147180559945309417232121458176568;
+/// <lang name="fr">
+/// <summary>La racine carrée de 2 (environ 1,41421).</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>The square root of 2 (approximately 1.41421).</summary>
+/// </lang>
+const double SQRT2: 1.414213562373095048801688724209698079;

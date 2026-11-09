@@ -1,0 +1,2 @@
+// Un rail sans crochets : signalé, ses étapes lues puis ignorées.
+train |> lire !> reparer |> done;

@@ -1,0 +1,17 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=a
+    TemplateExpression 2:8
+      TemplateText 2:9 text=seule }
+  VarDeclaration 3:1 keyword=var name=b
+    TemplateExpression 3:8
+      TemplateText 3:9 text=vide 
+      TemplateInterpolation 3:14
+        MissingExpression 3:15
+  VarDeclaration 4:1 keyword=var name=c
+    TemplateExpression 4:8
+      TemplateText 4:9 text=deux 
+      TemplateInterpolation 4:14
+        LiteralExpression 4:15 kind=IntegerLiteral text=1
+  VarDeclaration 5:1 keyword=var name=d
+    TemplateExpression 5:8
+      TemplateText 5:9 text=ouverte 

@@ -1,0 +1,58 @@
+CompilationUnit 1:1
+  IngotDeclaration 2:1 name=UserId
+    PrimitiveType 2:15 type=int
+  IngotDeclaration 3:1 name=Angle
+    BoundedType 3:14
+      PrimitiveType 3:14 type=float
+      LiteralExpression 3:20 kind=FloatLiteral text=0.0
+      LiteralExpression 3:25 kind=FloatLiteral text=360.0
+  IngotDeclaration 4:1 name=Ecart
+    BoundedType 4:14
+      PrimitiveType 4:14 type=int
+      UnaryExpression 4:18 op=-
+        LiteralExpression 4:19 kind=IntegerLiteral text=5
+      LiteralExpression 4:22 kind=IntegerLiteral text=5
+  GearDeclaration 6:1 kind=gear name=demo pure=false parameters=0
+    PrimitiveType 6:14 type=uint
+    BlockStatement 6:19
+      VarDeclaration 7:5 keyword=none name=uid
+        NamedType 7:5 name=UserId
+        LiteralExpression 7:17 kind=IntegerLiteral text=42
+      VarDeclaration 8:5 keyword=var name=brut
+        UnbrandExpression 8:15
+          NameExpression 8:15 name=uid
+      AssignmentStatement 9:5 target=uid op=°<-
+        LiteralExpression 9:13 kind=IntegerLiteral text=43
+      VarDeclaration 10:5 keyword=none name=pct
+        BoundedType 10:5
+          PrimitiveType 10:5 type=int
+          LiteralExpression 10:9 kind=IntegerLiteral text=0
+          LiteralExpression 10:12 kind=IntegerLiteral text=100
+        LiteralExpression 10:22 kind=IntegerLiteral text=50
+      VarDeclaration 11:5 keyword=var name=octet
+        CastExpression 11:16 kind=Checked
+          NameExpression 11:16 name=brut
+          PrimitiveType 11:24 type=byte
+      VarDeclaration 12:5 keyword=var name=peutEtre
+        CastExpression 12:19 kind=Optional
+          NameExpression 12:19 name=brut
+          PrimitiveType 12:28 type=byte
+      VarDeclaration 13:5 keyword=var name=compare
+        BinaryExpression 13:18 op=<
+          CastExpression 13:18 kind=Checked
+            NameExpression 13:18 name=brut
+            PrimitiveType 13:26 type=int
+          LiteralExpression 13:32 kind=IntegerLiteral text=5
+      VarDeclaration 14:5 keyword=var name=nom
+        MemberAccessExpression 14:14 member=x
+          UnbrandExpression 14:14
+            CallExpression 14:14
+              NameExpression 14:14 name=UserId
+              LiteralExpression 14:21 kind=IntegerLiteral text=7
+      ReturnStatement 15:5
+        LiteralExpression 15:12 kind=IntegerLiteral text=0
+  TrainDeclaration 18:1 unguarded=true parameters=none
+    Pipeline 18:8
+      ExitCodeStep 18:11
+        CallExpression 18:13
+          NameExpression 18:13 name=demo

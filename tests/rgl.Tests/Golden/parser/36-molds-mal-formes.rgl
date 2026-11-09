@@ -1,0 +1,7 @@
+// Molds mal formés : champ sans type ni « ; », new sans valeur, accolade non fermée.
+mold A { int; double y }
+gear f(): void {
+    var a: new A;
+    var b: {x: 1, y 2};
+}
+!train |> done;

@@ -1,0 +1,2 @@
+// Le paramètre a un type mais pas de nom.
+train([string]) |> done;

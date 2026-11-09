@@ -1,0 +1,25 @@
+CompilationUnit 1:1
+  FileHeader 1:1 kind=precast description="Precasts" metadata=false
+  PrecastDeclaration 4:1 name=Zero
+    NamedType 4:9 name=Vec2
+    MoldFieldValue 4:22 name=x
+      LiteralExpression 4:25 kind=FloatLiteral text=0.0
+    MoldFieldValue 4:30 name=y
+      LiteralExpression 4:33 kind=FloatLiteral text=0.0
+  PrecastDeclaration 5:1 name=Config
+    AnonymousMoldType 5:9
+      MoldField 5:10 name=name
+        PrimitiveType 5:10 type=string
+      MoldField 5:23 name=debug
+        PrimitiveType 5:23 type=bool
+    MoldFieldValue 6:5 name=name
+      LiteralExpression 6:11 kind=StringLiteral text="MonApp"
+    MoldFieldValue 7:5 name=debug
+      LiteralExpression 7:12 kind=FalseKeyword text=false
+  PrecastDeclaration 9:1 name=Autre
+    MoldField 10:5 name=name
+      PrimitiveType 10:5 type=string
+      LiteralExpression 10:18 kind=StringLiteral text="x"
+    MoldField 11:5 name=n
+      PrimitiveType 11:5 type=int
+      LiteralExpression 11:12 kind=IntegerLiteral text=2

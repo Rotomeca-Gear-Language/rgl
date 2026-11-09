@@ -1,0 +1,16 @@
+// Fusion : trois parcours écrits en trois instructions sur vingt millions d'entiers ; sans fusion, deux tableaux intermédiaires de 80 Mo.
+gear pure f(int i): int => (i * 7 + 3) % 1000;
+
+gear pure g(int x): int => x * 2 + 1;
+
+gear pure ajouter(long acc, int x): long => acc + x;
+
+emit fin(): uint {
+    [int] a: [0..<20000000] ||> f;
+    [int] b: a ||> g;
+    long somme: b |+> 0 with ajouter;
+    `{somme}\n` -> console;
+    return 0;
+}
+
+!train |> fin;

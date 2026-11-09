@@ -1,0 +1,604 @@
+forge: gears
+description: "Lecture de fichiers de configuration : INI, TOML et YAML, en dictionnaire à clés pointées"
+
+use <Errors> only {ParseError};
+
+/// <lang name="fr"><summary>Lit le texte et rend la liste à plat : un premier élément vide puis clé, valeur…, ou le message d'erreur seul.</summary><param name="text">Le texte à lire.</param><returns>La liste à plat.</returns></lang>
+/// <lang name="en"><summary>Reads the text and returns the flat list: an empty first element then key, value…, or the error message alone.</summary><param name="text">The text to read.</param><returns>The flat list.</returns></lang>
+@trusted
+gear pure _parseIni(string text): [string] => cpp {
+    #include <string>
+    #include <vector>
+    #include <cstdint>
+    #include <cstdlib>
+    using Entries = std::vector<std::string>;
+    static rgl_return finish(const std::string& error, const Entries& entries) {
+        rgl_return result;
+        if (!error.empty()) {
+            result.push(rgl::standard::string(error.c_str(), error.size()));
+            return result;
+        }
+        result.push(rgl::standard::string("", 0));
+        for (const auto& item : entries) result.push(rgl::standard::string(item.c_str(), item.size()));
+        return result;
+    }
+    static std::string trim(const std::string& value) {
+        std::size_t begin = 0, end = value.size();
+        while (begin < end && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r')) ++begin;
+        while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r')) --end;
+        return value.substr(begin, end - begin);
+    }
+    static void appendUtf8(std::string& out, std::uint32_t point) {
+        if (point < 0x80u) out += static_cast<char>(point);
+        else if (point < 0x800u) { out += static_cast<char>(0xC0u | (point >> 6)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+        else if (point < 0x10000u) { out += static_cast<char>(0xE0u | (point >> 12)); out += static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+        else { out += static_cast<char>(0xF0u | (point >> 18)); out += static_cast<char>(0x80u | ((point >> 12) & 0x3Fu)); out += static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+    }
+    rgl_return rgl(rgl_arg_text text) {
+        Entries entries;
+        std::string section;
+        std::size_t lineNumber = 0;
+        std::size_t position = 0;
+        const std::string source(text.data(), text.size());
+        while (position <= source.size()) {
+            std::size_t next = source.find('\n', position);
+            if (next == std::string::npos) next = source.size();
+            std::string line = trim(source.substr(position, next - position));
+            position = next + 1;
+            ++lineNumber;
+            if (line.empty() || line[0] == ';' || line[0] == '#') continue;
+            if (line[0] == '[') {
+                if (line.back() != ']') return finish("INI invalide, ligne " + std::to_string(lineNumber) + " : « ] » attendu à la fin de la section", entries);
+                section = trim(line.substr(1, line.size() - 2));
+                continue;
+            }
+            std::size_t split = line.find_first_of("=:");
+            if (split == std::string::npos) return finish("INI invalide, ligne " + std::to_string(lineNumber) + " : « = » attendu entre la clé et la valeur", entries);
+            std::string key = trim(line.substr(0, split));
+            std::string value = trim(line.substr(split + 1));
+            if (key.empty()) return finish("INI invalide, ligne " + std::to_string(lineNumber) + " : clé vide", entries);
+            if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') || (value.front() == '\'' && value.back() == '\''))) value = value.substr(1, value.size() - 2);
+            entries.push_back(section.empty() ? key : section + "." + key);
+            entries.push_back(value);
+        }
+        return finish("", entries);
+    }
+}(string text: text): [string];
+
+/// <lang name="fr"><summary>Lit le texte et rend la liste à plat : un premier élément vide puis clé, valeur…, ou le message d'erreur seul.</summary><param name="text">Le texte à lire.</param><returns>La liste à plat.</returns></lang>
+/// <lang name="en"><summary>Reads the text and returns the flat list: an empty first element then key, value…, or the error message alone.</summary><param name="text">The text to read.</param><returns>The flat list.</returns></lang>
+@trusted
+gear pure _parseToml(string text): [string] => cpp {
+    #include <string>
+    #include <vector>
+    #include <cstdint>
+    #include <cstdlib>
+    using Entries = std::vector<std::string>;
+    static rgl_return finish(const std::string& error, const Entries& entries) {
+        rgl_return result;
+        if (!error.empty()) {
+            result.push(rgl::standard::string(error.c_str(), error.size()));
+            return result;
+        }
+        result.push(rgl::standard::string("", 0));
+        for (const auto& item : entries) result.push(rgl::standard::string(item.c_str(), item.size()));
+        return result;
+    }
+    static std::string trim(const std::string& value) {
+        std::size_t begin = 0, end = value.size();
+        while (begin < end && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r')) ++begin;
+        while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r')) --end;
+        return value.substr(begin, end - begin);
+    }
+    static void appendUtf8(std::string& out, std::uint32_t point) {
+        if (point < 0x80u) out += static_cast<char>(point);
+        else if (point < 0x800u) { out += static_cast<char>(0xC0u | (point >> 6)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+        else if (point < 0x10000u) { out += static_cast<char>(0xE0u | (point >> 12)); out += static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+        else { out += static_cast<char>(0xF0u | (point >> 18)); out += static_cast<char>(0x80u | ((point >> 12) & 0x3Fu)); out += static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+    }
+
+    struct TomlParser {
+        std::string s;
+        std::size_t i = 0;
+        std::size_t line = 1;
+        std::string error;
+        Entries entries;
+        std::vector<std::pair<std::string, std::size_t>> tableCounts;
+
+        explicit TomlParser(std::string source) : s(std::move(source)) {}
+
+        bool fail(const std::string& message) {
+            if (error.empty()) error = "TOML invalide, ligne " + std::to_string(line) + " : " + message;
+            return false;
+        }
+        bool atEnd() const { return i >= s.size(); }
+        void skipSpaces() { while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r')) ++i; }
+        void skipComment() { if (i < s.size() && s[i] == '#') while (i < s.size() && s[i] != '\n') ++i; }
+        void skipBlank() {
+            for (;;) {
+                skipSpaces();
+                skipComment();
+                if (i < s.size() && s[i] == '\n') { ++line; ++i; continue; }
+                break;
+            }
+        }
+        static bool bareChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-'; }
+
+        bool parseQuoted(std::string& result) {
+            const char quote = s[i];
+            const bool triple = i + 2 < s.size() && s[i + 1] == quote && s[i + 2] == quote;
+            i += triple ? 3 : 1;
+            if (triple && i < s.size() && s[i] == '\n') { ++line; ++i; }
+            for (;;) {
+                if (atEnd()) return fail("chaîne non terminée");
+                const char c = s[i];
+                if (triple) {
+                    if (c == quote && i + 2 < s.size() + 0 && s[i + 1] == quote && s[i + 2] == quote) { i += 3; return true; }
+                } else if (c == quote) { ++i; return true; }
+                else if (c == '\n') return fail("chaîne non terminée");
+                if (c == '\n') ++line;
+                if (quote == '"' && c == '\\') {
+                    ++i;
+                    if (atEnd()) return fail("échappement incomplet");
+                    const char e = s[i++];
+                    switch (e) {
+                        case 'n': result += '\n'; break;
+                        case 't': result += '\t'; break;
+                        case 'r': result += '\r'; break;
+                        case 'b': result += '\b'; break;
+                        case 'f': result += '\f'; break;
+                        case '"': result += '"'; break;
+                        case '\\': result += '\\'; break;
+                        case 'u': case 'U': {
+                            const std::size_t count = e == 'u' ? 4 : 8;
+                            if (i + count > s.size()) return fail("échappement \\u incomplet");
+                            const std::uint32_t point = static_cast<std::uint32_t>(std::strtoul(s.substr(i, count).c_str(), nullptr, 16));
+                            appendUtf8(result, point);
+                            i += count;
+                            break;
+                        }
+                        case '\n': ++line; while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) { if (s[i] == '\n') ++line; ++i; } break;
+                        default: return fail(std::string("échappement inconnu \\") + e);
+                    }
+                    continue;
+                }
+                result += c;
+                ++i;
+            }
+        }
+
+        bool parseKey(std::string& result) {
+            // Une clé, éventuellement pointée : a.b."c d"
+            result.clear();
+            for (;;) {
+                skipSpaces();
+                std::string part;
+                if (!atEnd() && (s[i] == '"' || s[i] == '\'')) { if (!parseQuoted(part)) return false; }
+                else {
+                    const std::size_t begin = i;
+                    while (i < s.size() && bareChar(s[i])) ++i;
+                    if (i == begin) return fail("clé attendue");
+                    part = s.substr(begin, i - begin);
+                }
+                result += part;
+                skipSpaces();
+                if (!atEnd() && s[i] == '.') { result += '.'; ++i; continue; }
+                return true;
+            }
+        }
+
+        bool parseValue(const std::string& path) {
+            skipSpaces();
+            if (atEnd()) return fail("valeur attendue");
+            const char c = s[i];
+            if (c == '"' || c == '\'') {
+                std::string value;
+                if (!parseQuoted(value)) return false;
+                entries.push_back(path);
+                entries.push_back(value);
+                return true;
+            }
+            if (c == '[') {
+                ++i;
+                std::size_t index = 0;
+                for (;;) {
+                    skipBlank();
+                    if (atEnd()) return fail("« ] » attendu");
+                    if (s[i] == ']') { ++i; return true; }
+                    if (!parseValue(path + "[" + std::to_string(index++) + "]")) return false;
+                    skipBlank();
+                    if (!atEnd() && s[i] == ',') { ++i; continue; }
+                    skipBlank();
+                    if (!atEnd() && s[i] == ']') { ++i; return true; }
+                    return fail("« , » ou « ] » attendu");
+                }
+            }
+            if (c == '{') {
+                ++i;
+                for (;;) {
+                    skipSpaces();
+                    if (atEnd()) return fail("« } » attendu");
+                    if (s[i] == '}') { ++i; return true; }
+                    std::string key;
+                    if (!parseKey(key)) return false;
+                    skipSpaces();
+                    if (atEnd() || s[i] != '=') return fail("« = » attendu");
+                    ++i;
+                    if (!parseValue(path + "." + key)) return false;
+                    skipSpaces();
+                    if (!atEnd() && s[i] == ',') { ++i; continue; }
+                    skipSpaces();
+                    if (!atEnd() && s[i] == '}') { ++i; return true; }
+                    return fail("« , » ou « } » attendu");
+                }
+            }
+            const std::size_t begin = i;
+            while (i < s.size() && s[i] != ',' && s[i] != ']' && s[i] != '}' && s[i] != '\n' && s[i] != '#') ++i;
+            std::string token = trim(s.substr(begin, i - begin));
+            if (token.empty()) return fail("valeur attendue");
+            if (token != "true" && token != "false") {
+                std::string cleaned;
+                for (const char ch : token) if (ch != '_') cleaned += ch;
+                const bool numeric = !cleaned.empty() && (cleaned[0] == '-' || cleaned[0] == '+' || (cleaned[0] >= '0' && cleaned[0] <= '9') || cleaned == "inf" || cleaned == "nan");
+                if (!numeric) return fail("valeur « " + token + " » non reconnue (texte entre guillemets attendu)");
+                token = cleaned[0] == '+' ? cleaned.substr(1) : cleaned;
+            }
+            entries.push_back(path);
+            entries.push_back(token);
+            return true;
+        }
+
+        std::size_t countOf(const std::string& name) {
+            for (auto& pair : tableCounts) if (pair.first == name) return pair.second++;
+            tableCounts.push_back({name, 1});
+            return 0;
+        }
+
+        void run() {
+            std::string table;
+            for (;;) {
+                skipBlank();
+                if (atEnd()) return;
+                if (s[i] == '[') {
+                    const bool array = i + 1 < s.size() && s[i + 1] == '[';
+                    i += array ? 2 : 1;
+                    std::string name;
+                    if (!parseKey(name)) return;
+                    skipSpaces();
+                    if (atEnd() || s[i] != ']') { fail("« ] » attendu"); return; }
+                    ++i;
+                    if (array) {
+                        if (atEnd() || s[i] != ']') { fail("« ]] » attendu"); return; }
+                        ++i;
+                        table = name + "[" + std::to_string(countOf(name)) + "]";
+                    } else table = name;
+                } else {
+                    std::string key;
+                    if (!parseKey(key)) return;
+                    skipSpaces();
+                    if (atEnd() || s[i] != '=') { fail("« = » attendu après la clé « " + key + " »"); return; }
+                    ++i;
+                    if (!parseValue(table.empty() ? key : table + "." + key)) return;
+                }
+                skipSpaces();
+                skipComment();
+                if (!atEnd() && s[i] != '\n') { fail("fin de ligne attendue"); return; }
+            }
+        }
+    };
+    rgl_return rgl(rgl_arg_text text) {
+        TomlParser parser(std::string(text.data(), text.size()));
+        parser.run();
+        return finish(parser.error, parser.entries);
+    }
+}(string text: text): [string];
+
+/// <lang name="fr"><summary>Lit le texte et rend la liste à plat : un premier élément vide puis clé, valeur…, ou le message d'erreur seul.</summary><param name="text">Le texte à lire.</param><returns>La liste à plat.</returns></lang>
+/// <lang name="en"><summary>Reads the text and returns the flat list: an empty first element then key, value…, or the error message alone.</summary><param name="text">The text to read.</param><returns>The flat list.</returns></lang>
+@trusted
+gear pure _parseYaml(string text): [string] => cpp {
+    #include <string>
+    #include <vector>
+    #include <cstdint>
+    #include <cstdlib>
+    using Entries = std::vector<std::string>;
+    static rgl_return finish(const std::string& error, const Entries& entries) {
+        rgl_return result;
+        if (!error.empty()) {
+            result.push(rgl::standard::string(error.c_str(), error.size()));
+            return result;
+        }
+        result.push(rgl::standard::string("", 0));
+        for (const auto& item : entries) result.push(rgl::standard::string(item.c_str(), item.size()));
+        return result;
+    }
+    static std::string trim(const std::string& value) {
+        std::size_t begin = 0, end = value.size();
+        while (begin < end && (value[begin] == ' ' || value[begin] == '\t' || value[begin] == '\r')) ++begin;
+        while (end > begin && (value[end - 1] == ' ' || value[end - 1] == '\t' || value[end - 1] == '\r')) --end;
+        return value.substr(begin, end - begin);
+    }
+    static void appendUtf8(std::string& out, std::uint32_t point) {
+        if (point < 0x80u) out += static_cast<char>(point);
+        else if (point < 0x800u) { out += static_cast<char>(0xC0u | (point >> 6)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+        else if (point < 0x10000u) { out += static_cast<char>(0xE0u | (point >> 12)); out += static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+        else { out += static_cast<char>(0xF0u | (point >> 18)); out += static_cast<char>(0x80u | ((point >> 12) & 0x3Fu)); out += static_cast<char>(0x80u | ((point >> 6) & 0x3Fu)); out += static_cast<char>(0x80u | (point & 0x3Fu)); }
+    }
+
+    struct YamlLine { std::size_t indent = 0; std::size_t number = 0; std::string content; };
+
+    // Retire un commentaire « # » qui n'est ni dans une chaîne ni collé à un mot.
+    static std::string stripComment(const std::string& value) {
+        char quote = 0;
+        for (std::size_t i = 0; i < value.size(); ++i) {
+            const char c = value[i];
+            if (quote) { if (c == quote) quote = 0; }
+            else if (c == '"' || c == '\'') quote = c;
+            else if (c == '#' && (i == 0 || value[i - 1] == ' ')) return trim(value.substr(0, i));
+        }
+        return value;
+    }
+
+    // La position du « : » qui sépare la clé de la valeur (suivi d'une espace ou de la fin), hors guillemets ; npos sinon.
+    static std::size_t colonOf(const std::string& value) {
+        char quote = 0;
+        for (std::size_t i = 0; i < value.size(); ++i) {
+            const char c = value[i];
+            if (quote) { if (c == quote) quote = 0; continue; }
+            if (c == '"' || c == '\'') { quote = c; continue; }
+            if (c == '[' || c == '{') return std::string::npos;
+            if (c == ':' && (i + 1 == value.size() || value[i + 1] == ' ')) return i;
+        }
+        return std::string::npos;
+    }
+
+    static std::string unquote(const std::string& value) {
+        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+            std::string result;
+            for (std::size_t i = 1; i + 1 < value.size(); ++i) {
+                if (value[i] == '\\' && i + 2 < value.size() + 0) {
+                    const char e = value[++i];
+                    switch (e) {
+                        case 'n': result += '\n'; break;
+                        case 't': result += '\t'; break;
+                        case '"': result += '"'; break;
+                        case '\\': result += '\\'; break;
+                        default: result += '\\'; result += e; break;
+                    }
+                } else result += value[i];
+            }
+            return result;
+        }
+        if (value.size() >= 2 && value.front() == '\'' && value.back() == '\'') return value.substr(1, value.size() - 2);
+        return value;
+    }
+
+    struct YamlParser {
+        std::vector<YamlLine> lines;
+        std::size_t at = 0;
+        std::string error;
+        Entries entries;
+
+        void fail(std::size_t number, const std::string& message) {
+            if (error.empty()) error = "YAML invalide, ligne " + std::to_string(number) + " : " + message;
+        }
+
+        // Un scalaire, ou une valeur de flux [a, b] / {a: b}, rangé sous path.
+        void emitValue(const std::string& path, const std::string& value, std::size_t number) {
+            if (value.empty() || value == "~" || value == "null") { entries.push_back(path); entries.push_back(""); return; }
+            if (value[0] == '[' || value[0] == '{') {
+                std::size_t pos = 0;
+                parseFlow(path, value, pos, number);
+                return;
+            }
+            entries.push_back(path);
+            entries.push_back(unquote(value));
+        }
+
+        void parseFlow(const std::string& path, const std::string& v, std::size_t& pos, std::size_t number) {
+            const auto skip = [&]() { while (pos < v.size() && v[pos] == ' ') ++pos; };
+            skip();
+            if (pos >= v.size()) return fail(number, "valeur de flux incomplète");
+            if (v[pos] == '[') {
+                ++pos;
+                std::size_t index = 0;
+                for (;;) {
+                    skip();
+                    if (pos >= v.size()) return fail(number, "« ] » attendu");
+                    if (v[pos] == ']') { ++pos; return; }
+                    parseFlowItem(path + "[" + std::to_string(index++) + "]", v, pos, number, false);
+                    if (!error.empty()) return;
+                    skip();
+                    if (pos < v.size() && v[pos] == ',') ++pos;
+                }
+            }
+            if (v[pos] == '{') {
+                ++pos;
+                for (;;) {
+                    skip();
+                    if (pos >= v.size()) return fail(number, "« } » attendu");
+                    if (v[pos] == '}') { ++pos; return; }
+                    std::size_t begin = pos;
+                    while (pos < v.size() && v[pos] != ':' && v[pos] != '}') ++pos;
+                    if (pos >= v.size() || v[pos] != ':') return fail(number, "« : » attendu dans le dictionnaire de flux");
+                    const std::string key = unquote(trim(v.substr(begin, pos - begin)));
+                    ++pos;
+                    parseFlowItem(path + "." + key, v, pos, number, true);
+                    if (!error.empty()) return;
+                    skip();
+                    if (pos < v.size() && v[pos] == ',') ++pos;
+                }
+            }
+        }
+
+        void parseFlowItem(const std::string& path, const std::string& v, std::size_t& pos, std::size_t number, bool) {
+            while (pos < v.size() && v[pos] == ' ') ++pos;
+            if (pos < v.size() && (v[pos] == '[' || v[pos] == '{')) { parseFlow(path, v, pos, number); return; }
+            std::size_t begin = pos;
+            if (pos < v.size() && (v[pos] == '"' || v[pos] == '\'')) {
+                const char quote = v[pos++];
+                while (pos < v.size() && v[pos] != quote) ++pos;
+                if (pos < v.size()) ++pos;
+            } else {
+                while (pos < v.size() && v[pos] != ',' && v[pos] != ']' && v[pos] != '}') ++pos;
+            }
+            emitValue(path, trim(v.substr(begin, pos - begin)), number);
+        }
+
+        // Les lignes d'un même niveau d'indentation : un dictionnaire (clé: valeur) ou une liste (- élément).
+        void parseBlock(std::size_t indent, const std::string& path) {
+            if (at >= lines.size()) return;
+            if (lines[at].content[0] == '-' && (lines[at].content.size() == 1 || lines[at].content[1] == ' ')) parseSequence(indent, path);
+            else parseMap(indent, path);
+        }
+
+        void parseMap(std::size_t indent, const std::string& path) {
+            while (error.empty() && at < lines.size() && lines[at].indent == indent) {
+                YamlLine& line = lines[at];
+                if (line.content[0] == '-' && (line.content.size() == 1 || line.content[1] == ' ')) return;
+                const std::size_t colon = colonOf(line.content);
+                if (colon == std::string::npos) return fail(line.number, "« clé: valeur » attendu");
+                const std::string key = unquote(trim(line.content.substr(0, colon)));
+                const std::string value = trim(line.content.substr(colon + 1));
+                const std::string full = path.empty() ? key : path + "." + key;
+                const std::size_t number = line.number;
+                ++at;
+                if (!value.empty()) emitValue(full, value, number);
+                else if (at < lines.size() && (lines[at].indent > indent || (lines[at].indent == indent && lines[at].content[0] == '-' && (lines[at].content.size() == 1 || lines[at].content[1] == ' '))))
+                    parseBlock(lines[at].indent, full);
+                else emitValue(full, "", number);
+            }
+            if (error.empty() && at < lines.size() && lines[at].indent > indent) fail(lines[at].number, "indentation inattendue");
+        }
+
+        void parseSequence(std::size_t indent, const std::string& path) {
+            std::size_t index = 0;
+            while (error.empty() && at < lines.size() && lines[at].indent == indent && lines[at].content[0] == '-' && (lines[at].content.size() == 1 || lines[at].content[1] == ' ')) {
+                YamlLine& line = lines[at];
+                const std::string rest = trim(line.content.size() > 1 ? line.content.substr(1) : std::string());
+                const std::string full = path + "[" + std::to_string(index++) + "]";
+                const std::size_t number = line.number;
+                if (rest.empty()) {
+                    ++at;
+                    if (at < lines.size() && lines[at].indent > indent) parseBlock(lines[at].indent, full);
+                    else emitValue(full, "", number);
+                } else if (colonOf(rest) != std::string::npos) {
+                    // « - clé: valeur » : l'élément est un dictionnaire dont cette ligne est la première.
+                    const std::size_t childIndent = indent + 2;
+                    line.indent = childIndent;
+                    line.content = rest;
+                    parseMap(childIndent, full);
+                } else {
+                    ++at;
+                    emitValue(full, rest, number);
+                }
+            }
+        }
+    };
+    rgl_return rgl(rgl_arg_text text) {
+        YamlParser parser;
+        std::string source(text.data(), text.size());
+        std::size_t position = 0;
+        std::size_t lineNumber = 0;
+        while (position <= source.size()) {
+            std::size_t next = source.find('\n', position);
+            if (next == std::string::npos) next = source.size();
+            std::string raw = source.substr(position, next - position);
+            position = next + 1;
+            ++lineNumber;
+            YamlLine line;
+            line.number = lineNumber;
+            std::size_t indent = 0;
+            while (indent < raw.size() && raw[indent] == ' ') ++indent;
+            if (indent < raw.size() && raw[indent] == '\t') return finish("YAML invalide, ligne " + std::to_string(lineNumber) + " : les tabulations ne sont pas permises dans l'indentation", {});
+            line.indent = indent;
+            line.content = stripComment(trim(raw.substr(indent)));
+            if (line.content.empty() || line.content == "---" || line.content == "...") continue;
+            parser.lines.push_back(line);
+        }
+        if (parser.lines.empty()) return finish("", {});
+        parser.parseBlock(parser.lines[0].indent, "");
+        if (parser.error.empty() && parser.at < parser.lines.size()) parser.fail(parser.lines[parser.at].number, "indentation inattendue");
+        return finish(parser.error, parser.entries);
+    }
+}(string text: text): [string];
+
+/// <lang name="fr">
+/// <summary>Lit un texte INI et le range à plat : chaque clé est le chemin de la valeur (`a.b`, `liste[0]`) et chaque valeur son texte.</summary>
+/// <param name="text">Le texte INI.</param>
+/// <returns>Le dictionnaire à clés pointées, ou une `ParseError` qui donne la ligne et la raison.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads INI text into a flat dictionary: each key is the path of the value (`a.b`, `list[0]`) and each value its text.</summary>
+/// <param name="text">The INI text.</param>
+/// <returns>The dotted-key dictionary, or a `ParseError` giving the line and the reason.</returns>
+/// </lang>
+gear pure parseIni(string text): [string:string] ! ParseError {
+    const [string] flat: _parseIni(text);
+    if (flat.length eq 0) { return err({message: 'INI invalide', input: text}); }
+    if (flat[0] not eq '') { return err({message: flat[0], input: text}); }
+    [string:string] none: [:];
+    return ok([1..<flat.length by 2] |+> none with (acc, i) => acc.put(flat[i], flat[i + 1]));
+}
+
+/// <lang name="fr">
+/// <summary>Lit un texte TOML et le range à plat : chaque clé est le chemin de la valeur (`a.b`, `liste[0]`) et chaque valeur son texte.</summary>
+/// <param name="text">Le texte TOML.</param>
+/// <returns>Le dictionnaire à clés pointées, ou une `ParseError` qui donne la ligne et la raison.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads TOML text into a flat dictionary: each key is the path of the value (`a.b`, `list[0]`) and each value its text.</summary>
+/// <param name="text">The TOML text.</param>
+/// <returns>The dotted-key dictionary, or a `ParseError` giving the line and the reason.</returns>
+/// </lang>
+gear pure parseToml(string text): [string:string] ! ParseError {
+    const [string] flat: _parseToml(text);
+    if (flat.length eq 0) { return err({message: 'TOML invalide', input: text}); }
+    if (flat[0] not eq '') { return err({message: flat[0], input: text}); }
+    [string:string] none: [:];
+    return ok([1..<flat.length by 2] |+> none with (acc, i) => acc.put(flat[i], flat[i + 1]));
+}
+
+/// <lang name="fr">
+/// <summary>Lit un texte YAML et le range à plat : chaque clé est le chemin de la valeur (`a.b`, `liste[0]`) et chaque valeur son texte.</summary>
+/// <param name="text">Le texte YAML.</param>
+/// <returns>Le dictionnaire à clés pointées, ou une `ParseError` qui donne la ligne et la raison.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reads YAML text into a flat dictionary: each key is the path of the value (`a.b`, `list[0]`) and each value its text.</summary>
+/// <param name="text">The YAML text.</param>
+/// <returns>The dotted-key dictionary, or a `ParseError` giving the line and the reason.</returns>
+/// </lang>
+gear pure parseYaml(string text): [string:string] ! ParseError {
+    const [string] flat: _parseYaml(text);
+    if (flat.length eq 0) { return err({message: 'YAML invalide', input: text}); }
+    if (flat[0] not eq '') { return err({message: flat[0], input: text}); }
+    [string:string] none: [:];
+    return ok([1..<flat.length by 2] |+> none with (acc, i) => acc.put(flat[i], flat[i + 1]));
+}
+
+/// <lang name="fr">
+/// <summary>Écrit un dictionnaire à clés pointées en INI : la partie avant le dernier point est la section, le reste la clé.</summary>
+/// <param name="values">Les valeurs, par clé pointée (`section.cle`).</param>
+/// <returns>Le texte INI : les clés sans section d'abord, puis chaque section.</returns>
+/// </lang>
+/// <lang name="en">
+/// <summary>Writes a dotted-key dictionary as INI: the part before the last dot is the section, the rest is the key.</summary>
+/// <param name="values">The values, by dotted key (`section.key`).</param>
+/// <returns>The INI text: keys without a section first, then each section.</returns>
+/// </lang>
+gear pure toIni([string:string] values): string {
+    const [string] keys: values.keys();
+    const string head: keys |+> '' with (acc, key) => key.contains('.') ? acc : `{acc}{key}={values[key]}\n`;
+    const [string] noSections: [];
+    const [string] sections: keys |+> noSections with (acc, key) => {
+        const long dot: key.lastIndexOf('.') ?? -1;
+        const string section: dot < 0 ? '' : key.substring(0, dot);
+        return (dot < 0 or acc.contains(section)) ? acc : [...acc, section];
+    };
+    return sections |+> head with (acc, section) =>
+        `{acc}{acc.isEmpty() ? '' : "\n"}[{section}]\n` + (keys |+> '' with (inner, key) => {
+            const long dot: key.lastIndexOf('.') ?? -1;
+            return (dot >= 0 and key.substring(0, dot) eq section) ? `{inner}{key.substring(dot + 1, key.length as long)}={values[key]}\n` : inner;
+        });
+}

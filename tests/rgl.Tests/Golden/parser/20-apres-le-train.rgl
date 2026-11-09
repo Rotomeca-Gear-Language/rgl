@@ -1,0 +1,5 @@
+// Après le train, seules des déclarations sont permises.
+train |> done;
+var a: 1;
+|> done;
+var b: 2;

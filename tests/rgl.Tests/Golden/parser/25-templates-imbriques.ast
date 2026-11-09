@@ -1,0 +1,20 @@
+CompilationUnit 1:1
+  VarDeclaration 2:1 keyword=var name=a
+    LiteralExpression 2:8 kind=IntegerLiteral text=1
+  VarDeclaration 3:1 keyword=var name=t
+    TemplateExpression 3:8
+      TemplateText 3:9 text=dehors 
+      TemplateInterpolation 3:16
+        TemplateExpression 3:17
+          TemplateText 3:18 text=dedans 
+          TemplateInterpolation 3:25
+            BinaryExpression 3:26 op=+
+              NameExpression 3:26 name=a
+              LiteralExpression 3:30 kind=IntegerLiteral text=1
+      TemplateText 3:34 text= et 
+      TemplateInterpolation 3:38
+        LiteralExpression 3:39 kind=StringLiteral text="`"
+      TemplateText 3:43 text= fin
+  TrainDeclaration 4:1 unguarded=false parameters=none
+    Pipeline 4:7
+      DoneStep 4:10

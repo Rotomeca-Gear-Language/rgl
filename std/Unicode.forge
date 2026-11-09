@@ -1,0 +1,50 @@
+forge: gears
+description: "Normalisation Unicode (NFC, NFD, NFKC, NFKD), suppression des accents et comparaison sans accents"
+
+/// <lang name="fr"><summary>Met un texte dans une forme de normalisation (usage interne).</summary><param name="text">Le texte.</param><param name="form">0 NFC, 1 NFD, 2 NFKC, 3 NFKD.</param><returns>Le texte normalisé.</returns></lang>
+/// <lang name="en"><summary>Puts a text in a normalization form (internal use).</summary><param name="text">The text.</param><param name="form">0 NFC, 1 NFD, 2 NFKC, 3 NFKD.</param><returns>The normalized text.</returns></lang>
+@trusted
+gear pure _normalize(string text, int form): string => cpp {
+    #include <rgl/standard/unicode.hpp>
+    rgl_return rgl(rgl_arg_text text, rgl_arg_form form) {
+        return rgl::standard::unicode::normalize(text, static_cast<rgl::standard::unicode::form>(form));
+    }
+}(string text: text, int form: form): string;
+
+/// <lang name="fr"><summary>Retire les caractères combinants d'un texte (usage interne).</summary><param name="text">Le texte.</param><returns>Le texte décomposé, sans ses accents.</returns></lang>
+/// <lang name="en"><summary>Removes the combining characters of a text (internal use).</summary><param name="text">The text.</param><returns>The decomposed text, without its accents.</returns></lang>
+@trusted
+gear pure _stripMarks(string text): string => cpp {
+    #include <rgl/standard/unicode.hpp>
+    rgl_return rgl(rgl_arg_text text) {
+        return rgl::standard::unicode::strip_marks(text);
+    }
+}(string text: text): string;
+
+/// <lang name="fr"><summary>La forme NFC : chaque lettre accentuée est écrite d'un seul caractère (« e » et son accent deviennent « é »). C'est la forme à comparer et à enregistrer.</summary><param name="text">Le texte.</param><returns>Le texte en NFC.</returns></lang>
+/// <lang name="en"><summary>The NFC form: each accented letter is written as one character (« e » and its accent become « é »). It is the form to compare and to store.</summary><param name="text">The text.</param><returns>The text in NFC.</returns></lang>
+gear pure normalizeNfc(string text): string => _normalize(text, 0);
+
+/// <lang name="fr"><summary>La forme NFD : chaque lettre accentuée est écrite d'une lettre puis de ses accents.</summary><param name="text">Le texte.</param><returns>Le texte en NFD.</returns></lang>
+/// <lang name="en"><summary>The NFD form: each accented letter is written as a letter then its accents.</summary><param name="text">The text.</param><returns>The text in NFD.</returns></lang>
+gear pure normalizeNfd(string text): string => _normalize(text, 1);
+
+/// <lang name="fr"><summary>La forme NFKC : comme NFC, et les caractères de compatibilité deviennent leurs équivalents ordinaires (« ﬁ » devient « fi », « ① » devient « 1 », une largeur pleine devient une largeur normale).</summary><param name="text">Le texte.</param><returns>Le texte en NFKC.</returns></lang>
+/// <lang name="en"><summary>The NFKC form: like NFC, and compatibility characters become their ordinary equivalents (« ﬁ » becomes « fi », « ① » becomes « 1 », a full width becomes a normal width).</summary><param name="text">The text.</param><returns>The text in NFKC.</returns></lang>
+gear pure normalizeNfkc(string text): string => _normalize(text, 2);
+
+/// <lang name="fr"><summary>La forme NFKD : comme NFD, avec les équivalences de compatibilité de NFKC.</summary><param name="text">Le texte.</param><returns>Le texte en NFKD.</returns></lang>
+/// <lang name="en"><summary>The NFKD form: like NFD, with the compatibility equivalences of NFKC.</summary><param name="text">The text.</param><returns>The text in NFKD.</returns></lang>
+gear pure normalizeNfkd(string text): string => _normalize(text, 3);
+
+/// <lang name="fr"><summary>Dit si un texte est déjà en NFC.</summary><param name="text">Le texte.</param><returns>Vrai si le texte est en NFC.</returns></lang>
+/// <lang name="en"><summary>Tells whether a text is already in NFC.</summary><param name="text">The text.</param><returns>True when the text is in NFC.</returns></lang>
+gear pure isNfc(string text): bool => normalizeNfc(text) eq text;
+
+/// <lang name="fr"><summary>Retire les accents d'un texte : « Héros à l'école » devient « Heros a l'ecole ». Les lettres sans équivalent décomposable (« ø », « ß ») restent telles quelles.</summary><param name="text">Le texte.</param><returns>Le texte sans accents.</returns></lang>
+/// <lang name="en"><summary>Removes the accents of a text: « Héros à l'école » becomes « Heros a l'ecole ». Letters with no decomposable equivalent (« ø », « ß ») stay as they are.</summary><param name="text">The text.</param><returns>The text without accents.</returns></lang>
+gear pure stripAccents(string text): string => _stripMarks(text);
+
+/// <lang name="fr"><summary>Compare deux textes sans tenir compte des accents ni de la casse : « Éléphant » et « elephant » sont égaux.</summary><param name="a">Le premier texte.</param><param name="b">Le second texte.</param><returns>Vrai si les textes ne diffèrent que par les accents et la casse.</returns></lang>
+/// <lang name="en"><summary>Compares two texts ignoring accents and case: « Éléphant » and « elephant » are equal.</summary><param name="a">The first text.</param><param name="b">The second text.</param><returns>True when the texts differ only by accents and case.</returns></lang>
+gear pure equalsIgnoringAccents(string a, string b): bool => stripAccents(normalizeNfkc(a)).toLower() eq stripAccents(normalizeNfkc(b)).toLower();

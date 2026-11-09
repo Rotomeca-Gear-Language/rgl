@@ -1,0 +1,9 @@
+mold Handle -> fermer {
+    int id;
+}
+
+mold Session -> Outils.cloturer {
+    Handle canal;
+}
+
+!train |> done;

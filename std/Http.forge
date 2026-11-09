@@ -1,0 +1,777 @@
+forge: gears
+description: "Serveur HTTP/1.1 synchrone et routage minimal"
+
+use <Path> only {executableDirectory, extension, join};
+use <Text> only {urlDecode};
+use <Compression> only {gzipCompress, gzipDecompress};
+use <Auth> only {BasicCredentials, parseBasicAuthorization, parseBearerAuthorization, signJwt, verifyJwt};
+use <HttpForm> only {FormPart, parseMultipart, parseForm};
+use <Time> only {now};
+
+/// <lang name="fr"><summary>Ce qu'un cookie de session signé contient : l'expiration (`exp`, secondes depuis 1970, lue par la vérification du jeton) et les données (usage interne).</summary></lang>
+/// <lang name="en"><summary>What a signed session cookie holds: the expiry (`exp`, seconds since 1970, read by the token check) and the data (internal use).</summary></lang>
+mold _SessionClaims {
+    /// <lang name="fr"><summary>L'instant d'expiration, en secondes depuis 1970.</summary></lang>
+    /// <lang name="en"><summary>The expiry instant, in seconds since 1970.</summary></lang>
+    long exp;
+    /// <lang name="fr"><summary>Les données de la session.</summary></lang>
+    /// <lang name="en"><summary>The session data.</summary></lang>
+    [string:string] data;
+}
+
+/// <lang name="fr"><summary>Une requête HTTP reçue par un handler.</summary></lang>
+/// <lang name="en"><summary>An HTTP request received by a handler.</summary></lang>
+mold HttpRequest {
+    /// <lang name="fr"><summary>La méthode HTTP telle que reçue, par exemple `GET`.</summary></lang>
+    /// <lang name="en"><summary>The HTTP method as received, for example `GET`.</summary></lang>
+    string method;
+    /// <lang name="fr"><summary>La cible brute, avec sa chaîne de requête.</summary></lang>
+    /// <lang name="en"><summary>The raw request target, including its query string.</summary></lang>
+    string target;
+    /// <lang name="fr"><summary>Le chemin situé avant le premier `?`.</summary></lang>
+    /// <lang name="en"><summary>The path before the first `?`.</summary></lang>
+    string path;
+    /// <lang name="fr"><summary>La chaîne de requête sans le `?` initial.</summary></lang>
+    /// <lang name="en"><summary>The query string without its leading `?`.</summary></lang>
+    string query;
+    /// <lang name="fr"><summary>Les lignes d'en-têtes brutes, séparées par CRLF.</summary></lang>
+    /// <lang name="en"><summary>The raw header lines, separated by CRLF.</summary></lang>
+    string headers;
+    /// <lang name="fr"><summary>Le corps lu selon `Content-Length`.</summary></lang>
+    /// <lang name="en"><summary>The body read according to `Content-Length`.</summary></lang>
+    string body;
+    /// <lang name="fr"><summary>Les paramètres de la query, sans décodage d'URL.</summary></lang>
+    /// <lang name="en"><summary>The query parameters, without URL decoding.</summary></lang>
+    [string:string] queryParameters;
+    /// <lang name="fr"><summary>Les composants capturés par les segments `:nom` de la route.</summary></lang>
+    /// <lang name="en"><summary>The components captured by the route's `:name` segments.</summary></lang>
+    [string:string] routeParameters;
+
+    /// <lang name="fr">
+    /// <summary>Les en-têtes, lus : nom en minuscules → valeur (un nom répété garde la dernière valeur).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The headers, parsed: lowercase name → value (a repeated name keeps its last value).</summary>
+    /// </lang>
+    [string:string] headerFields;
+
+    /// <lang name="fr">
+    /// <summary>Les cookies envoyés par le navigateur (en-tête `Cookie`), par nom.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The cookies sent by the browser (`Cookie` header), by name.</summary>
+    /// </lang>
+    [string:string] cookies;
+}
+
+/// <lang name="fr"><summary>Une réponse HTTP construite par un handler.</summary></lang>
+/// <lang name="en"><summary>An HTTP response built by a handler.</summary></lang>
+mold HttpResponse {
+    /// <lang name="fr"><summary>Le code de statut HTTP, 200 par défaut.</summary></lang>
+    /// <lang name="en"><summary>The HTTP status code, 200 by default.</summary></lang>
+    uint status: 200;
+    /// <lang name="fr"><summary>La valeur de l'en-tête `Content-Type`.</summary></lang>
+    /// <lang name="en"><summary>The value of the `Content-Type` header.</summary></lang>
+    string contentType: 'text/plain; charset=utf-8';
+    /// <lang name="fr"><summary>Le corps de la réponse.</summary></lang>
+    /// <lang name="en"><summary>The response body.</summary></lang>
+    string body: '';
+
+    /// <lang name="fr">
+    /// <summary>Des en-têtes de réponse en plus de `Content-Type` et `Content-Length`.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Response headers in addition to `Content-Type` and `Content-Length`.</summary>
+    /// </lang>
+    [string:string]? headers;
+
+    /// <lang name="fr">
+    /// <summary>Des cookies à poser : chaque élément est la valeur complète d'un en-tête `Set-Cookie` (voir `withCookie`).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Cookies to set: each element is the complete value of a `Set-Cookie` header (see `withCookie`).</summary>
+    /// </lang>
+    [string]? cookies;
+}
+
+/// <lang name="fr"><summary>Une route exacte associée à son handler.</summary></lang>
+/// <lang name="en"><summary>An exact route associated with its handler.</summary></lang>
+mold HttpRoute {
+    /// <lang name="fr"><summary>La méthode à faire correspondre exactement.</summary></lang>
+    /// <lang name="en"><summary>The method to match exactly.</summary></lang>
+    string method;
+    /// <lang name="fr"><summary>Le motif de chemin ; un segment `:nom` capture une valeur.</summary></lang>
+    /// <lang name="en"><summary>The path pattern; a `:name` segment captures a value.</summary></lang>
+    string path;
+    /// <lang name="fr"><summary>La fonction appelée lorsqu'une requête correspond.</summary></lang>
+    /// <lang name="en"><summary>The function called when a request matches.</summary></lang>
+    (HttpRequest) => HttpResponse handler;
+}
+
+/// <lang name="fr"><summary>Un message texte reçu sur une connexion WebSocket.</summary></lang>
+/// <lang name="en"><summary>A text message received over a WebSocket connection.</summary></lang>
+mold WebSocketMessage {
+    /// <lang name="fr"><summary>La requête HTTP qui a ouvert la connexion.</summary></lang>
+    /// <lang name="en"><summary>The HTTP request that opened the connection.</summary></lang>
+    HttpRequest request;
+    /// <lang name="fr"><summary>Le contenu UTF-8 de la frame texte.</summary></lang>
+    /// <lang name="en"><summary>The UTF-8 content of the text frame.</summary></lang>
+    string text;
+}
+
+/// <lang name="fr"><summary>Une route WebSocket associée à son handler de messages.</summary></lang>
+/// <lang name="en"><summary>A WebSocket route associated with its message handler.</summary></lang>
+mold WebSocketRoute {
+    /// <lang name="fr"><summary>Le motif de chemin, avec les éventuels segments `:nom`.</summary></lang>
+    /// <lang name="en"><summary>The path pattern, including optional `:name` segments.</summary></lang>
+    string path;
+    /// <lang name="fr"><summary>Fabrique un handler isolé pour chaque connexion.</summary></lang>
+    /// <lang name="en"><summary>Creates an isolated handler for each connection.</summary></lang>
+    (HttpRequest) => (string) => string open;
+}
+
+/// <lang name="fr"><summary>Un serveur et ses routes, évaluées dans leur ordre d'ajout.</summary></lang>
+/// <lang name="en"><summary>A server and its routes, evaluated in insertion order.</summary></lang>
+mold HttpServer {
+    /// <lang name="fr"><summary>Les routes dans leur ordre de priorité.</summary></lang>
+    /// <lang name="en"><summary>The routes in priority order.</summary></lang>
+    [HttpRoute] routes;
+    /// <lang name="fr"><summary>Les routes WebSocket dans leur ordre de priorité.</summary></lang>
+    /// <lang name="en"><summary>The WebSocket routes in priority order.</summary></lang>
+    [WebSocketRoute] webSockets;
+
+    /// <lang name="fr">
+    /// <summary>Les intergiciels, dans l'ordre où ils ont été ajoutés : le premier reçoit la requête en premier.</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The middlewares, in the order they were added: the first one receives the request first.</summary>
+    /// </lang>
+    [(HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse]? middlewares;
+
+    /// <lang name="fr">
+    /// <summary>La taille minimale du corps, en octets, à partir de laquelle une réponse textuelle est compressée en gzip quand le client l'accepte ; 0 désactive la compression (1024 par défaut).</summary>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The minimal body size, in bytes, from which a textual response is gzip-compressed when the client accepts it; 0 disables compression (1024 by default).</summary>
+    /// </lang>
+    uint compressFrom: 1024;
+}
+
+/// <lang name="fr"><summary>Échec de l'ouverture, de l'écoute ou d'une connexion HTTP.</summary></lang>
+/// <lang name="en"><summary>Failure while opening, listening, or handling an HTTP connection.</summary></lang>
+error HttpError {
+    /// <lang name="fr"><summary>Le code d'erreur renvoyé par la plateforme.</summary></lang>
+    /// <lang name="en"><summary>The error code returned by the platform.</summary></lang>
+    int code;
+    /// <lang name="fr"><summary>L'opération HTTP qui a échoué.</summary></lang>
+    /// <lang name="en"><summary>The HTTP operation that failed.</summary></lang>
+    string operation;
+}
+
+/// <lang name="fr"><summary>Donne la raison HTTP associée aux statuts pris en charge.</summary></lang>
+/// <lang name="en"><summary>Returns the HTTP reason associated with supported statuses.</summary></lang>
+gear pure _reason(uint status): string {
+    switch (status) {
+        case 200: return 'OK';
+        case 201: return 'Created';
+        case 204: return 'No Content';
+        case 301: return 'Moved Permanently';
+        case 302: return 'Found';
+        case 303: return 'See Other';
+        case 304: return 'Not Modified';
+        case 307: return 'Temporary Redirect';
+        case 308: return 'Permanent Redirect';
+        case 401: return 'Unauthorized';
+        case 403: return 'Forbidden';
+        case 409: return 'Conflict';
+        case 413: return 'Payload Too Large';
+        case 422: return 'Unprocessable Entity';
+        case 429: return 'Too Many Requests';
+        case 503: return 'Service Unavailable';
+        case 400: return 'Bad Request';
+        case 404: return 'Not Found';
+        case 405: return 'Method Not Allowed';
+        case 500: return 'Internal Server Error';
+        default: return 'Response';
+    }
+}
+
+/// <lang name="fr"><summary>Colle un corps binaire à un en-tête, octet pour octet (usage interne).</summary><param name="head">L'en-tête complet, ligne vide comprise.</param><param name="body">Les octets du corps.</param><returns>Le message, sans aucune conversion du corps.</returns></lang>
+/// <lang name="en"><summary>Appends a binary body to a header, byte for byte (internal use).</summary><param name="head">The complete header, blank line included.</param><param name="body">The body bytes.</param><returns>The message, with no conversion of the body.</returns></lang>
+@trusted
+gear pure _withBinaryBody(string head, bytes body): string => cpp {
+    #include <string>
+    #include <utility>
+    rgl_return rgl(rgl_arg_head head, rgl_arg_body body) {
+        std::string text(head.data(), head.size());
+        text.reserve(head.size() + body.size());
+        for (std::size_t i = 0; i < body.size(); ++i) text.push_back(static_cast<char>(body[i]));
+        return rgl_return(rgl::standard::string::from_std_string(std::move(text)));
+    }
+}(string head: head, bytes body: body): string;
+
+/// <lang name="fr"><summary>Indique si un type de contenu est du texte qu'il vaut la peine de compresser.</summary><param name="contentType">La valeur de `Content-Type`.</param><returns>`true` pour le texte, le JSON, le JavaScript, le XML et le SVG.</returns></lang>
+/// <lang name="en"><summary>Tells whether a content type is text worth compressing.</summary><param name="contentType">The `Content-Type` value.</param><returns>`true` for text, JSON, JavaScript, XML and SVG.</returns></lang>
+gear pure _compressible(string contentType): bool {
+    const string kind: contentType.toLower();
+    return kind.startsWith('text/') or kind.contains('json') or kind.contains('javascript') or kind.contains('xml') or kind.contains('svg');
+}
+
+/// <lang name="fr"><summary>Sérialise une réponse en message HTTP/1.1 complet, en compressant le corps en gzip si possible.</summary><param name="response">La réponse du handler.</param><param name="compressFrom">La taille minimale du corps à compresser (0 : jamais).</param><param name="acceptEncoding">La valeur de l'en-tête `Accept-Encoding` de la requête.</param><returns>Le message complet.</returns></lang>
+/// <lang name="en"><summary>Serializes a response into a complete HTTP/1.1 message, gzip-compressing the body when possible.</summary><param name="response">The handler's response.</param><param name="compressFrom">The minimal body size to compress (0: never).</param><param name="acceptEncoding">The value of the request's `Accept-Encoding` header.</param><returns>The complete message.</returns></lang>
+gear pure _serialize(HttpResponse response, uint compressFrom, string acceptEncoding): string {
+    const bytes plain: response.body as bytes;
+    const [string:string] noHeaders: [:];
+    const [string] noCookies: [];
+    const [string:string] headers: response.headers ?? noHeaders;
+    const bool encoded: headers.keys().any((name) => name.toLower() eq 'content-encoding');
+    const bool packable: compressFrom > 0 and plain.length >= compressFrom and not encoded and acceptEncoding.toLower().contains('gzip') and _compressible(response.contentType);
+    const bytes? packed: packable ? gzipCompress(plain) : null;
+    const bytes sent: packed ?? plain;
+    const string encoding: packed eq null ? '' : "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n";
+    const string extra: headers.keys() |+> '' with (acc, name) => `{acc}{name}: {headers[name]}\r\n`;
+    const string cookies: (response.cookies ?? noCookies) |+> '' with (acc, cookie) => `{acc}Set-Cookie: {cookie}\r\n`;
+    const string head: `HTTP/1.1 {response.status} {_reason(response.status)}\r\nContent-Type: {response.contentType}\r\nContent-Length: {sent.length}\r\n{encoding}{extra}{cookies}\r\n`;
+    return packed eq null ? `{head}{response.body}` : _withBinaryBody(head, sent);
+}
+
+/// <lang name="fr"><summary>Découpe une liste de couples clé-valeur sans décodage d'URL.</summary></lang>
+/// <lang name="en"><summary>Splits a key-value list without URL decoding.</summary></lang>
+gear pure _parameters(string text, string separator): [string:string] {
+    const [string:string] empty: [:];
+    return text eq '' ? empty : _parametersAt(text.split(separator), 0, empty);
+}
+
+/// <lang name="fr"><summary>Accumule récursivement les paramètres à partir d'un index.</summary></lang>
+/// <lang name="en"><summary>Recursively accumulates parameters from an index.</summary></lang>
+gear pure _parametersAt([string] parts, uint index, [string:string] parameters): [string:string] {
+    if (index >= parts.length) { return parameters; }
+    const (string before, string after, bool found) pair: parts[index].splitOnce('=');
+    mut [string:string] next: parameters;
+    next <- next.put(urlDecode(pair.before) ?? pair.before, pair.found ? (urlDecode(pair.after) ?? pair.after) : '');
+    return _parametersAt(parts, index + 1, next);
+}
+
+/// <lang name="fr"><summary>Fait correspondre un chemin et extrait les segments dynamiques.</summary></lang>
+/// <lang name="en"><summary>Matches a path and extracts its dynamic segments.</summary></lang>
+gear pure _routeParameters(string pattern, string path): [string:string]? {
+    const [string:string] empty: [:];
+    if (pattern eq '/*' and path.startsWith('/')) { return empty; }
+    const [string] expected: pattern.split('/');
+    const [string] actual: path.split('/');
+    return expected.length eq actual.length ? _routeParametersAt(expected, actual, 0, empty) : null;
+}
+
+/// <lang name="fr"><summary>Compare récursivement les composants d'un motif et d'un chemin.</summary></lang>
+/// <lang name="en"><summary>Recursively compares the components of a pattern and a path.</summary></lang>
+gear pure _routeParametersAt([string] expected, [string] actual, uint index, [string:string] parameters): [string:string]? {
+    if (index >= expected.length) { return parameters; }
+    if (expected[index].startsWith(':') and expected[index].length > 1) {
+        mut [string:string] next: parameters;
+        next.add(expected[index].substring(1, expected[index].length as long), urlDecode(actual[index]) ?? actual[index]);
+        return _routeParametersAt(expected, actual, index + 1, next);
+    }
+    return expected[index] eq actual[index] ? _routeParametersAt(expected, actual, index + 1, parameters) : null;
+}
+
+/// <lang name="fr"><summary>Le dictionnaire (éventuellement absent) avec une entrée de plus (usage interne).</summary><param name="headers">Le dictionnaire, ou `null`.</param><param name="name">La clé.</param><param name="value">La valeur.</param><returns>Le nouveau dictionnaire.</returns></lang>
+/// <lang name="en"><summary>The dictionary (possibly absent) with one more entry (internal use).</summary><param name="headers">The dictionary, or `null`.</param><param name="name">The key.</param><param name="value">The value.</param><returns>The new dictionary.</returns></lang>
+gear pure _withEntry([string:string]? headers, string name, string value): [string:string] {
+    const [string:string] none: [:];
+    return (headers ?? none).put(name, value);
+}
+
+/// <lang name="fr"><summary>La liste (éventuellement absente) de cookies avec un cookie de plus (usage interne).</summary><param name="cookies">La liste, ou `null`.</param><param name="cookie">Le cookie.</param><returns>La nouvelle liste.</returns></lang>
+/// <lang name="en"><summary>The list (possibly absent) of cookies with one more cookie (internal use).</summary><param name="cookies">The list, or `null`.</param><param name="cookie">The cookie.</param><returns>The new list.</returns></lang>
+gear pure _withCookie([string]? cookies, string cookie): [string] {
+    const [string] none: [];
+    return [...(cookies ?? none), cookie];
+}
+
+/// <lang name="fr"><summary>Lit les lignes d'en-têtes : nom en minuscules → valeur.</summary><param name="headers">Les en-têtes bruts.</param></lang>
+/// <lang name="en"><summary>Parses header lines: lowercase name → value.</summary><param name="headers">The raw headers.</param></lang>
+gear pure _headerFields(string headers): [string:string] {
+    [string:string] none: [:];
+    return headers.split("\r\n") |+> none with (acc, line) => {
+        const (string before, string after, bool found) pair: line.splitOnce(':');
+        return pair.found ? acc.put(pair.before.trim().toLower(), pair.after.trim()) : acc;
+    };
+}
+
+/// <lang name="fr"><summary>Lit la valeur d'un en-tête `Cookie`.</summary><param name="cookieHeader">La valeur de l'en-tête.</param></lang>
+/// <lang name="en"><summary>Parses the value of a `Cookie` header.</summary><param name="cookieHeader">The header value.</param></lang>
+gear pure _cookieFields(string cookieHeader): [string:string] {
+    [string:string] none: [:];
+    return cookieHeader.split(';') |+> none with (acc, part) => {
+        const (string before, string after, bool found) pair: part.splitOnce('=');
+        return pair.found ? acc.put(pair.before.trim(), pair.after.trim()) : acc;
+    };
+}
+
+/// <lang name="fr"><summary>Construit la requête structurée transmise à un handler.</summary></lang>
+/// <lang name="en"><summary>Builds the structured request passed to a handler.</summary></lang>
+gear pure _request(string method, string target, string headers, string body, [string:string] routeParameters): HttpRequest {
+    const (string before, string after, bool found) split: target.splitOnce('?');
+    const string query: split.found ? split.after : '';
+    const [string:string] fields: _headerFields(headers);
+    return {method, target, path: split.before, query, headers, body, queryParameters: _parameters(query, '&'), routeParameters, headerFields: fields, cookies: _cookieFields(fields.getOr('cookie', ''))};
+}
+
+/// <lang name="fr"><summary>Enveloppe un handler dans les intergiciels, le premier ajouté étant le plus extérieur.</summary><param name="chain">Les intergiciels, ou `null`.</param><param name="handler">Le handler de la route.</param></lang>
+/// <lang name="en"><summary>Wraps a handler in the middlewares, the first one added being the outermost.</summary><param name="chain">The middlewares, or `null`.</param><param name="handler">The route handler.</param></lang>
+gear _compose([(HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse]? chain, (HttpRequest) => HttpResponse handler): (HttpRequest) => HttpResponse {
+    const [(HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse] none: [];
+    return (chain ?? none).reversed() |+> handler with (next, middleware) => (HttpRequest request) => middleware(request, next);
+}
+
+/// <lang name="fr"><summary>Choisit la première route correspondante et sérialise sa réponse.</summary></lang>
+/// <lang name="en"><summary>Selects the first matching route and serializes its response.</summary></lang>
+gear _dispatch(HttpServer server, string method, string target, string headers, string body): string {
+    const string rawPath: target.splitOnce('?').before;
+    const string path: urlDecode(rawPath) ?? rawPath;
+    HttpResponse? missing: null;
+    const HttpResponse? response: server.routes |+> missing with (found, route) => {
+        const [string:string]? parameters: _routeParameters(route.path, path);
+        const [string:string] empty: [:];
+        if (route.method eq method and parameters not eq null) { done _compose(server.middlewares, route.handler)(_request(method, target, headers, body, parameters ?? empty)); }
+        return found;
+    };
+    return _serialize(response ?? {status: 404, contentType: 'text/plain; charset=utf-8', body: 'Not Found'}, server.compressFrom, _headerFields(headers).getOr('accept-encoding', ''));
+}
+
+/// <lang name="fr"><summary>Lit un fichier statique sous une racine sans autoriser de remontée `..`.</summary></lang>
+/// <lang name="en"><summary>Reads a static file below a root without allowing `..` traversal.</summary></lang>
+@trusted
+gear _readStatic(string root, string target): string? => cpp {
+    #include <filesystem>
+    #include <fstream>
+    #include <iterator>
+    #include <string>
+    rgl_return rgl(rgl_arg_root root, rgl_arg_target target) {
+        namespace fs = std::filesystem;
+        std::error_code error;
+        const auto base = fs::weakly_canonical(fs::u8path(root.data(), root.data() + root.size()), error);
+        if (error || !fs::is_directory(base, error)) return {};
+        std::string relative(target.data(), target.size());
+        while (!relative.empty() && relative.front() == '/') relative.erase(relative.begin());
+        auto requested = fs::u8path(relative);
+        if (relative.empty() || relative.back() == '/') requested /= "index.html";
+        const auto file = fs::weakly_canonical(base / requested, error);
+        if (error || !fs::is_regular_file(file, error)) return {};
+        auto basePart = base.begin();
+        auto filePart = file.begin();
+        for (; basePart != base.end() && filePart != file.end() && *basePart == *filePart; ++basePart, ++filePart) {}
+        if (basePart != base.end()) return {};
+        std::ifstream input(file, std::ios::binary);
+        if (!input) return {};
+        std::string content((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+        return rgl_return(rgl::standard::string::from_std_string(std::move(content)));
+    }
+}(string root: root, string target: target): string?;
+
+/// <lang name="fr"><summary>Déduit le type MIME d'un fichier statique depuis son extension.</summary></lang>
+/// <lang name="en"><summary>Infers a static file's MIME type from its extension.</summary></lang>
+gear pure _staticMime(string path): string {
+    const string suffix: extension(path).toLower();
+    switch (suffix) {
+        case '.html': return 'text/html; charset=utf-8';
+        case '.css': return 'text/css; charset=utf-8';
+        case '.js': return 'application/javascript; charset=utf-8';
+        case '.json': return 'application/json; charset=utf-8';
+        case '.svg': return 'image/svg+xml';
+        case '.png': return 'image/png';
+        case '.jpg': case '.jpeg': return 'image/jpeg';
+        case '.gif': return 'image/gif';
+        case '.webp': return 'image/webp';
+        case '.ico': return 'image/x-icon';
+        case '.wasm': return 'application/wasm';
+        case '.txt': return 'text/plain; charset=utf-8';
+        default: return 'application/octet-stream';
+    }
+}
+
+/// <lang name="fr"><summary>Construit la réponse d'un fichier statique ou une réponse 404.</summary></lang>
+/// <lang name="en"><summary>Builds a static-file response or a 404 response.</summary></lang>
+gear _staticResponse(string root, HttpRequest request): HttpResponse {
+    const string? content: _readStatic(root, request.path);
+    return content eq null
+        ? {status: 404, contentType: 'text/plain; charset=utf-8', body: 'Not Found'}
+        : {status: 200, contentType: _staticMime(request.path), body: content ?? ''};
+}
+
+/// <lang name="fr"><summary>Indique si une cible correspond à une route WebSocket.</summary></lang>
+/// <lang name="en"><summary>Checks whether a target matches a WebSocket route.</summary></lang>
+gear pure _acceptWebSocket(HttpServer server, string target, string headers): bool {
+    const string path: target.splitOnce('?').before;
+    return server.webSockets |+> false with (found, route) => found or _routeParameters(route.path, path) not eq null;
+}
+
+/// <lang name="fr"><summary>Transmet une frame texte au handler WebSocket correspondant.</summary></lang>
+/// <lang name="en"><summary>Passes a text frame to its matching WebSocket handler.</summary></lang>
+gear _openWebSocket(HttpServer server, string target, string headers): (string) => string {
+    const string path: target.splitOnce('?').before;
+    (string) => string missing: (text) => '';
+    return server.webSockets |+> missing with (found, route) => {
+        const [string:string]? parameters: _routeParameters(route.path, path);
+        const [string:string] empty: [:];
+        if (parameters not eq null) { done route.open(_request('GET', target, headers, '', parameters ?? empty)); }
+        return found;
+    };
+}
+
+/// <lang name="fr"><summary>Relie le transport C++ au callback synchrone écrit en RGL.</summary><remarks>Frontière interne de confiance de la bibliothèque standard.</remarks></lang>
+/// <lang name="en"><summary>Connects the C++ transport to the synchronous callback written in RGL.</summary><remarks>Internal trusted boundary of the standard library.</remarks></lang>
+@trusted
+gear _serve(string address, ushort port, uint maxRequests, uint workers, (string, string, string, string) => string callback, (string, string) => bool acceptWebSocket, (string, string) => (string) => string openWebSocket): int => cpp {
+    #include "rgl/standard/http.hpp"
+    int rgl(const rgl_arg_address& address, unsigned short port, unsigned int maxRequests, unsigned int workers, const rgl_arg_callback& callback, const rgl_arg_acceptWebSocket& acceptWebSocket, const rgl_arg_openWebSocket& openWebSocket) {
+        return rgl::standard::http::serve(address, port, maxRequests, workers, callback, acceptWebSocket, openWebSocket);
+    }
+}(string address: address, ushort port: port, uint maxRequests: maxRequests, uint workers: workers, (string, string, string, string) => string callback: callback, (string, string) => bool acceptWebSocket: acceptWebSocket, (string, string) => (string) => string openWebSocket: openWebSocket): int;
+
+/// <lang name="fr"><summary>Relie un serveur HTTPS OpenSSL au routeur RGL.</summary></lang>
+/// <lang name="en"><summary>Connects an OpenSSL HTTPS server to the RGL router.</summary></lang>
+@trusted
+gear _serveTls(string address, ushort port, string certificate, string privateKey, uint maxRequests, uint workers, (string, string, string, string) => string callback, (string, string) => bool acceptWebSocket, (string, string) => (string) => string openWebSocket): int => cpp {
+    #include "rgl/standard/http_tls.hpp"
+    int rgl(const rgl_arg_address& address, unsigned short port, const rgl_arg_certificate& certificate, const rgl_arg_privateKey& privateKey, unsigned int maxRequests, unsigned int workers, const rgl_arg_callback& callback, const rgl_arg_acceptWebSocket& acceptWebSocket, const rgl_arg_openWebSocket& openWebSocket) {
+        return rgl::standard::http::serve_tls(address, port, certificate, privateKey, maxRequests, workers, callback, acceptWebSocket, openWebSocket);
+    }
+}(string address: address, ushort port: port, string certificate: certificate, string privateKey: privateKey, uint maxRequests: maxRequests, uint workers: workers, (string, string, string, string) => string callback: callback, (string, string) => bool acceptWebSocket: acceptWebSocket, (string, string) => (string) => string openWebSocket: openWebSocket): int;
+
+/// <lang name="fr">
+/// <summary>Lecture des en-têtes et des cookies d'une requête.</summary>
+/// </lang>
+/// <lang name="en">
+/// <summary>Reading the headers and cookies of a request.</summary>
+/// </lang>
+extend HttpRequest {
+    /// <lang name="fr">
+    /// <summary>La valeur d'un en-tête de la requête.</summary>
+    /// <param name="request">La requête.</param>
+    /// <param name="name">Le nom de l'en-tête (la casse est ignorée).</param>
+    /// <returns>La valeur, `null` si l'en-tête est absent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The value of a request header.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="name">The header name (case is ignored).</param>
+    /// <returns>The value, `null` when the header is absent.</returns>
+    /// </lang>
+    gear pure header(this HttpRequest request, string name): string? => request.headerFields.has(name.toLower()) ? request.headerFields[name.toLower()] : null;
+
+    /// <lang name="fr">
+    /// <summary>La valeur d'un cookie envoyé avec la requête.</summary>
+    /// <param name="request">La requête.</param>
+    /// <param name="name">Le nom du cookie.</param>
+    /// <returns>La valeur, `null` si le cookie est absent.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The value of a cookie sent with the request.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="name">The cookie name.</param>
+    /// <returns>The value, `null` when the cookie is absent.</returns>
+    /// </lang>
+    gear pure cookie(this HttpRequest request, string name): string? => request.cookies.has(name) ? request.cookies[name] : null;
+
+    /// <lang name="fr"><summary>L'identifiant et le mot de passe de l'authentification Basic.</summary><param name="request">La requête.</param><returns>Les identifiants, `null` si la requête n'a pas d'en-tête Basic valide.</returns></lang>
+    /// <lang name="en"><summary>The user name and password of Basic authentication.</summary><param name="request">The request.</param><returns>The credentials, or `null` when the request has no valid Basic header.</returns></lang>
+    gear pure basicCredentials(this HttpRequest request): BasicCredentials? => parseBasicAuthorization(request.headerFields.getOr('authorization', ''));
+
+    /// <lang name="fr"><summary>Le jeton de l'authentification Bearer.</summary><param name="request">La requête.</param><returns>Le jeton, `null` si la requête n'a pas d'en-tête Bearer.</returns></lang>
+    /// <lang name="en"><summary>The token of Bearer authentication.</summary><param name="request">The request.</param><returns>The token, or `null` when the request has no Bearer header.</returns></lang>
+    gear pure bearerToken(this HttpRequest request): string? => parseBearerAuthorization(request.headerFields.getOr('authorization', ''));
+
+    /// <lang name="fr"><summary>Les parties d'un formulaire `multipart/form-data` (champs et fichiers envoyés).</summary><param name="request">La requête.</param><returns>Les parties, `null` si la requête n'est pas un formulaire multipart valide.</returns></lang>
+    /// <lang name="en"><summary>The parts of a `multipart/form-data` form (fields and uploaded files).</summary><param name="request">The request.</param><returns>The parts, or `null` when the request is not a valid multipart form.</returns></lang>
+    gear pure multipart(this HttpRequest request): [FormPart]? => parseMultipart(request.headerFields.getOr('content-type', ''), request.body);
+
+    /// <lang name="fr"><summary>Les champs d'un formulaire `application/x-www-form-urlencoded`.</summary><param name="request">La requête.</param><returns>Les champs, par nom.</returns></lang>
+    /// <lang name="en"><summary>The fields of an `application/x-www-form-urlencoded` form.</summary><param name="request">The request.</param><returns>The fields, by name.</returns></lang>
+    gear pure form(this HttpRequest request): [string:string] => parseForm(request.body);
+
+    /// <lang name="fr">
+    /// <summary>Les données de la session de la requête. La session vit dans un cookie signé (HMAC-SHA256, comme un jeton JWT) : le serveur ne garde rien, mais le navigateur peut lire le cookie, qui n'est donc pas fait pour des secrets.</summary>
+    /// <param name="request">La requête.</param>
+    /// <param name="secret">Le secret qui signe les sessions (le même qu'à `withSession`).</param>
+    /// <param name="name">Le nom du cookie.</param>
+    /// <returns>Les données, `null` s'il n'y a pas de session, si la signature est fausse ou si elle a expiré.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The session data of the request. The session lives in a signed cookie (HMAC-SHA256, like a JWT): the server keeps nothing, but the browser can read the cookie, so it is not meant for secrets.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="secret">The secret that signs sessions (the same as for `withSession`).</param>
+    /// <param name="name">The cookie name.</param>
+    /// <returns>The data, or `null` when there is no session, the signature is wrong or it has expired.</returns>
+    /// </lang>
+    gear session(this HttpRequest request, string secret, string name: 'rgl_session'): [string:string]? {
+        const string? token: request.cookies.has(name) ? request.cookies[name] : null;
+        if (token eq null) { return null; }
+        const string? payload: verifyJwt(token ?? '', secret);
+        if (payload eq null) { return null; }
+        const [string:string]? data: match (parseJson<_SessionClaims>(payload ?? '')) {
+            ok claims |> claims.data;
+            err failure |> null;
+        };
+        return data;
+    }
+}
+
+extend HttpResponse {
+    /// <lang name="fr">
+    /// <summary>Une redirection vers une autre adresse.</summary>
+    /// <param name="location">L'adresse de destination.</param>
+    /// <param name="status">Le code : 301, 302 (par défaut), 303, 307 ou 308.</param>
+    /// <returns>La réponse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A redirection to another address.</summary>
+    /// <param name="location">The destination address.</param>
+    /// <param name="status">The code: 301, 302 (the default), 303, 307 or 308.</param>
+    /// <returns>The response.</returns>
+    /// </lang>
+    gear pure redirect(string location, uint status: 302): HttpResponse => {status, contentType: 'text/plain; charset=utf-8', body: '', headers: ['Location': location]};
+
+    /// <lang name="fr">
+    /// <summary>Une réponse 204 sans corps.</summary>
+    /// <returns>La réponse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>A 204 response without a body.</summary>
+    /// <returns>The response.</returns>
+    /// </lang>
+    gear pure noContent(): HttpResponse => {status: 204, contentType: 'text/plain; charset=utf-8', body: ''};
+
+    /// <lang name="fr">
+    /// <summary>La réponse avec un en-tête de plus (ou remplacé).</summary>
+    /// <param name="response">La réponse.</param>
+    /// <param name="name">Le nom de l'en-tête.</param>
+    /// <param name="value">Sa valeur.</param>
+    /// <returns>La nouvelle réponse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The response with one more header (or one replaced).</summary>
+    /// <param name="response">The response.</param>
+    /// <param name="name">The header name.</param>
+    /// <param name="value">Its value.</param>
+    /// <returns>The new response.</returns>
+    /// </lang>
+    gear pure withHeader(this HttpResponse response, string name, string value): HttpResponse => {status: response.status, contentType: response.contentType, body: response.body, headers: _withEntry(response.headers, name, value), cookies: response.cookies};
+
+    /// <lang name="fr">
+    /// <summary>La réponse qui pose un cookie.</summary>
+    /// <param name="response">La réponse.</param>
+    /// <param name="name">Le nom du cookie.</param>
+    /// <param name="value">Sa valeur.</param>
+    /// <param name="attributes">Les attributs (`Path`, `Max-Age`, `Secure`, `SameSite`…).</param>
+    /// <returns>La nouvelle réponse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The response that sets a cookie.</summary>
+    /// <param name="response">The response.</param>
+    /// <param name="name">The cookie name.</param>
+    /// <param name="value">Its value.</param>
+    /// <param name="attributes">The attributes (`Path`, `Max-Age`, `Secure`, `SameSite`…).</param>
+    /// <returns>The new response.</returns>
+    /// </lang>
+    gear pure withCookie(this HttpResponse response, string name, string value, string attributes: 'Path=/; HttpOnly'): HttpResponse => {status: response.status, contentType: response.contentType, body: response.body, headers: response.headers, cookies: _withCookie(response.cookies, `{name}={value}; {attributes}`)};
+
+    /// <lang name="fr">
+    /// <summary>La réponse qui ouvre ou remplace la session : les données sont rangées dans un cookie signé (voir `session`).</summary>
+    /// <param name="response">La réponse.</param>
+    /// <param name="secret">Le secret qui signe (le même qu'à `session`).</param>
+    /// <param name="data">Les données de la session.</param>
+    /// <param name="seconds">La durée de validité, en secondes (une heure par défaut).</param>
+    /// <param name="name">Le nom du cookie.</param>
+    /// <param name="attributes">Les attributs du cookie (`HttpOnly` et `SameSite=Lax` par défaut ; ajouter `Secure` en HTTPS).</param>
+    /// <returns>La nouvelle réponse.</returns>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>The response that opens or replaces the session: the data is stored in a signed cookie (see `session`).</summary>
+    /// <param name="response">The response.</param>
+    /// <param name="secret">The secret that signs (the same as for `session`).</param>
+    /// <param name="data">The session data.</param>
+    /// <param name="seconds">The validity, in seconds (one hour by default).</param>
+    /// <param name="name">The cookie name.</param>
+    /// <param name="attributes">The cookie attributes (`HttpOnly` and `SameSite=Lax` by default; add `Secure` over HTTPS).</param>
+    /// <returns>The new response.</returns>
+    /// </lang>
+    gear withSession(this HttpResponse response, string secret, [string:string] data, uint seconds: 3600, string name: 'rgl_session', string attributes: 'Path=/; HttpOnly; SameSite=Lax'): HttpResponse {
+        const long expiry: (now() as long) / 1000 + (seconds as long);
+        const _SessionClaims claims: {exp: expiry, data};
+        const string json: match (toJson(claims)) {
+            ok text |> text;
+            err failure |> '{}';
+        };
+        return response.withCookie(name, signJwt(json, secret), `{attributes}; Max-Age={seconds}`);
+    }
+
+    /// <lang name="fr"><summary>La réponse qui ferme la session : le navigateur supprime le cookie.</summary><param name="response">La réponse.</param><param name="name">Le nom du cookie.</param><returns>La nouvelle réponse.</returns></lang>
+    /// <lang name="en"><summary>The response that ends the session: the browser deletes the cookie.</summary><param name="response">The response.</param><param name="name">The cookie name.</param><returns>The new response.</returns></lang>
+    gear pure withoutSession(this HttpResponse response, string name: 'rgl_session'): HttpResponse => response.withCookie(name, '', 'Path=/; HttpOnly; Max-Age=0');
+
+    /// <lang name="fr"><summary>Construit une réponse en texte UTF-8.</summary><param name="body">Corps à envoyer.</param><param name="status">Statut HTTP.</param><returns>La réponse prête à renvoyer.</returns></lang>
+    /// <lang name="en"><summary>Builds a UTF-8 plain-text response.</summary><param name="body">Body to send.</param><param name="status">HTTP status.</param><returns>The response ready to return.</returns></lang>
+    gear pure text(string body, uint status: 200): HttpResponse => {status, contentType: 'text/plain; charset=utf-8', body};
+    /// <lang name="fr"><summary>Construit une réponse HTML en UTF-8.</summary><param name="body">Document HTML à envoyer.</param><param name="status">Statut HTTP.</param><returns>La réponse prête à renvoyer.</returns></lang>
+    /// <lang name="en"><summary>Builds a UTF-8 HTML response.</summary><param name="body">HTML document to send.</param><param name="status">HTTP status.</param><returns>The response ready to return.</returns></lang>
+    gear pure html(string body, uint status: 200): HttpResponse => {status, contentType: 'text/html; charset=utf-8', body};
+    /// <lang name="fr"><summary>Construit une réponse JSON en UTF-8.</summary><param name="body">JSON déjà sérialisé.</param><param name="status">Statut HTTP.</param><returns>La réponse prête à renvoyer.</returns></lang>
+    /// <lang name="en"><summary>Builds a UTF-8 JSON response.</summary><param name="body">Already serialized JSON.</param><param name="status">HTTP status.</param><returns>The response ready to return.</returns></lang>
+    gear pure json(string body, uint status: 200): HttpResponse => {status, contentType: 'application/json; charset=utf-8', body};
+}
+
+extend HttpServer {
+    /// <lang name="fr"><summary>Crée un serveur sans route.</summary><returns>Un serveur prêt à être configuré.</returns></lang>
+    /// <lang name="en"><summary>Creates a server with no routes.</summary><returns>A server ready to configure.</returns></lang>
+    gear pure create(): HttpServer => {routes: [], webSockets: []};
+
+    /// <lang name="fr">
+    /// <summary>Règle la compression gzip des réponses textuelles : elles sont compressées dès que leur corps atteint `minimumBytes` octets et que le client envoie `Accept-Encoding: gzip`.</summary>
+    /// <param name="server">Le serveur à modifier (variable `mut`).</param>
+    /// <param name="minimumBytes">La taille minimale du corps ; 0 désactive la compression.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Sets the gzip compression of textual responses: they are compressed once their body reaches `minimumBytes` bytes and the client sends `Accept-Encoding: gzip`.</summary>
+    /// <param name="server">The server to modify (a `mut` variable).</param>
+    /// <param name="minimumBytes">The minimal body size; 0 disables compression.</param>
+    /// </lang>
+    gear compress(this mut HttpServer server, uint minimumBytes): void {
+        server.compressFrom <- minimumBytes;
+    }
+
+    /// <lang name="fr">
+    /// <summary>Autorise les requêtes d'une autre origine (CORS) : chaque réponse porte `Access-Control-Allow-Origin`, et les requêtes de pré-vérification `OPTIONS` reçoivent un 204 avec les méthodes et en-têtes permis.</summary>
+    /// <param name="server">Le serveur à modifier (variable `mut`).</param>
+    /// <param name="origin">L'origine autorisée (`*` pour toutes).</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Allows requests from another origin (CORS): every response carries `Access-Control-Allow-Origin`, and `OPTIONS` preflight requests get a 204 with the allowed methods and headers.</summary>
+    /// <param name="server">The server to modify (a `mut` variable).</param>
+    /// <param name="origin">The allowed origin (`*` for all).</param>
+    /// </lang>
+    gear cors(this mut HttpServer server, string origin: '*'): void {
+        server.middleware((HttpRequest request, (HttpRequest) => HttpResponse next) => next(request).withHeader('Access-Control-Allow-Origin', origin));
+        server.route('OPTIONS', '/*', (HttpRequest request) =>
+            HttpResponse.noContent()
+                .withHeader('Access-Control-Allow-Origin', origin)
+                .withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+                .withHeader('Access-Control-Allow-Headers', request.headerFields.getOr('access-control-request-headers', 'Content-Type, Authorization'))
+                .withHeader('Access-Control-Max-Age', '86400'));
+    }
+
+    /// <lang name="fr"><summary>Ajoute une route à la fin de la table.</summary><param name="server">Serveur à modifier.</param><param name="method">Méthode à comparer exactement.</param><param name="path">Motif de chemin.</param><param name="handler">Fonction qui construit la réponse.</param></lang>
+    /// <lang name="en"><summary>Adds a route at the end of the table.</summary><param name="server">Server to modify.</param><param name="method">Method to match exactly.</param><param name="path">Path pattern.</param><param name="handler">Function that builds the response.</param></lang>
+    gear route(this mut HttpServer server, string method, string path, (HttpRequest) => HttpResponse handler): void {
+        server.routes.push({method, path, handler});
+    }
+
+    /// <lang name="fr"><summary>Ajoute une route `GET`.</summary><param name="server">Serveur à modifier.</param><param name="path">Motif de chemin.</param><param name="handler">Fonction qui construit la réponse.</param></lang>
+    /// <lang name="en"><summary>Adds a `GET` route.</summary><param name="server">Server to modify.</param><param name="path">Path pattern.</param><param name="handler">Function that builds the response.</param></lang>
+    gear get(this mut HttpServer server, string path, (HttpRequest) => HttpResponse handler): void => server.route('GET', path, handler);
+
+    /// <lang name="fr">
+    /// <summary>Ajoute une route pour la méthode PUT.</summary>
+    /// <param name="server">Le serveur à modifier (variable `mut`).</param>
+    /// <param name="path">Le chemin, avec d'éventuels paramètres `:nom`.</param>
+    /// <param name="handler">Ce qui répond à la requête.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds a route for the PUT method.</summary>
+    /// <param name="server">The server to modify (a `mut` variable).</param>
+    /// <param name="path">The path, with optional `:name` parameters.</param>
+    /// <param name="handler">What answers the request.</param>
+    /// </lang>
+    gear put(this mut HttpServer server, string path, (HttpRequest) => HttpResponse handler): void => server.route('PUT', path, handler);
+
+    /// <lang name="fr">
+    /// <summary>Ajoute une route pour la méthode DELETE.</summary>
+    /// <param name="server">Le serveur à modifier (variable `mut`).</param>
+    /// <param name="path">Le chemin, avec d'éventuels paramètres `:nom`.</param>
+    /// <param name="handler">Ce qui répond à la requête.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds a route for the DELETE method.</summary>
+    /// <param name="server">The server to modify (a `mut` variable).</param>
+    /// <param name="path">The path, with optional `:name` parameters.</param>
+    /// <param name="handler">What answers the request.</param>
+    /// </lang>
+    gear del(this mut HttpServer server, string path, (HttpRequest) => HttpResponse handler): void => server.route('DELETE', path, handler);
+
+    /// <lang name="fr">
+    /// <summary>Ajoute une route pour la méthode PATCH.</summary>
+    /// <param name="server">Le serveur à modifier (variable `mut`).</param>
+    /// <param name="path">Le chemin, avec d'éventuels paramètres `:nom`.</param>
+    /// <param name="handler">Ce qui répond à la requête.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds a route for the PATCH method.</summary>
+    /// <param name="server">The server to modify (a `mut` variable).</param>
+    /// <param name="path">The path, with optional `:name` parameters.</param>
+    /// <param name="handler">What answers the request.</param>
+    /// </lang>
+    gear patch(this mut HttpServer server, string path, (HttpRequest) => HttpResponse handler): void => server.route('PATCH', path, handler);
+
+    /// <lang name="fr">
+    /// <summary>Ajoute un intergiciel : il reçoit la requête et la suite de la chaîne (`next`), peut répondre sans l'appeler (authentification, journal…) ou transformer la réponse. Le premier ajouté s'exécute en premier ; il ne voit que les requêtes qui trouvent une route.</summary>
+    /// <param name="server">Le serveur à modifier (variable `mut`).</param>
+    /// <param name="handler">L'intergiciel : `(request, next) => response`.</param>
+    /// </lang>
+    /// <lang name="en">
+    /// <summary>Adds a middleware: it receives the request and the rest of the chain (`next`), may answer without calling it (authentication, logging…) or transform the response. The first one added runs first; it only sees requests that find a route.</summary>
+    /// <param name="server">The server to modify (a `mut` variable).</param>
+    /// <param name="handler">The middleware: `(request, next) => response`.</param>
+    /// </lang>
+    gear middleware(this mut HttpServer server, (HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse handler): void {
+        const [(HttpRequest, (HttpRequest) => HttpResponse) => HttpResponse] none: [];
+    server.middlewares <- [...(server.middlewares ?? none), handler];
+    }
+    /// <lang name="fr"><summary>Ajoute une route `POST`.</summary><param name="server">Serveur à modifier.</param><param name="path">Motif de chemin.</param><param name="handler">Fonction qui construit la réponse.</param></lang>
+    /// <lang name="en"><summary>Adds a `POST` route.</summary><param name="server">Server to modify.</param><param name="path">Path pattern.</param><param name="handler">Function that builds the response.</param></lang>
+    gear post(this mut HttpServer server, string path, (HttpRequest) => HttpResponse handler): void => server.route('POST', path, handler);
+
+    /// <lang name="fr"><summary>Ajoute en dernier recours une route GET qui sert le dossier `static` à côté de l'exécutable.</summary><param name="server">Serveur à configurer.</param></lang>
+    /// <lang name="en"><summary>Adds a last-resort GET route serving the `static` directory beside the executable.</summary><param name="server">Server to configure.</param></lang>
+    gear staticFiles(this mut HttpServer server): void {
+        const string directory: join(executableDirectory(), 'static');
+        server.staticFiles(directory);
+    }
+
+    /// <lang name="fr"><summary>Ajoute en dernier recours une route GET qui sert le dossier choisi.</summary><param name="server">Serveur à configurer.</param><param name="root">Dossier à servir.</param></lang>
+    /// <lang name="en"><summary>Adds a last-resort GET route serving the selected directory.</summary><param name="server">Server to configure.</param><param name="root">Directory to serve.</param></lang>
+    gear staticFiles(this mut HttpServer server, string root): void {
+        server.get('/*', (HttpRequest request) => _staticResponse(root, request));
+    }
+
+    /// <lang name="fr"><summary>Ajoute une route WebSocket texte.</summary><param name="server">Serveur à modifier.</param><param name="path">Motif de chemin.</param><param name="handler">Fonction appelée pour chaque message texte.</param></lang>
+    /// <lang name="en"><summary>Adds a text WebSocket route.</summary><param name="server">Server to modify.</param><param name="path">Path pattern.</param><param name="handler">Function called for every text message.</param></lang>
+    gear webSocket(this mut HttpServer server, string path, (WebSocketMessage) => string handler): void {
+        server.webSocketCircuit(path, (HttpRequest request) => (string text) => handler({request, text}));
+    }
+
+    /// <lang name="fr"><summary>Ajoute une route WebSocket dont chaque connexion reçoit son propre handler persistant.</summary><param name="server">Serveur à modifier.</param><param name="path">Motif de chemin.</param><param name="open">Fabrique le handler de la nouvelle connexion.</param></lang>
+    /// <lang name="en"><summary>Adds a WebSocket route where each connection receives its own persistent handler.</summary><param name="server">Server to modify.</param><param name="path">Path pattern.</param><param name="open">Creates the new connection's handler.</param></lang>
+    gear webSocketCircuit(this mut HttpServer server, string path, (HttpRequest) => (string) => string open): void {
+        server.webSockets.push({path, open});
+    }
+
+    /// <lang name="fr"><summary>Écoute les requêtes HTTP jusqu'à l'arrêt ou la limite demandée.</summary><param name="server">Serveur et routes à utiliser.</param><param name="address">Adresse locale, IPv4 ou IPv6 (`::` écoute les deux).</param><param name="port">Port TCP.</param><param name="maxRequests">Nombre de requêtes avant l'arrêt ; zéro signifie sans limite.</param><param name="workers">Nombre de requêtes traitées en parallèle ; zéro choisit selon la machine.</param></lang>
+    /// <lang name="en"><summary>Listens for HTTP requests until stopped or until the requested limit.</summary><param name="server">Server and routes to use.</param><param name="address">Local address, IPv4 or IPv6 (`::` listens on both).</param><param name="port">TCP port.</param><param name="maxRequests">Number of requests before stopping; zero means unlimited.</param><param name="workers">Number of requests handled concurrently; zero selects it from the machine.</param></lang>
+    guard listen(this HttpServer server, string address: '127.0.0.1', ushort port: 8080, uint maxRequests: 0, uint workers: 0): void {
+        const int code: _serve(address, port, maxRequests, workers,
+            (method, target, headers, body) => _dispatch(server, method, target, headers, body),
+            (target, headers) => _acceptWebSocket(server, target, headers),
+            (target, headers) => _openWebSocket(server, target, headers));
+        if (code not eq 0) { fail new HttpError {message: 'le serveur HTTP a échoué', code, operation: 'listen'}; }
+    }
+
+    /// <lang name="fr"><summary>Écoute en HTTPS avec un certificat PEM et sa clé privée.</summary><param name="server">Serveur et routes à utiliser.</param><param name="certificate">Chemin du certificat ou de sa chaîne PEM.</param><param name="privateKey">Chemin de la clé privée PEM.</param><param name="address">Adresse locale, IPv4 ou IPv6 (`::` écoute les deux).</param><param name="port">Port TCP.</param><param name="maxRequests">Nombre de requêtes avant l'arrêt ; zéro signifie sans limite.</param><param name="workers">Nombre de requêtes traitées en parallèle ; zéro choisit selon la machine.</param><remarks>OpenSSL doit être disponible à la compilation et à l'exécution.</remarks></lang>
+    /// <lang name="en"><summary>Listens over HTTPS with a PEM certificate and private key.</summary><param name="server">Server and routes to use.</param><param name="certificate">Path to the PEM certificate or chain.</param><param name="privateKey">Path to the PEM private key.</param><param name="address">Local address, IPv4 or IPv6 (`::` listens on both).</param><param name="port">TCP port.</param><param name="maxRequests">Number of requests before stopping; zero means unlimited.</param><param name="workers">Number of requests handled concurrently; zero selects it from the machine.</param><remarks>OpenSSL must be available at build time and runtime.</remarks></lang>
+    guard listenTls(this HttpServer server, string certificate, string privateKey, string address: '127.0.0.1', ushort port: 8443, uint maxRequests: 0, uint workers: 0): void {
+        const int code: _serveTls(address, port, certificate, privateKey, maxRequests, workers,
+            (method, target, headers, body) => _dispatch(server, method, target, headers, body),
+            (target, headers) => _acceptWebSocket(server, target, headers),
+            (target, headers) => _openWebSocket(server, target, headers));
+        if (code not eq 0) { fail new HttpError {message: 'le serveur HTTPS a échoué', code, operation: 'listenTls'}; }
+    }
+}
