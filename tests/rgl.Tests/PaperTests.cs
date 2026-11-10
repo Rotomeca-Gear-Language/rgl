@@ -135,10 +135,11 @@ public class PaperTests
         Assert.DoesNotContain(diagnostics.Items, d => d.Level == DiagnosticLevel.Error);
     }
 
-    private static string BindPage(string paper, out DiagnosticBag diagnostics, string? main = null)
+    private static string BindPage(string paper, out DiagnosticBag diagnostics, string? main = null, params (string Name, string Text)[] others)
     {
         var project = new TempDirectory();
         project.File("Home.paper", paper);
+        foreach (var (name, content) in others) project.File(name, content);
         var entry = project.File("main.rgl", main ?? "import Home;\ngear page(): string => Home.render()°;\n!train |> done;\n");
         diagnostics = new DiagnosticBag();
         var modules = SourceGraph.Load(SourceText.FromPath(entry, diagnostics)!, project.Path, diagnostics);
@@ -536,6 +537,31 @@ public class PaperTests
         var rendered = ZigBuild.Run(built!.Executable!);
         Assert.Equal(0, rendered.Item1);
         Assert.StartsWith("<header><!--rgl:f0-->25<!--rgl:/f0--></header><main><!--rgl:f1-->25<!--rgl:/f1--></main><footer data-rgl-on-click=\"bump\">F</footer>", rendered.Item2);
+    }
+
+    [Fact]
+    public void Les_constantes_de_la_page_restent_avant_les_gears_du_layout_et_des_composants()
+    {
+        var errors = BindPage("@layout Main;\n@rgl { const string titre: 'T'; gear f(): string => titre + site + bord(1); }<p>@@ f() @@</p><Etiquette texte=\"a\" />", out _, null,
+            ("Main.paper", "@rgl { const string site: 'S'; gear deuxFois(int n): int => n + n; }<slot />"),
+            ("Etiquette.paper", "@rgl { param string texte; const int bordure: 2; gear bord(int n): string => `{n}`; }<b>@@ texte @@</b>"));
+
+        Assert.True(errors == "", errors);
+    }
+
+    [Fact]
+    public void Les_constantes_remontent_en_tete_sans_toucher_au_reste()
+    {
+        var blocks = "gear a(): int => 1;\nconst int x: 2;\n// note\nconst string t: 'a;b{';\nmold M { int v; }\nexport const M m: {v: 1};\ngear b(): string => `{1}`;\n";
+
+        var (constants, others) = PaperCompiler.SplitConstants(blocks);
+
+        Assert.Equal("const int x: 2;\n// note\nconst string t: 'a;b{';\nexport const M m: {v: 1};\n", constants);
+        Assert.Contains("gear a(): int => 1;", others);
+        Assert.Contains("mold M { int v; }", others);
+        Assert.Contains("gear b(): string => `{1}`;", others);
+        Assert.DoesNotContain("const", others);
+        Assert.Equal("const int x: 1;\ngear a(): int => 1;\n", PaperCompiler.HoistConstants("const int x: 1;\ngear a(): int => 1;\n"));
     }
 
     #endregion

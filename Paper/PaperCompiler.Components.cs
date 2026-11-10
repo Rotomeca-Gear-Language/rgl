@@ -27,7 +27,7 @@ internal static partial class PaperCompiler
         public void Error(string message) => Diagnostics.Error(message, Source.Path);
     }
 
-    private sealed record ComponentTag(string Name, Dictionary<string, string> Attributes, bool SelfClosing, int End);
+    private sealed record ComponentTag(string Name, Dictionary<string, string> Attributes, bool SelfClosing, int End, int Start = 0, Dictionary<string, (int Start, int End)>? Spans = null);
 
     /// <summary>
     /// Remplace chaque balise <c>&lt;Nom …&gt;contenu&lt;/Nom&gt;</c> (nom commençant par une majuscule) par le markup du composant <c>Nom.paper</c>. Le composant n'a pas d'état :
@@ -134,6 +134,7 @@ internal static partial class PaperCompiler
         while (i < text.Length && (char.IsAsciiLetterOrDigit(text[i]) || text[i] == '_')) i++;
         var name = text[(start + 1)..i];
         Dictionary<string, string> attributes = new(StringComparer.Ordinal);
+        Dictionary<string, (int Start, int End)> spans = new(StringComparer.Ordinal);
         while (true)
         {
             while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
@@ -142,8 +143,8 @@ internal static partial class PaperCompiler
                 context.Error($"la balise du composant « {name} » n'est pas fermée : il manque « > »");
                 return null;
             }
-            if (text[i] == '>') return new ComponentTag(name, attributes, false, i + 1);
-            if (text[i] == '/' && i + 1 < text.Length && text[i + 1] == '>') return new ComponentTag(name, attributes, true, i + 2);
+            if (text[i] == '>') return new ComponentTag(name, attributes, false, i + 1, start, spans);
+            if (text[i] == '/' && i + 1 < text.Length && text[i + 1] == '>') return new ComponentTag(name, attributes, true, i + 2, start, spans);
 
             var nameStart = i;
             while (i < text.Length && (char.IsAsciiLetterOrDigit(text[i]) || text[i] is '_' or '-')) i++;
@@ -153,6 +154,7 @@ internal static partial class PaperCompiler
                 return null;
             }
             var attribute = text[nameStart..i];
+            spans.TryAdd(attribute, (nameStart, i));
             while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
             if (i >= text.Length || text[i] != '=')
             {
@@ -339,4 +341,74 @@ internal static partial class PaperCompiler
         context.Used.Add(definition);
         return definition;
     }
+
+    /// <summary>Une balise de composant lue dans une page, pour l'éditeur : ses places dans le texte de la page.</summary>
+    /// <param name="Name">Le nom du composant.</param>
+    /// <param name="Start">La place du <c>&lt;</c>.</param>
+    /// <param name="NameStart">La place du premier caractère du nom.</param>
+    /// <param name="NameEnd">La place qui suit le nom.</param>
+    /// <param name="Attributes">Les attributs écrits, avec la place de leur nom.</param>
+    /// <param name="HasContent">Vrai si la balise a un contenu qui n'est pas blanc.</param>
+    internal sealed record PaperTagInfo(string Name, int Start, int NameStart, int NameEnd, IReadOnlyDictionary<string, (int Start, int End)> Attributes, bool HasContent);
+
+    /// <summary>Un <c>param</c> d'un composant ou d'une page, avec la place de son nom dans le fichier.</summary>
+    internal sealed record PaperParameterInfo(string Type, string Name, string? Default, int NameStart, int NameEnd);
+
+    /// <summary>Ce qu'un composant montre à ses utilisateurs : ses <c>param</c> et s'il a un <c>&lt;slot /&gt;</c>.</summary>
+    internal sealed record PaperComponentInfo(IReadOnlyList<PaperParameterInfo> Parameters, bool HasSlot);
+
+    /// <summary>Les balises de composant d'un texte de page (celles qui s'écrivent hors des blocs <c>@rgl</c>, des interpolations et des commentaires), sans erreur : une balise mal écrite est ignorée.</summary>
+    internal static IReadOnlyList<PaperTagInfo> ScanComponentTags(string pageText)
+    {
+        var text = MaskBlocks(pageText);
+        var context = new ComponentContext(new SourceText("", ""), "", new DiagnosticBag());
+        List<PaperTagInfo> tags = [];
+        var i = 0;
+        while (i < text.Length)
+        {
+            if (SkipOpaque(text, i) is var next && next > i)
+            {
+                i = next;
+                continue;
+            }
+            if (text[i] != '<' || i + 1 >= text.Length || !char.IsAsciiLetterUpper(text[i + 1]))
+            {
+                i++;
+                continue;
+            }
+            var tag = ParseTag(text, i, context);
+            if (tag is null)
+            {
+                i++;
+                continue;
+            }
+            var hasContent = false;
+            if (!tag.SelfClosing && FindClosing(text, tag, context) is { } close) hasContent = text[tag.End..close].Trim().Length > 0;
+            tags.Add(new PaperTagInfo(tag.Name, i, i + 1, i + 1 + tag.Name.Length, tag.Spans ?? [], hasContent));
+            i = tag.End;
+        }
+        return tags;
+    }
+
+    /// <summary>Le texte avec l'intérieur des blocs <c>@rgl</c> remplacé par des espaces (les places ne bougent pas) : ce qui reste est le markup.</summary>
+    internal static string MaskBlocks(string pageText)
+    {
+        var characters = pageText.ToCharArray();
+        foreach (var region in PaperRegions.Find(pageText).Where(r => r.IsBlock))
+            for (var i = region.Start; i < region.End && i < characters.Length; i++)
+                if (characters[i] is not ('\n' or '\r')) characters[i] = ' ';
+        return new string(characters);
+    }
+
+    /// <summary>Ce qu'un fichier <c>.paper</c> offre comme composant : ses <c>param</c> et son <c>&lt;slot /&gt;</c>.</summary>
+    internal static PaperComponentInfo ReadComponentInterface(string fileText)
+    {
+        var parameters = ParamDeclaration().Matches(fileText).Select(m =>
+            new PaperParameterInfo(m.Groups[1].Value.Trim(), m.Groups[2].Value, m.Groups[3].Success ? m.Groups[3].Value.Trim() : null, m.Groups[2].Index, m.Groups[2].Index + m.Groups[2].Length)).ToArray();
+        return new PaperComponentInfo(parameters, SlotTag().IsMatch(MaskBlocks(fileText)));
+    }
+
+    /// <summary>Les directives <c>@layout Nom;</c> d'une page : le nom et la place du nom.</summary>
+    internal static IReadOnlyList<(string Name, int Start, int End)> LayoutDirectives(string pageText) =>
+        [.. LayoutDirective().Matches(MaskBlocks(pageText)).Select(m => (m.Groups[1].Value, m.Groups[1].Index, m.Groups[1].Index + m.Groups[1].Length))];
 }

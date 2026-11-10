@@ -93,7 +93,7 @@ internal static partial class PaperCompiler
         return true;
     }
 
-    private static string? FindPaperFile(string name, string label, string pagePath, string projectRoot, DiagnosticBag diagnostics)
+    internal static string? FindPaperFile(string name, string label, string pagePath, string projectRoot, DiagnosticBag diagnostics)
     {
         var pageDirectory = Path.GetDirectoryName(Path.GetFullPath(pagePath))!;
         var box = AncestorBox(pageDirectory, projectRoot);

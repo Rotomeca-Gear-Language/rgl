@@ -197,6 +197,9 @@ internal sealed class ProjectIndex
         return module;
     }
 
+    /// <summary>Le dossier du projet qui contient ce fichier.</summary>
+    internal static string RootOf(string path) => _FindRoot(Path.GetDirectoryName(Path.GetFullPath(path))!);
+
     /// <summary>Le dossier du <code>rgl.json</code> le plus proche en remontant, sinon le dossier de départ.</summary>
     private static string _FindRoot(string directory)
     {

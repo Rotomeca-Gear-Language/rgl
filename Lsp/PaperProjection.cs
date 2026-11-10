@@ -35,17 +35,33 @@ internal sealed partial class PaperProjection
     /// <summary>Vrai pour le texte virtuel d'un <c>.paper</c> (celui que le chargeur ne doit pas compiler comme une page).</summary>
     public static bool IsVirtual(string text) => text.StartsWith("forge: gears\ndescription: \"" + Marker + "\"", StringComparison.Ordinal);
 
-    public static PaperProjection Build(string paper)
+    /// <param name="paper">Le texte de la page.</param>
+    /// <param name="layouts">Les textes des layouts de la page (le plus proche d'abord) : leurs blocs <c>@rgl</c> rejoignent ceux de la page à la compilation, donc leurs noms se lisent dans la page. Ils entrent dans le texte virtuel sans correspondance avec la page.</param>
+    public static PaperProjection Build(string paper, IReadOnlyList<string>? layouts = null)
     {
         var projection = new PaperProjection(paper);
         var virtualText = new StringBuilder("forge: gears\ndescription: \"" + Marker + "\"\n\n"
             + "use <Http> only {HttpRequest, HttpResponse, HttpServer};\nuse <Paper> only {html, escapeHtml, escapeJson, DomEvent, PageHead};\n\n");
         var reactives = new List<string>();
         // La tête de page implicite : une constante pour l'éditeur (les écritures qu'elle reçoit ne sont pas des erreurs de la page).
-        if (PageWord().IsMatch(paper))
+        if (PageWord().IsMatch(paper) || (layouts ?? []).Any(layout => PageWord().IsMatch(layout)))
         {
             virtualText.Append("const PageHead page: {};\n\n");
             reactives.Add(PaperCompiler.PageName);
+        }
+
+        // Les constantes du layout s'écrivent avant celles de la page, ses gears après ses blocs : une constante ne vient jamais après un gear.
+        var layoutNumber = 0;
+        var layoutRest = new StringBuilder();
+        foreach (var layoutText in layouts ?? [])
+        {
+            var nested = new PaperProjection(layoutText);
+            var piece = new StringBuilder();
+            foreach (var region in PaperRegions.Find(layoutText).Where(r => r.IsBlock)) nested._AddBlock(piece, region.Start, region.End, reactives);
+            // Le load d'un layout est renommé à la compilation : il ne fait pas doublon avec celui de la page.
+            var (constants, rest) = PaperCompiler.SplitConstants(LayoutLoad().Replace(piece.ToString(), "gear __layout_load_" + ++layoutNumber + "("));
+            virtualText.Append(constants);
+            layoutRest.Append(rest).Append('\n');
         }
 
         var expressions = new List<(int Start, int End)>();
@@ -54,6 +70,8 @@ internal sealed partial class PaperProjection
             if (region.IsBlock) projection._AddBlock(virtualText, region.Start, region.End, reactives);
             else expressions.Add((region.Start, region.End));
         }
+
+        virtualText.Append(layoutRest);
 
         var count = 0;
         foreach (var (start, end) in expressions)
@@ -149,6 +167,9 @@ internal sealed partial class PaperProjection
 
     [GeneratedRegex(@"(?:^|(?<=[;{}]))[ \t]*param\s+(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([^;]+))?;", RegexOptions.Singleline | RegexOptions.Multiline)]
     private static partial Regex ParamDeclaration();
+
+    [GeneratedRegex(@"\bgear\s+load\s*\(")]
+    private static partial Regex LayoutLoad();
 
     [GeneratedRegex(@"\bpage\b")]
     private static partial Regex PageWord();

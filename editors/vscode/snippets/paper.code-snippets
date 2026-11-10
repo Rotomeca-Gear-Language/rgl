@@ -1,0 +1,90 @@
+{
+  "Page Paper": {
+    "prefix": "paperpage",
+    "description": "Une page Paper avec un état réactif et un handler",
+    "body": [
+      "@rgl {",
+      "    reactive int ${1:count}: 0;",
+      "",
+      "    gear ${2:increase}(): void {",
+      "        ${1:count} +<- 1;",
+      "    }",
+      "}",
+      "",
+      "<button @click=\"${2:increase}\">@@ ${1:count} @@</button>"
+    ]
+  },
+  "Layout Paper": {
+    "prefix": "paperlayout",
+    "description": "Un layout : le markup de la page prend la place de <slot />",
+    "body": [
+      "@rgl {",
+      "    gear load(): void {",
+      "        page.title <- '${1:Mon site}';",
+      "    }",
+      "}",
+      "",
+      "<!doctype html>",
+      "<html>",
+      "<body>",
+      "    <nav>${2:menu}</nav>",
+      "    <slot />",
+      "    <footer>${3:pied de page}</footer>",
+      "</body>",
+      "</html>"
+    ]
+  },
+  "Utiliser un layout": {
+    "prefix": "paperuselayout",
+    "description": "Enveloppe la page dans un layout",
+    "body": "@layout ${1:Main};"
+  },
+  "Composant Paper": {
+    "prefix": "papercomponent",
+    "description": "Un composant : des param typés et un <slot /> pour son contenu",
+    "body": [
+      "@rgl {",
+      "    param ${1:string} ${2:titre};",
+      "}",
+      "",
+      "<section>",
+      "    <h2>@@ ${2:titre} @@</h2>",
+      "    <slot />",
+      "</section>"
+    ]
+  },
+  "Param Paper": {
+    "prefix": "paperparam",
+    "description": "Un paramètre de page ou de composant",
+    "body": "param ${1:string} ${2:nom}${3:: ${4:'valeur'}};"
+  },
+  "Appeler un composant": {
+    "prefix": "papercall",
+    "description": "Utilise un composant avec un attribut texte et un attribut expression",
+    "body": "<${1:Carte} ${2:titre}=\"${3:texte}\" ${4:niveau}=@@ ${5:expression} @@>$0</${1:Carte}>"
+  },
+  "Chargement de page": {
+    "prefix": "paperload",
+    "description": "Le gear load s'exécute à la création de l'état de la page",
+    "body": [
+      "gear load(): void {",
+      "    page.title <- '${1:Titre}';",
+      "    $0",
+      "}"
+    ]
+  },
+  "Tête de page": {
+    "prefix": "paperhead",
+    "description": "Titre, script et variable d'environnement JavaScript",
+    "body": [
+      "page.title <- '${1:Titre}';",
+      "page.script('${2:/app.js}');",
+      "page.env('${3:NOM}', ${4:'valeur'});"
+    ]
+  },
+  "Monter une page avec paramètres": {
+    "prefix": "papermount",
+    "description": "mountWith calcule les paramètres de la page à chaque requête",
+    "body": "|> ${1:Home}.mountWith('${2:/}', (HttpRequest request) => new ${1:Home}.Props {${3:nom}: request.queryParameters.getOr('${3:nom}', '${4:valeur}')})"
+  }
+}

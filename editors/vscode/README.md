@@ -270,3 +270,17 @@ Pendant une session de débogage, survoler une variable donne sa valeur, dans un
 ## Le `.rgl` du projet depuis un `.forge` ou un `.paper` (0.19.2)
 
 Dans un `.forge`, un `.paper` ou tout fichier d'un projet (pas seulement dans le `.rgl`), **Exécuter, Compiler, Vérifier** (palette et boutons de la barre de titre) et **Déboguer** (F5) travaillent sur le **`.rgl` d'entrée du projet** : le seul `.rgl` de la racine du projet (celle du `rgl.json` le plus proche), sans les fichiers `nom.test.rgl`. Avant, ces commandes lançaient `rgl compile` sans fichier. Si le projet a plusieurs `.rgl` ou aucun `rgl.json`, un message le dit au lieu d'essayer quelque chose. Les boutons ▶ 🔨 et le débogage sont aussi dans la barre de titre d'une page `.paper`, et **F5 dans une page propose le débogueur RGL** (il proposait Node ou Edge) ; contrepartie : RGL figure aussi dans la liste des débogueurs proposés pour un fichier HTML ordinaire.
+
+## Pages Paper : layouts, composants et paramètres (0.20.0)
+
+L'éditeur comprend les nouveautés de Paper (`@layout`, `<slot />`, composants, `param`, `page`).
+
+- **Noms du layout** : une page qui écrit `@layout Main;` voit les `reactive`, `param`, constantes et gears du bloc `@rgl` de `Main.paper` (et de ses propres layouts), sans fausse erreur « nom inconnu ». Le `load` du layout et celui de la page ne se heurtent pas.
+- **Diagnostics du markup**, sur le nom concerné : composant introuvable, attribut qui n'est pas un `param`, `param` obligatoire manquant, contenu donné à un composant sans `<slot />`, layout introuvable ou sans `<slot />`.
+- **Complétion** : après `<` + majuscule, les composants du projet (la proposition écrit les attributs obligatoires et la balise fermante si le composant a un `<slot />`) ; dans la balise, les `param` pas encore écrits (`titre="…"` pour un texte, `n=@@ … @@` pour le reste) ; après `@layout`, les fichiers qui ont un `<slot />` ; `@` en début de ligne propose `@layout` et `@rgl`. Dans un bloc, `page.` propose `title`, `script(…)` et `env(…)`.
+- **Survol et définition** : sur le nom d'une balise (signature du composant et fichier), sur un attribut (le `param`, son type et sa valeur par défaut) et sur le nom d'un layout ; **Aller à la définition** ouvre `Carte.paper`, le `param` lui-même ou `Main.paper`.
+- **Coloration** : les balises de composants (nom à majuscule), leurs attributs, `<slot />`, la directive `@layout Nom;` et les mots `param` / `reactive` dans un bloc.
+- **Snippets Paper** (fichiers HTML) : `paperpage`, `paperlayout`, `paperuselayout`, `papercomponent`, `paperparam`, `papercall`, `paperload`, `paperhead`, `papermount`.
+- Limites : les balises de composants ne sont pas colorées sémantiquement ; les changements d'un layout ou d'un composant ne relancent le diagnostic d'une page ouverte qu'à son prochain changement ou à celui d'un fichier surveillé.
+
+Côté compilateur, ce travail a aussi corrigé un défaut : une `const` d'une page qui a un layout ou des composants venait après les gears de ceux-ci et était refusée (« constante après un gear ») ; les constantes sont maintenant remontées en tête.

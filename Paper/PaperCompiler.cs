@@ -27,6 +27,17 @@ internal static partial class PaperCompiler
         List<string> layoutLoads = [];
         if (!ApplyLayouts(source, projectRoot, diagnostics, blocks, markup, blockRanges, layoutLoads, out var layoutCount)) return null;
         if (!ExpandComponents(source, projectRoot, diagnostics, blocks, markup, blockRanges, out var componentCount)) return null;
+        if (layoutCount + componentCount > 0)
+        {
+            // Les blocs de plusieurs fichiers sont bout à bout : les constantes de la page ne doivent pas venir après les gears du layout ou des composants.
+            var hoisted = HoistConstants(blocks.ToString());
+            if (hoisted != blocks.ToString())
+            {
+                blocks.Clear().Append(hoisted);
+                blockRanges.Clear();
+                blockRanges.Add((0, hoisted.Count(c => c == '\n')));
+            }
+        }
         List<PaperReactive> reactives = [];
         var blockSource = ReactiveDeclaration().Replace(blocks.ToString(), match =>
         {

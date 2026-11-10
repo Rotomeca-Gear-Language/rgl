@@ -66,6 +66,39 @@ async function main() {
                 assert(!closingScopes.includes("meta.embedded.expression.rgl.paper"), "l'interpolation doit être fermée");
             }
         }
+        const tokenize = text => grammar.tokenizeLine(text, null);
+        const scopeOf = (text, word) => scopesAt(tokenize(text), text, word);
+
+        // Directive de layout, <slot />, balise de composant et ses attributs.
+        const layoutLine = "@layout Main;";
+        assert(scopeOf(layoutLine, "@layout").includes("keyword.control.layout.rgl.paper"));
+        assert(scopeOf(layoutLine, "Main").includes("entity.name.type.layout.rgl.paper"));
+
+        const slotLine = "<section><slot /></section>";
+        assert(scopeOf(slotLine, "slot").includes("keyword.control.slot.rgl.paper"));
+        assert(scopeOf(slotLine, "section").includes("entity.name.tag.html"));
+
+        const componentLine = '<Carte titre="x" niveau=@@ count + 1 @@>texte</Carte>';
+        assert(scopeOf(componentLine, "Carte").includes("entity.name.class.component.rgl.paper"));
+        assert(scopeOf(componentLine, "titre").includes("entity.other.attribute-name.component.rgl.paper"));
+        assert(scopeOf(componentLine, "niveau").includes("entity.other.attribute-name.component.rgl.paper"));
+        assert(scopeOf(componentLine, "count").includes("meta.embedded.expression.rgl.paper"));
+        // Un > dans l'interpolation ne ferme pas la balise, et le texte après la balise n'est plus un composant.
+        const comparison = '<Carte ok=@@ a > b @@>x</Carte>';
+        assert(scopeOf(comparison, "b").includes("meta.embedded.expression.rgl.paper"));
+        assert(!scopeOf(componentLine, "texte").includes("meta.tag.component.rgl.paper"));
+        // Un nom en minuscules reste du HTML.
+        assert(!scopeOf("<main>x</main>", "main").includes("entity.name.class.component.rgl.paper"));
+
+        // param et reactive dans un bloc : des mots propres à Paper, pas dans un texte.
+        let block = null;
+        for (const [index, line] of ["@rgl {", "  param string titre;", "  reactive int count: 0;", "  const string texte: 'un param ici';", "}"].entries()) {
+            const result = grammar.tokenizeLine(line, block);
+            block = result.ruleStack;
+            if (index === 1) assert(scopesAt(result, line, "param").includes("storage.modifier.rgl.paper"));
+            if (index === 2) assert(scopesAt(result, line, "reactive").includes("storage.modifier.rgl.paper"));
+            if (index === 3) assert(!scopesAt(result, line, "param").includes("storage.modifier.rgl.paper"));
+        }
         console.log("VS Code Paper : HTML natif et régions RGL colorés.");
     } finally {
         registry.dispose();

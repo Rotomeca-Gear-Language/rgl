@@ -456,6 +456,7 @@ internal sealed partial class LanguageServer
         var document = _Semantic(uri);
         if (document is null) return null;
 
+        if (_ProjectionOf(uri) is { } paper && _PaperMarkupHover(uri, paper, parameters["position"]!) is { } markup) return markup;
         var offset = _OffsetOf(uri, document, parameters["position"]!);
         if (offset < 0 || HoverProvider.At(document, offset) is not { } hover) return null;
         return new JsonObject
@@ -472,6 +473,7 @@ internal sealed partial class LanguageServer
         var document = _Semantic(uri);
         if (document is null) return null;
 
+        if (_ProjectionOf(uri) is { } paper && _PaperMarkupDefinition(uri, paper, parameters["position"]!) is { } markup) return markup;
         var offset = _OffsetOf(uri, document, parameters["position"]!);
         if (offset < 0 || document.TargetAt(offset)?.Symbol is not { Module: { } module } symbol) return null;
 

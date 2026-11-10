@@ -17,10 +17,66 @@
       },
       "patterns": [
         { "include": "#nested-braces" },
+        { "include": "#state-declaration" },
         { "include": "source.rgl" }
       ]
     },
+    { "include": "#interpolation" },
     {
+      "comment": "@layout Nom; : la page est enveloppée dans le layout Nom.paper.",
+      "match": "^\\s*(@layout)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(;)",
+      "captures": {
+        "1": { "name": "keyword.control.layout.rgl.paper" },
+        "2": { "name": "entity.name.type.layout.rgl.paper" },
+        "3": { "name": "punctuation.terminator.rgl" }
+      }
+    },
+    {
+      "comment": "<slot /> : l'endroit où le layout ou le composant reçoit son contenu.",
+      "match": "(</?)(slot)(?![A-Za-z0-9_-])",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "keyword.control.slot.rgl.paper" }
+      }
+    },
+    {
+      "comment": "<Carte titre=\"x\" n=@@ expression @@> : un nom qui commence par une majuscule est un composant.",
+      "name": "meta.tag.component.rgl.paper",
+      "begin": "(</?)([A-Z][A-Za-z0-9_]*)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.class.component.rgl.paper" }
+      },
+      "end": "(/?)(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.html" },
+        "2": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "patterns": [
+        { "include": "#interpolation" },
+        {
+          "match": "[A-Za-z_][A-Za-z0-9_-]*(?=\\s*=)",
+          "name": "entity.other.attribute-name.component.rgl.paper"
+        },
+        {
+          "name": "string.quoted.double.html",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.html",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "match": "=",
+          "name": "punctuation.separator.key-value.html"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "interpolation": {
       "name": "meta.embedded.expression.rgl.paper",
       "begin": "@@",
       "beginCaptures": {
@@ -33,9 +89,12 @@
       "patterns": [
         { "include": "source.rgl" }
       ]
-    }
-  ],
-  "repository": {
+    },
+    "state-declaration": {
+      "comment": "reactive et param : des déclarations propres à Paper, que le langage RGL ne connaît pas.",
+      "match": "(?<![\\w.])(reactive|param)(?=\\s+(?:mut\\s+)?[A-Za-z_\\[(])",
+      "name": "storage.modifier.rgl.paper"
+    },
     "nested-braces": {
       "begin": "\\{",
       "beginCaptures": {

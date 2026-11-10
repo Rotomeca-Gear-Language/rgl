@@ -24,12 +24,19 @@ internal sealed partial class LanguageServer
     private PaperProjection? _ProjectionOf(string uri)
     {
         if (!PaperProjection.IsPaper(_PathOf(uri)) || !_documents.TryGetValue(uri, out var text)) return null;
-        if (_projections.TryGetValue(uri, out var cached) && cached.Text == text) return cached.Projection;
 
-        var projection = PaperProjection.Build(text);
-        _projections[uri] = (text, projection);
+        // Les blocs des layouts font partie de la page : un changement de layout change la projection.
+        var layouts = PaperMarkup.LayoutTexts(_PathOf(uri), text, _ReadOpenText);
+        var key = layouts.Count == 0 ? text : text + "\0" + string.Join("\0", layouts);
+        if (_projections.TryGetValue(uri, out var cached) && cached.Text == key) return cached.Projection;
+
+        var projection = PaperProjection.Build(text, layouts);
+        _projections[uri] = (key, projection);
         return projection;
     }
+
+    /// <summary>Le texte d'un fichier tel qu'il est ouvert dans l'éditeur ; <see langword="null"/> s'il ne l'est pas (le disque fait foi).</summary>
+    private string? _ReadOpenText(string fullPath) => _openTexts.GetValueOrDefault(fullPath);
 
     /// <summary>Vrai pour une demande sur un <c>.paper</c> que le serveur ne traite pas.</summary>
     private static bool _IgnoredForPaper(string? method, JsonNode? parameters) =>
@@ -61,7 +68,44 @@ internal sealed partial class LanguageServer
             if (diagnostic.Code is "E005" or "E013" or "E102" && projection.Reactives.Any(r => span.Text.Contains(r, StringComparison.Ordinal))) continue;
             mapped.Add(diagnostic with { Span = new SourceSpan(paperSource, RUint.CreateChecked(place.Start), RUint.CreateChecked(place.End - place.Start)) });
         }
+
+        // Le markup : composants et layout, que le texte virtuel ne contient pas.
+        foreach (var problem in PaperMarkup.Diagnose(path, text, _ReadOpenText))
+        {
+            mapped.Add(new Diagnostic(DiagnosticLevel.Error, problem.Message, path, null,
+                new SourceSpan(paperSource, RUint.CreateChecked(problem.Start), RUint.CreateChecked(Math.Max(1, problem.End - problem.Start)))));
+        }
         return new DocumentReport(paperSource, mapped, []);
+    }
+
+    /// <summary>La survol d'une balise de composant ou d'une directive <c>@layout</c> ; <see langword="null"/> ailleurs.</summary>
+    private JsonNode? _PaperMarkupHover(string uri, PaperProjection projection, JsonNode position)
+    {
+        var path = _PathOf(uri);
+        var hover = PaperMarkup.HoverAt(path, projection.PaperText, _PaperTextOffset(uri, projection, position), _ReadOpenText);
+        if (hover is null) return null;
+        var paper = new SourceText(path, projection.PaperText);
+        return new JsonObject
+        {
+            ["contents"] = new JsonObject { ["kind"] = "markdown", ["value"] = hover.Markdown },
+            ["range"] = _Range(paper, new SourceSpan(paper, RUint.CreateChecked(hover.Start), RUint.CreateChecked(hover.End - hover.Start))),
+        };
+    }
+
+    /// <summary>La définition d'une balise de composant, d'un de ses attributs ou d'une directive <c>@layout</c> ; <see langword="null"/> ailleurs.</summary>
+    private JsonNode? _PaperMarkupDefinition(string uri, PaperProjection projection, JsonNode position)
+    {
+        var target = PaperMarkup.DefinitionAt(_PathOf(uri), projection.PaperText, _PaperTextOffset(uri, projection, position), _ReadOpenText);
+        if (target is null) return null;
+        string text;
+        try { text = _ReadOpenText(Path.GetFullPath(target.Path)) ?? File.ReadAllText(target.Path); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
+        var file = new SourceText(target.Path, text);
+        return new JsonObject
+        {
+            ["uri"] = new Uri(Path.GetFullPath(target.Path)).AbsoluteUri,
+            ["range"] = _Range(file, new SourceSpan(file, RUint.CreateChecked(target.Start), RUint.CreateChecked(target.End - target.Start))),
+        };
     }
 
     /// <summary>La place du texte virtuel qui correspond à une position du <c>.paper</c> ; <c>-1</c> hors du RGL de la page. Sans projection, la place ordinaire.</summary>
@@ -71,14 +115,17 @@ internal sealed partial class LanguageServer
         return _PaperOffset(uri, projection, position);
     }
 
-    private int _PaperOffset(string uri, PaperProjection projection, JsonNode position)
+    private int _PaperOffset(string uri, PaperProjection projection, JsonNode position) =>
+        projection.ToVirtual(_PaperTextOffset(uri, projection, position)) ?? -1;
+
+    /// <summary>La place du texte de la page qui correspond à une position du protocole.</summary>
+    private int _PaperTextOffset(string uri, PaperProjection projection, JsonNode position)
     {
         var (line, character) = ((uint)position["line"]!, (uint)position["character"]!);
         var paper = new SourceText(_PathOf(uri), projection.PaperText);
-        var offset = line >= paper.LineStart.Count
+        return line >= paper.LineStart.Count
             ? paper.Content.Length
             : Math.Min((int)paper.LineStart[(int)line].Value + (int)character, line + 1 < paper.LineStart.Count ? (int)paper.LineStart[(int)line + 1].Value : paper.Content.Length);
-        return projection.ToVirtual(offset) ?? -1;
     }
 
     /// <summary>La plage de la page qui correspond à ce morceau du document ; <see langword="null"/> si elle n'est pas dans le RGL de la page.</summary>
@@ -95,8 +142,14 @@ internal sealed partial class LanguageServer
     private JsonArray _CompletePaper(string uri, PaperProjection projection, JsonNode position)
     {
         var path = _PathOf(uri);
-        var offset = _PaperOffset(uri, projection, position);
-        if (offset < 0) return [];
+        var textOffset = _PaperTextOffset(uri, projection, position);
+        var offset = projection.ToVirtual(textOffset) ?? -1;
+        if (offset < 0)
+        {
+            // Hors du RGL : le markup (composants, layout).
+            var markup = PaperMarkup.Complete(path, projection.PaperText, textOffset, _ReadOpenText);
+            return markup is null ? [] : new JsonArray([.. markup.Select(_ToLsp)]);
+        }
 
         var virtualSource = new SourceText(path, projection.VirtualText);
         var place = _Position(virtualSource, RUint.CreateChecked(offset));
