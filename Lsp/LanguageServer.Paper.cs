@@ -58,7 +58,7 @@ internal sealed partial class LanguageServer
 
             if (projection.ToPaper((int)span.Start.Value, (int)span.End.Value) is not { } place) continue;
             // L'état reactive est une constante dans le texte virtuel : lui écrire n'est pas une erreur dans la page.
-            if (diagnostic.Code is "E005" or "E013" && projection.Reactives.Any(r => span.Text.Contains(r, StringComparison.Ordinal))) continue;
+            if (diagnostic.Code is "E005" or "E013" or "E102" && projection.Reactives.Any(r => span.Text.Contains(r, StringComparison.Ordinal))) continue;
             mapped.Add(diagnostic with { Span = new SourceSpan(paperSource, RUint.CreateChecked(place.Start), RUint.CreateChecked(place.End - place.Start)) });
         }
         return new DocumentReport(paperSource, mapped, []);

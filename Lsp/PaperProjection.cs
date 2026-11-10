@@ -39,8 +39,14 @@ internal sealed partial class PaperProjection
     {
         var projection = new PaperProjection(paper);
         var virtualText = new StringBuilder("forge: gears\ndescription: \"" + Marker + "\"\n\n"
-            + "use <Http> only {HttpRequest, HttpResponse, HttpServer};\nuse <Paper> only {html, escapeHtml, escapeJson, DomEvent};\n\n");
+            + "use <Http> only {HttpRequest, HttpResponse, HttpServer};\nuse <Paper> only {html, escapeHtml, escapeJson, DomEvent, PageHead};\n\n");
         var reactives = new List<string>();
+        // La tête de page implicite : une constante pour l'éditeur (les écritures qu'elle reçoit ne sont pas des erreurs de la page).
+        if (PageWord().IsMatch(paper))
+        {
+            virtualText.Append("const PageHead page: {};\n\n");
+            reactives.Add(PaperCompiler.PageName);
+        }
 
         var expressions = new List<(int Start, int End)>();
         foreach (var region in PaperRegions.Find(paper))
@@ -67,13 +73,33 @@ internal sealed partial class PaperProjection
     private void _AddBlock(StringBuilder virtualText, int start, int end, List<string> reactives)
     {
         var position = start;
-        foreach (Match match in ReactiveDeclaration().Matches(paperSpan(start, end)))
+        var block = paperSpan(start, end);
+        var declarations = ParamDeclaration().Matches(block).Select(m => (Match: m, IsParam: true))
+            .Concat(ReactiveDeclaration().Matches(block).Select(m => (Match: m, IsParam: false)))
+            .OrderBy(d => d.Match.Index);
+        foreach (var (match, isParam) in declarations)
         {
-            var from = start + match.Index;
-            _Map(virtualText, position, from);
+            if (!isParam)
+            {
+                var from = start + match.Index;
+                _Map(virtualText, position, from);
+                virtualText.Append("const ");
+                _Map(virtualText, start + match.Groups[2].Index, start + match.Index + match.Length);
+                reactives.Add(match.Groups[3].Value);
+                position = start + match.Index + match.Length;
+                continue;
+            }
+            // Un param est une constante ; sans valeur par défaut, le texte virtuel lui en donne une inconnue (son type reste celui qu'écrit la page).
+            _Map(virtualText, position, start + match.Index);
             virtualText.Append("const ");
-            _Map(virtualText, start + match.Groups[2].Index, start + match.Index + match.Length);
-            reactives.Add(match.Groups[3].Value);
+            _Map(virtualText, start + match.Groups[1].Index, start + match.Groups[2].Index + match.Groups[2].Length);
+            if (match.Groups[3].Success)
+            {
+                virtualText.Append(": ");
+                _Map(virtualText, start + match.Groups[3].Index, start + match.Groups[3].Index + match.Groups[3].Length);
+            }
+            else virtualText.Append(": __param__()");
+            virtualText.Append(';');
             position = start + match.Index + match.Length;
         }
         _Map(virtualText, position, end);
@@ -120,6 +146,12 @@ internal sealed partial class PaperProjection
         }
         return null;
     }
+
+    [GeneratedRegex(@"(?:^|(?<=[;{}]))[ \t]*param\s+(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([^;]+))?;", RegexOptions.Singleline | RegexOptions.Multiline)]
+    private static partial Regex ParamDeclaration();
+
+    [GeneratedRegex(@"\bpage\b")]
+    private static partial Regex PageWord();
 
     [GeneratedRegex(@"\breactive\s+(?:(mut)\s+)?(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^;]+);", RegexOptions.Singleline)]
     private static partial Regex ReactiveDeclaration();

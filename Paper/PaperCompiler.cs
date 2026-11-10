@@ -24,6 +24,9 @@ internal static partial class PaperCompiler
         // Pour chaque bloc : la ligne de la page où il commence et le nombre de lignes qu'il occupe, pour que le débogueur parle de la page.
         List<(int PaperLine, int Lines)> blockRanges = [];
         if (!Split(source, blocks, markup, diagnostics, blockRanges)) return null;
+        List<string> layoutLoads = [];
+        if (!ApplyLayouts(source, projectRoot, diagnostics, blocks, markup, blockRanges, layoutLoads, out var layoutCount)) return null;
+        if (!ExpandComponents(source, projectRoot, diagnostics, blocks, markup, blockRanges, out var componentCount)) return null;
         List<PaperReactive> reactives = [];
         var blockSource = ReactiveDeclaration().Replace(blocks.ToString(), match =>
         {
@@ -36,14 +39,51 @@ internal static partial class PaperCompiler
             diagnostics.Error("déclaration reactive Paper mal formée ; écris : reactive TYPE nom: expression;", source.Path);
             return null;
         }
+        List<PaperReactive> parameters = [];
+        blockSource = ParamDeclaration().Replace(blockSource, match =>
+        {
+            parameters.Add(new PaperReactive(match.Groups[1].Value.Trim(), match.Groups[2].Value, match.Groups[3].Value.Trim(), false, true));
+            return new string('\n', match.Value.Count(c => c == '\n'));
+        });
+        if (ParamLeftover().IsMatch(blockSource))
+        {
+            diagnostics.Error("déclaration param Paper mal formée ; écris : param TYPE nom; ou param TYPE nom: valeur;", source.Path);
+            return null;
+        }
+        reactives.InsertRange(0, parameters);
+        var hasParams = parameters.Count > 0;
         if (reactives.Select(r => r.Name).Distinct(StringComparer.Ordinal).Count() != reactives.Count)
         {
             diagnostics.Error("deux états reactive portent le même nom dans ce fichier Paper", source.Path);
             return null;
         }
-        if (reactives.Count > 0) blockSource = TransformStatefulGears(blockSource, reactives);
+        if (reactives.Any(r => r.Name == PageName))
+        {
+            diagnostics.Error($"« {PageName} » est le nom de la tête de page : un état reactive ne peut pas le porter", source.Path);
+            return null;
+        }
 
         var signatures = GearSignature().Matches(blocks.ToString()).ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value.Trim(), StringComparer.Ordinal);
+        var hasPageLoad = signatures.TryGetValue(LoadGear, out var loadParameters);
+        if (hasPageLoad && loadParameters!.Length > 0)
+        {
+            diagnostics.Error($"le gear « {LoadGear} » s'exécute au chargement de la page et ne prend aucun paramètre", source.Path);
+            return null;
+        }
+        var hasLoad = hasPageLoad || layoutLoads.Count > 0;
+        foreach (var gear in signatures.Keys)
+        {
+            var written = WrittenReactives(blocks.ToString(), gear, reactives);
+            if (parameters.FirstOrDefault(p => written.Contains(p.Name)) is { } changed)
+            {
+                diagnostics.Error($"le gear « {gear} » écrit le paramètre « {changed.Name} » : un param est en lecture seule ; copie sa valeur dans un reactive pour la modifier", source.Path);
+                return null;
+            }
+        }
+        var interpolations = string.Join('\n', InterpolationText().Matches(markup.ToString()).Select(m => m.Groups[1].Value));
+        var usesPage = hasLoad || PageUse().IsMatch(CodeOnly(blockSource)) || PageUse().IsMatch(CodeOnly(interpolations));
+        if (usesPage) reactives.Insert(0, new PaperReactive("PageHead", PageName, "{}", false));
+        if (reactives.Count > 0) blockSource = TransformStatefulGears(blockSource, reactives, usesPage);
         List<PaperHandler> handlers = [];
         var markupSource = EventAttribute().Replace(markup.ToString(), match =>
         {
@@ -98,7 +138,7 @@ internal static partial class PaperCompiler
                 inner = Quote(content!);
             else if (ImportStart().IsMatch(inner)) return null;
 
-            var dependencies = reactives.Where(reactive => Regex.IsMatch(written, $@"(?<![.\w]){Regex.Escape(reactive.Name)}\b"))
+            var dependencies = reactives.Where(reactive => !reactive.IsParam && Regex.IsMatch(written, $@"(?<![.\w]){Regex.Escape(reactive.Name)}\b"))
                 .Select(reactive => reactive.Name).ToArray();
             // Dans <title>, un commentaire est traité comme du texte brut par HTML et apparaîtrait
             // dans l'onglet du navigateur. Le titre est rendu correctement, mais reste statique.
@@ -113,7 +153,7 @@ internal static partial class PaperCompiler
         var component = Path.GetFileNameWithoutExtension(source.Path);
         var socketPath = $"/__rgl/paper/{component}";
         if (handlers.Count > 0)
-            pieces.Add(Quote($"<script src=\"/rgl-paper.js\"></script><script>RglPaper.connect((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '{socketPath}');</script>"));
+            pieces.Add(Quote($"<script src=\"/rgl-paper.js\"></script><script>RglPaper.connect((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '{socketPath}'{(hasParams ? " + location.search" : "")});</script>"));
 
         if (handlers.Count > 0 && reactives.Count > 0)
         {
@@ -125,28 +165,55 @@ internal static partial class PaperCompiler
             })];
         }
 
+        var propsParameter = hasParams ? "Props props" : "";
+        var propsArgument = hasParams ? "props" : "";
         List<int> fragmentLines = [];
-        var generated = new StringBuilder("forge: gears\ndescription: \"Page Paper engendrée\"\n\nuse <Http> only {HttpRequest, HttpResponse, HttpServer};\nuse <Paper> only {html, escapeHtml, escapeJson, DomEvent};\n");
+        var generated = new StringBuilder("forge: gears\ndescription: \"Page Paper engendrée\"\n\nuse <Http> only {HttpRequest, HttpResponse, HttpServer};\nuse <Paper> only {html, escapeHtml, escapeJson, DomEvent");
+        if (usesPage) generated.Append(", PageHead, headHtml, takeHead, settle");
+        generated.Append("};\n");
         if (handlers.Count > 0) generated.Append("use <File> only {readText};\nuse <Path> only {executableDirectory, join};\n");
         generated.Append('\n');
         generated.Append("export const uint fragmentCount: ").Append(fragments.Count).Append(";\n");
+        if (hasParams)
+        {
+            generated.Append("export mold Props {\n");
+            foreach (var parameter in parameters)
+            {
+                generated.Append("    ").Append(parameter.Type).Append(' ').Append(parameter.Name);
+                if (parameter.Initializer.Length > 0) generated.Append(": ").Append(parameter.Initializer);
+                generated.Append(";\n");
+            }
+            generated.Append("}\n");
+        }
         if (reactives.Count > 0)
         {
             generated.Append("export mold State {\n");
             foreach (var reactive in reactives)
-                generated.Append("    ").Append(reactive.Type).Append(' ').Append(reactive.Name).Append(": ").Append(reactive.Initializer).Append(";\n");
+            {
+                generated.Append("    ").Append(reactive.Type).Append(' ').Append(reactive.Name);
+                if (reactive.Initializer.Length > 0) generated.Append(": ").Append(reactive.Initializer);
+                generated.Append(";\n");
+            }
             generated.Append("}\n");
         }
         var blockStartLine = Lines(generated);
         generated.Append(blockSource);
         if (blockSource.Length > 0 && blockSource[^1] != '\n') generated.Append('\n');
-        if (reactives.Count > 0) generated.Append("export gear createState(): State => {};\n");
+        if (reactives.Count > 0)
+        {
+            var initialState = hasParams ? "{" + string.Join(", ", parameters.Select(p => $"{p.Name}: props.{p.Name}")) + "}" : "{}";
+            if (hasLoad) generated.Append("export gear createState(").Append(propsParameter).Append("): State {\n    mut State state: ").Append(initialState).Append(";\n    mut PageHead page: state.page;\n")
+                .AppendJoin("", layoutLoads.Append(hasPageLoad ? LoadGear : "").Where(name => name.Length > 0).Select(name => $"    {name}(state, page);\n"))
+                .Append("    state.page <- page;\n    return state;\n}\n");
+            else generated.Append("export gear createState(").Append(propsParameter).Append("): State => ").Append(initialState).Append(";\n");
+            if (usesPage) generated.Append("export gear createSettledState(").Append(propsParameter).Append("): State {\n    mut State state: createState(").Append(propsArgument).Append(");\n    mut PageHead page: state.page;\n    settle(page);\n    state.page <- page;\n    return state;\n}\n");
+        }
         foreach (var fragment in fragments)
         {
             fragmentLines.Add(Lines(generated));
             var expression = reactives.Count == 0 ? fragment.Expression : RewriteState(fragment.Expression, reactives);
             generated.Append("gear __paper_fragment_").Append(fragment.Id).Append('(')
-                .Append(reactives.Count == 0 ? "" : "mut State state").Append("): string => ");
+                .Append(reactives.Count == 0 ? "" : usesPage ? "mut State state, PageHead page" : "mut State state").Append("): string => ");
             if (fragment.ImportedFile is not null)
             {
                 var literal = Quote(fragment.ImportedContent!);
@@ -157,68 +224,92 @@ internal static partial class PaperCompiler
             else generated.Append("escapeHtml(`{").Append(expression).Append("}`);\n");
         }
         var stateParameter = reactives.Count == 0 ? "" : "mut State state";
-        var stateArgument = reactives.Count == 0 ? "" : "state";
+        var stateArgument = reactives.Count == 0 ? "" : usesPage ? "state, page" : "state";
         if (reactives.Count > 0)
             for (var i = 0; i < pieces.Count; i++)
-                if (pieces[i].StartsWith("__paper_fragment_", StringComparison.Ordinal)) pieces[i] = pieces[i][..^1] + "state)";
-        generated.Append("\nexport gear ").Append(reactives.Count == 0 ? "render" : "renderWithState").Append('(').Append(stateParameter).Append("): html => html(")
-            .Append(pieces.Count == 0 ? "\"\"" : string.Join(" + ", pieces)).Append(");\n");
+                if (pieces[i].StartsWith("__paper_fragment_", StringComparison.Ordinal)) pieces[i] = pieces[i][..^1] + stateArgument + ")";
+        var body = pieces.Count == 0 ? "\"\"" : string.Join(" + ", pieces);
+        if (usesPage)
+            generated.Append("\nexport gear renderWithState(mut State state): html {\n    mut PageHead page: state.page;\n    const string body: ").Append(body)
+                .Append(";\n    const string head: headHtml(page);\n    state.page <- page;\n    return html(body + head);\n}\n");
+        else
+            generated.Append("\nexport gear ").Append(reactives.Count == 0 ? "render" : "renderWithState").Append('(').Append(stateParameter).Append("): html => html(")
+                .Append(body).Append(");\n");
         if (reactives.Count > 0)
-            generated.Append("export gear render(): html { mut State state: createState(); return renderWithState(state); }\n");
-        generated.Append("export gear renderFragment(").Append(reactives.Count == 0 ? "" : "mut State state, ").Append("uint id): string {\n    switch (id) {\n");
+            generated.Append("export gear render(").Append(propsParameter).Append("): html { mut State state: createState(").Append(propsArgument).Append("); return renderWithState(state); }\n");
+        generated.Append("export gear renderFragment(").Append(reactives.Count == 0 ? "" : "mut State state, ").Append("uint id): string {\n");
+        if (usesPage) generated.Append("    const PageHead page: state.page;\n");
+        generated.Append("    switch (id) {\n");
         foreach (var fragment in fragments)
             generated.Append("        case ").Append(fragment.Id).Append(": return __paper_fragment_").Append(fragment.Id).Append('(').Append(stateArgument).Append(");\n");
         generated.Append("        default: return '';\n    }\n}\n");
         if (handlers.Count > 0)
         {
+            string HandlerCall(PaperHandler h) => h.Gear + "(" + (reactives.Count == 0 ? "" : stateArgument)
+                + (reactives.Count > 0 && h.ReceivesEvent ? ", " : "") + (h.ReceivesEvent ? "event" : "") + ")";
             generated.Append("export gear dispatch(").Append(reactives.Count == 0 ? "" : "mut State state, ")
-                .Append("string handler, DomEvent event): [uint] {\n    switch (handler) {\n");
+                .Append("string handler, DomEvent event): [uint] {\n");
+            if (usesPage) generated.Append("    mut PageHead page: state.page;\n    [uint] result: [];\n");
+            generated.Append("    switch (handler) {\n");
             foreach (var handler in handlers.DistinctBy(h => h.Gear))
-                generated.Append("        case '").Append(handler.Gear).Append("': ").Append(handler.Gear).Append('(')
-                    .Append(reactives.Count == 0 ? "" : "state")
-                    .Append(reactives.Count > 0 && handler.ReceivesEvent ? ", " : "")
-                    .Append(handler.ReceivesEvent ? "event" : "").Append("); return [")
-                    .AppendJoin(", ", handler.Invalidates).Append("];\n");
-            generated.Append("        default: return [];\n    }\n}\n");
+            {
+                generated.Append("        case '").Append(handler.Gear).Append("': ").Append(HandlerCall(handler)).Append(usesPage ? "; result <- [" : "; return [")
+                    .AppendJoin(", ", handler.Invalidates).Append(usesPage ? "]; break;\n" : "];\n");
+            }
+            generated.Append(usesPage ? "        default: break;\n    }\n    state.page <- page;\n    return result;\n}\n" : "        default: return [];\n    }\n}\n");
             generated.Append("export gear handleMessage(").Append(reactives.Count == 0 ? "" : "mut State state, ").Append("string message): string {\n")
                 .Append("    const [string] parts: message.split(\"\\n\");\n")
                 .Append("    const string handler: parts.length > 0 ? parts[0] : '';\n")
-                .Append("    const DomEvent event: {type: parts.length > 1 ? parts[1] : '', targetId: parts.length > 2 ? parts[2] : '', value: parts.length > 3 ? parts[3] : '', key: parts.length > 4 ? parts[4] : ''};\n")
-                .Append("    switch (handler) {\n");
+                .Append("    const DomEvent event: {type: parts.length > 1 ? parts[1] : '', targetId: parts.length > 2 ? parts[2] : '', value: parts.length > 3 ? parts[3] : '', key: parts.length > 4 ? parts[4] : ''};\n");
+            if (usesPage) generated.Append("    mut PageHead page: state.page;\n    string result: '{\"type\":\"fragments\",\"items\":[]}';\n");
+            generated.Append("    switch (handler) {\n");
             foreach (var handler in handlers.DistinctBy(h => h.Gear))
             {
-                generated.Append("        case '").Append(handler.Gear).Append("': ").Append(handler.Gear).Append('(')
-                    .Append(reactives.Count == 0 ? "" : "state")
-                    .Append(reactives.Count > 0 && handler.ReceivesEvent ? ", " : "")
-                    .Append(handler.ReceivesEvent ? "event" : "").Append("); return '{\"type\":\"fragments\",\"items\":['");
+                generated.Append("        case '").Append(handler.Gear).Append("': ").Append(HandlerCall(handler))
+                    .Append(usesPage ? "; result <- " : "; return ").Append("'{\"type\":\"fragments\",\"items\":['");
                 for (var i = 0; i < handler.Invalidates.Count; i++)
                 {
                     if (i > 0) generated.Append(" + ','");
                     var id = handler.Invalidates[i];
                     generated.Append(" + '{\"id\":").Append(id).Append(",\"html\":\"' + escapeJson(__paper_fragment_").Append(id).Append('(')
-                        .Append(reactives.Count == 0 ? "" : "state").Append(")) + '\"}'");
+                        .Append(reactives.Count == 0 ? "" : stateArgument).Append(")) + '\"}'");
                 }
-                generated.Append(" + ']}';\n");
+                generated.Append(usesPage ? " + ']' + takeHead(page) + '}'; break;\n" : " + ']}';\n");
             }
-            generated.Append("        default: return '{\"type\":\"fragments\",\"items\":[]}';\n    }\n}\n");
+            generated.Append(usesPage ? "        default: break;\n    }\n    state.page <- page;\n    return result;\n}\n"
+                : "        default: return '{\"type\":\"fragments\",\"items\":[]}';\n    }\n}\n");
         }
-        generated.Append("export ").Append(handlers.Count > 0 ? "guard" : "gear").Append(" mount(HttpServer server, string path): HttpServer {\n")
-            .Append("    mut HttpServer configured: server;\n");
+        var kind = handlers.Count > 0 ? "guard" : "gear";
+        var rendered = hasParams ? "render(provider(request))" : "render()";
+        var created = (usesPage ? "createSettledState" : "createState") + (hasParams ? "(provider(request))" : "()");
+        if (hasParams) generated.Append(kind).Append(" _mountPage(HttpServer server, string path, (HttpRequest) => Props provider): HttpServer {\n");
+        else generated.Append("export ").Append(kind).Append(" mount(HttpServer server, string path): HttpServer {\n");
+        generated.Append("    mut HttpServer configured: server;\n");
         if (handlers.Count > 0)
         {
             generated.Append("    const string runtime: readText(join(executableDirectory(), 'rgl-paper.js'));\n");
         }
-        generated.Append("    configured.get(path, (HttpRequest request) => HttpResponse.html(render()°, 200));\n");
+        generated.Append("    configured.get(path, (HttpRequest request) => HttpResponse.html(").Append(rendered).Append("°, 200));\n");
         if (handlers.Count > 0)
         {
             generated.Append("    configured.get('/rgl-paper.js', (HttpRequest request) => { const HttpResponse response: {status: 200, contentType: 'application/javascript; charset=utf-8', body: runtime}; return response; });\n")
                 .Append("    configured.webSocketCircuit('").Append(socketPath).Append("', (HttpRequest request) => {\n");
             if (reactives.Count > 0)
-                generated.Append("        mut [State] circuit: [createState()];\n        return (string message) => (circuit ||> (mut State state) => handleMessage(state, message))[0];\n");
+                generated.Append("        mut [State] circuit: [").Append(created).Append("];\n        return (string message) => (circuit ||> (mut State state) => handleMessage(state, message))[0];\n");
             else generated.Append("        return (string message) => handleMessage(message);\n");
             generated.Append("    });\n");
         }
         generated.Append("    return configured;\n}\n");
+        if (hasParams)
+        {
+            generated.Append("export ").Append(kind).Append(" mount(HttpServer server, string path, Props props): HttpServer {\n")
+                .Append("    return _mountPage(server, path, (HttpRequest request) => props);\n}\n");
+            generated.Append("export ").Append(kind).Append(" mountWith(HttpServer server, string path, (HttpRequest) => Props provider): HttpServer {\n")
+                .Append("    return _mountPage(server, path, provider);\n}\n");
+            if (parameters.All(p => p.Initializer.Length > 0))
+                generated.Append("export ").Append(kind).Append(" mount(HttpServer server, string path): HttpServer {\n")
+                    .Append("    return _mountPage(server, path, (HttpRequest request) => new Props {});\n}\n");
+        }
 
         // Ligne engendrée → ligne de la page : les blocs (verbatim, ligne pour ligne) et les interpolations ; le reste (render, dispatch, mount…) n'en a pas.
         var map = new uint[Lines(generated)];
@@ -228,12 +319,13 @@ internal static partial class PaperCompiler
             for (var k = 0; k < count; k++)
             {
                 var index = blockStartLine - 1 + cumulative + k;
-                if (index < map.Length) map[index] = (uint)(paperLine + k);
+                if (paperLine > 0 && index < map.Length) map[index] = (uint)(paperLine + k);
             }
             cumulative += count;
         }
         var expressions = PaperRegions.Find(source.Content).Where(r => !r.IsBlock).ToArray();
-        for (var i = 0; i < fragments.Count && i < expressions.Length && i < fragmentLines.Count; i++)
+        // Avec un layout ou un composant, les interpolations ne sont plus dans l'ordre de la page : elles ne sont rattachées à aucune ligne.
+        for (var i = 0; layoutCount + componentCount == 0 && i < fragments.Count && i < expressions.Length && i < fragmentLines.Count; i++)
         {
             var paperLine = LineOf(source.Content, expressions[i].Start);
             for (var k = 0; k < CountLines(source.Content, expressions[i].Start, expressions[i].End); k++)
@@ -390,20 +482,122 @@ internal static partial class PaperCompiler
 
     private static bool IsName(char c) => char.IsLetterOrDigit(c) || c == '_';
 
+    /// <summary>Le nom implicite de la tête de page (titre, scripts, variables d'environnement).</summary>
+    public const string PageName = "page";
+
+    /// <summary>Le gear sans paramètre exécuté quand l'état d'une page est créé.</summary>
+    public const string LoadGear = "load";
+
+    /// <summary>Remplace chaque nom d'état par son champ (<c>count</c> devient <c>state.count</c>), sauf dans le texte des chaînes : un mot comme « page » écrit entre guillemets reste intact, et seules les interpolations <c>{…}</c> d'un gabarit sont réécrites.</summary>
     private static string RewriteState(string expression, IReadOnlyList<PaperReactive> reactives)
     {
-        foreach (var reactive in reactives)
-            expression = Regex.Replace(expression, $@"(?<![.\w]){Regex.Escape(reactive.Name)}\b", "state." + reactive.Name);
-        return expression;
+        var fields = reactives.Where(r => r.Name != PageName).ToArray();
+        if (fields.Length == 0) return expression;
+        var names = string.Join('|', fields.Select(r => Regex.Escape(r.Name)));
+        var name = new Regex($@"(?<![.\w])(?:{names})\b");
+        var result = new StringBuilder(expression.Length + 16);
+        RewriteCode(expression, 0, expression.Length, name, match => "state." + match.Value, result);
+        return result.ToString();
     }
 
-    private static string TransformStatefulGears(string source, IReadOnlyList<PaperReactive> reactives)
+    /// <summary>Le code sans le texte des chaînes : ce qui est entre guillemets ou entre apostrophes disparaît, et d'un gabarit ne restent que ses interpolations <c>{…}</c>.</summary>
+    private static string CodeOnly(string text)
+    {
+        var result = new StringBuilder(text.Length);
+        void Scan(int from, int to)
+        {
+            var i = from;
+            while (i < to)
+            {
+                var c = text[i];
+                if (c is '\'' or '"')
+                {
+                    i++;
+                    while (i < to && text[i] != c) i += text[i] == '\\' ? 2 : 1;
+                    i++;
+                }
+                else if (c == '`')
+                {
+                    i++;
+                    while (i < to && text[i] != '`')
+                    {
+                        if (text[i] == '\\') i += 2;
+                        else if (text[i] == '{')
+                        {
+                            var close = ClosingBrace(text, i);
+                            if (close < 0 || close >= to) close = to - 1;
+                            result.Append(' ');
+                            Scan(i + 1, close);
+                            i = close + 1;
+                        }
+                        else i++;
+                    }
+                    i++;
+                }
+                else result.Append(text[i++]);
+            }
+        }
+        Scan(0, text.Length);
+        return result.ToString();
+    }
+
+    /// <summary>Réécrit chaque correspondance de <paramref name="name"/> par <paramref name="map"/>, hors du texte des chaînes (voir <see cref="RewriteState"/>).</summary>
+    private static void RewriteCode(string text, int from, int to, Regex name, MatchEvaluator map, StringBuilder result)
+    {
+        var plain = from;
+        void Flush(int end)
+        {
+            result.Append(name.Replace(text[plain..end], map));
+            plain = end;
+        }
+        var i = from;
+        while (i < to)
+        {
+            var c = text[i];
+            if (c is '\'' or '"')
+            {
+                Flush(i);
+                var end = i + 1;
+                while (end < to && text[end] != c) end += text[end] == '\\' ? 2 : 1;
+                end = Math.Min(end + 1, to);
+                result.Append(text, i, end - i);
+                plain = i = end;
+            }
+            else if (c == '`')
+            {
+                Flush(i);
+                result.Append('`');
+                var end = i + 1;
+                while (end < to && text[end] != '`')
+                {
+                    if (text[end] == '\\') { result.Append(text, end, Math.Min(2, to - end)); end += 2; }
+                    else if (text[end] == '{')
+                    {
+                        var close = ClosingBrace(text, end);
+                        if (close < 0 || close >= to) close = to - 1;
+                        result.Append('{');
+                        RewriteCode(text, end + 1, close, name, map, result);
+                        result.Append('}');
+                        end = close + 1;
+                    }
+                    else result.Append(text[end++]);
+                }
+                if (end < to) result.Append('`');
+                plain = i = Math.Min(end + 1, to);
+            }
+            else i++;
+        }
+        Flush(to);
+    }
+
+    private static string TransformStatefulGears(string source, IReadOnlyList<PaperReactive> reactives, bool usesPage)
     {
         source = RewriteState(source, reactives);
+        var implicitParameters = usesPage ? "mut State state, mut PageHead page" : "mut State state";
         return GearHeader().Replace(source, match =>
         {
             var parameters = match.Groups[1].Value.Trim();
-            return match.Value[..(match.Groups[1].Index - match.Index)] + (parameters.Length == 0 ? "mut State state" : "mut State state, " + parameters) + ")";
+            return match.Value[..(match.Groups[1].Index - match.Index)] + (parameters.Length == 0 ? implicitParameters : implicitParameters + ", " + parameters) + ")";
         });
     }
 
@@ -416,7 +610,7 @@ internal static partial class PaperCompiler
         if (close < 0) return [];
         var body = source[(open + 1)..close];
         return reactives.Where(reactive => Regex.IsMatch(body,
-                $@"(?:\b{Regex.Escape(reactive.Name)}\s*(?:<-|\+<-|-<-|\*<-|/<-|<-\|)|\b(?:increment|decrement)\s+{Regex.Escape(reactive.Name)}\b)"))
+                $@"(?:(?<![.\w]){Regex.Escape(reactive.Name)}(?:\.[A-Za-z_]\w*|\[[^\]]*\])*\s*(?:<-|\+<-|-<-|\*<-|/<-|<-\|)|\b(?:increment|decrement)\s+{Regex.Escape(reactive.Name)}\b|(?<![.\w]){Regex.Escape(reactive.Name)}\.[A-Za-z_]\w*\s*\()"))
             .Select(reactive => reactive.Name).ToHashSet(StringComparer.Ordinal);
     }
 
@@ -453,6 +647,18 @@ internal static partial class PaperCompiler
 
     [GeneratedRegex(@"\bgear(?:\s+pure)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)")]
     private static partial Regex GearSignature();
+
+    [GeneratedRegex(@"(?:^|(?<=[;{}]))[ \t]*param\s+(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([^;]+))?;", RegexOptions.Singleline | RegexOptions.Multiline)]
+    private static partial Regex ParamDeclaration();
+
+    [GeneratedRegex(@"(?:^|(?<=[;{}]))[ \t]*param\b", RegexOptions.Multiline)]
+    private static partial Regex ParamLeftover();
+
+    [GeneratedRegex(@"@@(.*?)@@", RegexOptions.Singleline)]
+    private static partial Regex InterpolationText();
+
+    [GeneratedRegex(@"(?<![.\w'""`])page\b")]
+    private static partial Regex PageUse();
 
     [GeneratedRegex("@(click|input|change|submit|keydown|keyup)\\s*=\\s*\"([A-Za-z_][A-Za-z0-9_]*)\"")]
     private static partial Regex EventAttribute();

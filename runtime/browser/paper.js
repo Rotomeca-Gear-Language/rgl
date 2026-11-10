@@ -32,6 +32,22 @@
         return true;
     }
 
+    const loaded = new Set();
+
+    function applyHead(head) {
+        if (typeof head.title === "string") document.title = head.title;
+        if (head.env) window.RGL_ENV = Object.assign(window.RGL_ENV || {}, head.env);
+        for (const url of head.scripts || []) {
+            if (loaded.has(url)) continue;
+            loaded.add(url);
+            const script = document.createElement("script");
+            script.src = url;
+            document.body.appendChild(script);
+        }
+    }
+
+    for (const script of document.querySelectorAll("script[src]")) loaded.add(script.getAttribute("src"));
+
     let activeSocket = null;
 
     function connect(url) {
@@ -42,6 +58,7 @@
             if (message.type === "fragment") patch(message.id, message.html);
             if (message.type === "fragments")
                 for (const fragment of message.items) patch(fragment.id, fragment.html);
+            if (message.head) applyHead(message.head);
             if (message.type === "reload") location.reload();
         });
         return socket;

@@ -20,7 +20,9 @@ internal sealed record PaperFragment(int Id, string Expression, bool RawHtml, st
 }
 
 /// <summary>État réactif privé à une instance de page.</summary>
-internal sealed record PaperReactive(string Type, string Name, string Initializer, bool Mutable);
+/// <param name="Initializer">Valeur initiale ; vide pour un paramètre <c>param</c> sans valeur par défaut.</param>
+/// <param name="IsParam">Vrai pour un <c>param</c> : donné par l'appelant de <c>mount</c>, en lecture seule dans la page.</param>
+internal sealed record PaperReactive(string Type, string Name, string Initializer, bool Mutable, bool IsParam = false);
 
 /// <summary>Liaison d'un événement HTML vers un gear Paper vérifié.</summary>
 internal sealed record PaperHandler(string Event, string Gear, bool ReceivesEvent, IReadOnlyList<int>? Invalidates = null)

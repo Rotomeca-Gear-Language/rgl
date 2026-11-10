@@ -22,6 +22,103 @@ export mold DomEvent {
     string key: '';
 }
 
+/// <lang name="fr"><summary>La tête d'une page : titre de l'onglet, scripts à charger et variables d'environnement JavaScript. Chaque connexion a la sienne, déclarée implicitement sous le nom `page` dans un fichier Paper qui l'emploie.</summary></lang>
+/// <lang name="en"><summary>A page's head: tab title, scripts to load and JavaScript environment variables. Each connection has its own, implicitly declared as `page` in a Paper file that uses it.</summary></lang>
+export mold PageHead {
+    /// <lang name="fr"><summary>Titre de l'onglet du navigateur ; texte vide tant qu'il n'est pas réglé.</summary></lang>
+    /// <lang name="en"><summary>Browser tab title; empty until set.</summary></lang>
+    string title: '';
+    /// <lang name="fr"><summary>Dernier titre envoyé au navigateur (interne).</summary></lang>
+    /// <lang name="en"><summary>Last title sent to the browser (internal).</summary></lang>
+    string shownTitle: '';
+    /// <lang name="fr"><summary>Adresses des scripts pas encore envoyés, une par ligne (interne).</summary></lang>
+    /// <lang name="en"><summary>Addresses of scripts not sent yet, one per line (internal).</summary></lang>
+    string pendingScripts: '';
+    /// <lang name="fr"><summary>Variables d'environnement pas encore envoyées, écrites en membres JSON (interne).</summary></lang>
+    /// <lang name="en"><summary>Environment variables not sent yet, written as JSON members (internal).</summary></lang>
+    string variables: '';
+}
+
+extend PageHead {
+    /// <lang name="fr"><summary>Demande au navigateur de charger un script.</summary><param name="page">La tête de la page (`page`).</param><param name="url">Adresse du script.</param></lang>
+    /// <lang name="en"><summary>Asks the browser to load a script.</summary><param name="page">The page head (`page`).</param><param name="url">Script address.</param></lang>
+    gear script(this mut PageHead page, string url): void {
+        page.pendingScripts <- page.pendingScripts eq '' ? url : `{page.pendingScripts}\n{url}`;
+    }
+
+    /// <lang name="fr"><summary>Définit une variable d'environnement JavaScript texte, lue par le navigateur dans `window.RGL_ENV`.</summary><param name="page">La tête de la page (`page`).</param><param name="name">Nom de la variable.</param><param name="value">Sa valeur.</param></lang>
+    /// <lang name="en"><summary>Sets a text JavaScript environment variable, read by the browser in `window.RGL_ENV`.</summary><param name="page">The page head (`page`).</param><param name="name">Variable name.</param><param name="value">Its value.</param></lang>
+    gear env(this mut PageHead page, string name, string value): void {
+        _addEnv(page, name, '"' + _scriptSafe(value) + '"');
+    }
+
+    /// <lang name="fr"><summary>Définit une variable d'environnement JavaScript booléenne.</summary><param name="page">La tête de la page (`page`).</param><param name="name">Nom de la variable.</param><param name="value">Sa valeur.</param></lang>
+    /// <lang name="en"><summary>Sets a boolean JavaScript environment variable.</summary><param name="page">The page head (`page`).</param><param name="name">Variable name.</param><param name="value">Its value.</param></lang>
+    gear env(this mut PageHead page, string name, bool value): void {
+        _addEnv(page, name, value ? 'true' : 'false');
+    }
+
+    /// <lang name="fr"><summary>Définit une variable d'environnement JavaScript entière.</summary><param name="page">La tête de la page (`page`).</param><param name="name">Nom de la variable.</param><param name="value">Sa valeur.</param></lang>
+    /// <lang name="en"><summary>Sets an integer JavaScript environment variable.</summary><param name="page">The page head (`page`).</param><param name="name">Variable name.</param><param name="value">Its value.</param></lang>
+    gear env(this mut PageHead page, string name, long value): void {
+        _addEnv(page, name, `{value}`);
+    }
+}
+
+/// <lang name="fr"><summary>Ajoute un membre JSON aux variables d'environnement en attente.</summary><param name="page">La tête de la page.</param><param name="name">Nom de la variable.</param><param name="literal">Valeur déjà écrite en JSON.</param></lang>
+/// <lang name="en"><summary>Adds a JSON member to the pending environment variables.</summary><param name="page">The page head.</param><param name="name">Variable name.</param><param name="literal">Value already written as JSON.</param></lang>
+gear _addEnv(mut PageHead page, string name, string literal): void {
+    const string member: '"' + _scriptSafe(name) + '":' + literal;
+    page.variables <- page.variables eq '' ? member : page.variables + ',' + member;
+}
+
+/// <lang name="fr"><summary>Échappe un texte pour une chaîne JSON placée dans une balise script : le caractère inférieur à devient la séquence unicode 003c, donc la fin de balise script ne peut pas la refermer.</summary><param name="value">Texte arbitraire.</param><returns>Contenu de chaîne JSON sans les guillemets extérieurs.</returns></lang>
+/// <lang name="en"><summary>Escapes text for a JSON string placed in a script tag: the less-than character becomes the unicode escape 003c, so a closing script tag cannot close it.</summary><param name="value">Arbitrary text.</param><returns>JSON string content without surrounding quotes.</returns></lang>
+gear pure _scriptSafe(string value): string => escapeJson(value).replace('<', "\\" + 'u003c');
+
+/// <lang name="fr"><summary>Les balises script du HTML initial pour des adresses séparées par des retours à la ligne.</summary><param name="scripts">Adresses, une par ligne.</param><returns>Les balises `script` correspondantes.</returns></lang>
+/// <lang name="en"><summary>The script tags of the initial HTML for newline-separated addresses.</summary><param name="scripts">Addresses, one per line.</param><returns>The matching `script` tags.</returns></lang>
+gear pure _scriptTags(string scripts): string {
+    if (scripts eq '') { return ''; }
+    return scripts.split("\n") |+> '' with (string tags, string url) => tags + '<script src="' + escapeHtml(url) + '"></script>';
+}
+
+/// <lang name="fr"><summary>La liste JSON des adresses séparées par des retours à la ligne.</summary><param name="scripts">Adresses, une par ligne.</param><returns>Les éléments JSON, séparés par des virgules.</returns></lang>
+/// <lang name="en"><summary>The JSON list of newline-separated addresses.</summary><param name="scripts">Addresses, one per line.</param><returns>The JSON elements, separated by commas.</returns></lang>
+gear pure _scriptList(string scripts): string {
+    if (scripts eq '') { return ''; }
+    return scripts.split("\n") |+> '' with (string list, string url) => (list eq '' ? '' : list + ',') + '"' + _scriptSafe(url) + '"';
+}
+
+/// <lang name="fr"><summary>Marque tout ce que la tête contient comme déjà envoyé au navigateur.</summary><param name="page">La tête de la page.</param></lang>
+/// <lang name="en"><summary>Marks everything the head holds as already sent to the browser.</summary><param name="page">The page head.</param></lang>
+export gear settle(mut PageHead page): void {
+    page.shownTitle <- page.title;
+    page.pendingScripts <- '';
+    page.variables <- '';
+}
+
+/// <lang name="fr"><summary>Le HTML initial de la tête : variables d'environnement, titre, puis scripts. Ce qui est écrit est ensuite marqué comme envoyé.</summary><param name="page">La tête de la page.</param><returns>Des balises `script` à placer à la fin de la page.</returns></lang>
+/// <lang name="en"><summary>The head's initial HTML: environment variables, title, then scripts. What is written is then marked as sent.</summary><param name="page">The page head.</param><returns>`script` tags to put at the end of the page.</returns></lang>
+export gear headHtml(mut PageHead page): string {
+    const string env: page.variables eq '' ? '' : '<script>window.RGL_ENV=Object.assign(window.RGL_ENV||{},{' + page.variables + '});</script>';
+    const string title: page.title eq '' ? '' : '<script>document.title="' + _scriptSafe(page.title) + '";</script>';
+    const string tags: _scriptTags(page.pendingScripts);
+    settle(page);
+    return env + title + tags;
+}
+
+/// <lang name="fr"><summary>Ce qui a changé dans la tête depuis le dernier envoi, comme membre JSON `,"head":{…}` à ajouter à un message ; texte vide sans changement. Ce qui est rendu est ensuite marqué comme envoyé.</summary><param name="page">La tête de la page.</param><returns>Le membre JSON, ou un texte vide.</returns></lang>
+/// <lang name="en"><summary>What changed in the head since the last send, as a JSON member `,"head":{…}` to add to a message; empty text when nothing changed. What is returned is then marked as sent.</summary><param name="page">The page head.</param><returns>The JSON member, or empty text.</returns></lang>
+export gear takeHead(mut PageHead page): string {
+    string members: '';
+    if (not (page.title eq page.shownTitle)) { members <- '"title":"' + escapeJson(page.title) + '"'; }
+    if (not (page.pendingScripts eq '')) { members <- (members eq '' ? '' : members + ',') + '"scripts":[' + _scriptList(page.pendingScripts) + ']'; }
+    if (not (page.variables eq '')) { members <- (members eq '' ? '' : members + ',') + '"env":{' + page.variables + '}'; }
+    settle(page);
+    return members eq '' ? '' : ',"head":{' + members + '}';
+}
+
 @trusted
 /// <lang name="fr"><summary>Échappe un texte pour l'insérer dans le contenu d'un élément HTML.</summary><param name="value">Texte non fiable.</param><returns>Texte où les caractères HTML significatifs sont remplacés par des entités.</returns></lang>
 /// <lang name="en"><summary>Escapes text for insertion into HTML element content.</summary><param name="value">Untrusted text.</param><returns>Text whose HTML-significant characters are replaced with entities.</returns></lang>

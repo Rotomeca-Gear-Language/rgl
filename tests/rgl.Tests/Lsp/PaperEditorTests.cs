@@ -125,6 +125,33 @@ public class PaperEditorTests
     }
 
     [Fact]
+    public void La_tete_de_page_et_les_param_ne_sont_pas_des_erreurs_dans_l_editeur()
+    {
+        var text = """
+            @rgl {
+                param string who;
+                param int times: 2;
+                reactive int count: 0;
+                gear load(): void {
+                    page.title <- 'Salut ' + who;
+                    page.script('/app.js');
+                    page.env('n', times);
+                }
+            }
+            <p>@@ who @@ @@ count @@ @@ inconnu @@</p>
+            """.ReplaceLineEndings("\n");
+        var (directory, uri) = Project();
+        using (directory)
+        {
+            var messages = Serve(Open(uri, text));
+
+            var diagnostics = messages.Last(m => (string?)m["method"] == "textDocument/publishDiagnostics")["params"]!["diagnostics"]!.AsArray();
+            var error = Assert.Single(diagnostics, d => (int?)d!["severity"] == 1)!;
+            Assert.Contains("inconnu", (string?)error["message"] ?? "");
+        }
+    }
+
+    [Fact]
     public void Le_survol_et_la_completion_marchent_dans_une_interpolation_et_se_taisent_dans_le_html()
     {
         var (directory, uri) = Project();
