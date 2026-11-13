@@ -183,5 +183,10 @@ public class DiagnosticCoverageTests(ITestOutputHelper output)
         Add("W064", new AsyncTests().Appeler_un_gear_sync_depuis_une_coroutine_avertit);
         Add("W065", new SafeModeTests().Un_handler_qui_ne_lit_pas_l_erreur_et_finit_en_succes_avertit);
         Add("W066", new SafeModeTests().Un_fail_seul_envoie_l_erreur_recue_et_un_fail_avec_texte_la_perd);
+        Add("E155", new PackageTests().Un_paquet_ou_une_version_inconnus_sont_E155);
+        Add("E156", new PackageTests().Un_contenu_qui_ne_correspond_pas_au_lock_est_E156_et_le_lock_reste);
+        Add("E157", new PackageTests().Un_paquet_mal_forme_est_E157);
+        Add("E158", new PackageTests().Deux_versions_d_un_meme_paquet_sont_un_conflit_E158_qui_dit_qui_demande_quoi);
+        Add("E159", new PackageTests().Des_paquets_qui_se_demandent_les_uns_les_autres_sont_un_cycle_E159);
     }
 }

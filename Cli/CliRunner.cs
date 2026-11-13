@@ -6,6 +6,7 @@ using Rgl.Build.Toolchain;
 using Rgl.Diagnostics;
 using Rgl.Lsp;
 using Rgl.Project;
+using Rgl.Project.Packages;
 
 namespace Rgl.Cli;
 
@@ -18,9 +19,10 @@ namespace Rgl.Cli;
 /// <param name="Toolchain">Chaîne de compilation C++ ; <see langword="null"/> si elle est introuvable.</param>
 /// <param name="Input">Entrée standard brute, lue par le serveur de langage ; <see langword="null"/> sans entrée.</param>
 /// <param name="Output">Sortie standard brute, où écrit le serveur de langage ; <see langword="null"/> sans sortie.</param>
+/// <param name="Packages">D'où viennent les archives des paquets ; <see langword="null"/> pour Internet (GitHub, GitLab, Codeberg). Les tests y mettent une source figée.</param>
 /// <param name="DiskSize">La taille du disque du cache, en octets, qui remplace celle que le système donne ; sert aux tests de l'avertissement du cache.</param>
 internal sealed record CliContext(TextWriter Out, TextWriter Error, string WorkingDirectory, string CacheRoot, bool Color = false, ICompilerToolchain? Toolchain = null,
-    Stream? Input = null, Stream? Output = null, long? DiskSize = null);
+    Stream? Input = null, Stream? Output = null, long? DiskSize = null, IPackageSource? Packages = null);
 
 /// <summary>Exécute une commande <c>rgl</c> et renvoie le code de sortie du processus.</summary>
 internal static class CliRunner
@@ -61,6 +63,7 @@ internal static class CliRunner
                                     (avec les optimisations du profil : voir --release)
           --explain-optimizations   S'arrête après la transpilation et dit quelles optimisations ont été faites, ou refusées et pourquoi
           --count-allocations       Le programme écrit, en s'arrêtant, ses allocations et ses copies profondes (dossier out/<profil>-compteurs)
+          --locked                  rgl.lock doit déjà être à jour avec les dépendances : il n'est jamais modifié (pour la CI)
           --explain-vectorization   Compile en release et dit quelles boucles Clang vectorise, et pourquoi pas les autres
           --debug                   Build de debug (le profil par défaut)
           --release=size            Build de release le plus petit possible (-Oz), au prix de la vitesse
@@ -171,7 +174,7 @@ internal static class CliRunner
         var profile = _ResolveProfile(commandLine, project?.Manifest, build);
         if (commandLine.CountAllocations) profile = profile.WithCounters();
         var output = commandLine.ExplainOptimizations ? BuildOutput.Optimizations : commandLine.ExplainVectorization ? BuildOutput.Vectorization : commandLine.EmitAsm ? BuildOutput.Assembly : commandLine.EmitCpp ? BuildOutput.Cpp : BuildOutput.Executable;
-        var result = project is null ? null : BuildPipeline.Run(project, context.CacheRoot, output, profile, context.Toolchain, build);
+        var result = project is null ? null : BuildPipeline.Run(project, context.CacheRoot, output, profile, context.Toolchain, build, context.Packages, commandLine.Locked);
 
         // Un build écrit dans le cache : s'il prend 2 % du disque ou plus, l'utilisateur en est prévenu (W067).
         CacheCommand.Warn(context.CacheRoot, context.DiskSize, build);

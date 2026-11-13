@@ -8,6 +8,7 @@ using Rgl.Native;
 using Rgl.Parsing;
 using Rgl.Paper;
 using Rgl.Project;
+using Rgl.Project.Packages;
 using Rgl.Syntax;
 using Rgl.Text;
 
@@ -48,10 +49,16 @@ internal static class BuildPipeline
     /// <param name="profile">Debug (informations pour déboguer) ou release (vitesse, puis taille).</param>
     /// <param name="toolchain">Chaîne de compilation C++ ; <see langword="null"/> si elle est introuvable.</param>
     /// <param name="diagnostics">Reçoit les diagnostics du build.</param>
-    public static BuildResult? Run(RglProject project, string cacheRoot, BuildOutput output, BuildProfile profile, ICompilerToolchain? toolchain, DiagnosticBag diagnostics)
+    /// <param name="packages">D'où viennent les archives des paquets ; Internet sans valeur.</param>
+    /// <param name="lockedPackages">Vrai (<c>--locked</c>) : <c>rgl.lock</c> n'est pas modifié, et doit être à jour.</param>
+    public static BuildResult? Run(RglProject project, string cacheRoot, BuildOutput output, BuildProfile profile, ICompilerToolchain? toolchain, DiagnosticBag diagnostics, IPackageSource? packages = null, bool lockedPackages = false)
     {
         var assets = ProjectAssets.Resolve(project, diagnostics);
         if (assets is null) return null;
+
+        // Les paquets du projet : récupérés, vérifiés contre rgl.lock (écrit s'il change) avant de lire le moindre fichier.
+        var packageGraph = PackageResolver.ForProject(project, cacheRoot, packages, lockedPackages, diagnostics);
+        if (packageGraph is null) return null;
         var projectDirectory = Cache.ProjectDirectory(cacheRoot, project);
         var cppDirectory = Path.Combine(projectDirectory, "cpp");
         Directory.CreateDirectory(cppDirectory);

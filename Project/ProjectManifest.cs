@@ -2,6 +2,7 @@ using System.Text.Json;
 using Rgl.Build.Toolchain;
 using Rgl.Diagnostics;
 using Rgl.IR;
+using Rgl.Project.Packages;
 
 namespace Rgl.Project;
 
@@ -24,7 +25,9 @@ namespace Rgl.Project;
 /// <param name="NoCpp">Interdit les blocs C++ et les liaisons natives hors std et cpp-trust.</param>
 /// <param name="CppTrust">Chemins relatifs de fichiers forge explicitement autorisés.</param>
 /// <param name="Assets">Fichiers et motifs relatifs copiés à côté de l'exécutable.</param>
-internal sealed record ProjectManifest(string Name, string Version, string? Icon, string LanguageVersion, OverflowMode Overflow = OverflowMode.Checked, uint? RecursionLimit = ProjectManifest.DefaultRecursionLimit, string[]? Exclude = null, bool Safe = false, bool BoundedLoops = false, bool NoTrust = false, bool NoCpp = false, string[]? CppTrust = null, string[]? Assets = null, OverflowMode? ReleaseOverflow = null, IReadOnlyDictionary<string, BuildProfile>? Profiles = null)
+/// <param name="Dependencies">Les paquets dont le projet dépend (clé <c>dependencies</c>) : l'adresse du paquet et sa version exacte, triées par adresse.</param>
+/// <param name="Trust">Ce que le projet autorise à ses paquets (clé <c>package-trust</c>) : garder leurs binaires de bibliothèques, utiliser leur C++.</param>
+internal sealed record ProjectManifest(string Name, string Version, string? Icon, string LanguageVersion, OverflowMode Overflow = OverflowMode.Checked, uint? RecursionLimit = ProjectManifest.DefaultRecursionLimit, string[]? Exclude = null, bool Safe = false, bool BoundedLoops = false, bool NoTrust = false, bool NoCpp = false, string[]? CppTrust = null, string[]? Assets = null, OverflowMode? ReleaseOverflow = null, IReadOnlyDictionary<string, BuildProfile>? Profiles = null, IReadOnlyDictionary<string, string>? Dependencies = null, PackageTrust? Trust = null)
 {
     /// <summary>Dossiers exclus de la recherche des fichiers sans clé <c>exclude</c> : la sortie des builds.</summary>
     public static readonly string[] DefaultExclude = ["out"];
@@ -38,6 +41,15 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
     /// <summary>Fichiers et motifs copiés dans le dossier de sortie, en gardant leur chemin relatif.</summary>
     public string[] Assets { get; init; } = Assets ?? [];
 
+    /// <summary>Ce que le projet autorise à ses paquets (clé <c>package-trust</c>) ; rien sans cette clé.</summary>
+    public PackageTrust Trust { get; init; } = Trust ?? PackageTrust.None;
+
+    /// <summary>Les paquets du projet : adresse → version exacte ; vide sans clé <c>dependencies</c>.</summary>
+    public IReadOnlyDictionary<string, string> Dependencies { get; init; } = Dependencies is { Count: > 0 } ? Dependencies : NoDependencies;
+
+    /// <summary>Le même dictionnaire vide pour tous les manifestes sans dépendance : l'égalité d'un enregistrement compare les références.</summary>
+    private static readonly IReadOnlyDictionary<string, string> NoDependencies = new Dictionary<string, string>();
+
     public const string FileName = "rgl.json";
 
     /// <summary>Profondeur maximale des gears récursifs sans clé <c>recursion</c>.</summary>
@@ -47,7 +59,7 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
     public const string SupportedLanguageVersion = "0";
 
     /// <summary>Clés reconnues ; les autres déclenchent un avertissement.</summary>
-    private static readonly string[] KnownKeys = ["name", "version", "icon", "rgl", "overflow", "recursion", "exclude", "assets", "safe", "loop", "no-trust", "no-cpp", "cpp-trust", "profiles"];
+    private static readonly string[] KnownKeys = ["name", "version", "icon", "rgl", "overflow", "recursion", "exclude", "assets", "safe", "loop", "no-trust", "no-cpp", "cpp-trust", "profiles", "dependencies", "package-trust"];
 
     /// <summary>Lit et valide un manifeste ; renvoie <c>null</c> si une erreur a été signalée.</summary>
     /// <param name="path">Chemin de <c>rgl.json</c>.</param>
@@ -141,14 +153,16 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
             var (cppTrustOk, cppTrust) = ReadCppTrust(root, path, diagnostics);
             var (assetsOk, assets) = ReadAssets(root, path, diagnostics);
             var (profilesOk, profiles) = ReadProfiles(root, path, diagnostics);
+            var (dependenciesOk, dependencies) = PackageManifest.ReadDependencies(root, path, diagnostics);
+            var (trustOk, trust) = PackageTrust.Read(root, path, diagnostics);
 
-            if (!profilesOk || !profileOverflowOk || !noTrustOk || !noCppOk || !cppTrustOk || !assetsOk || name is null || version is null || language is null || overflowMode is null || !recursionOk || !excludeOk || !safeOk || !loopOk)
+            if (!trustOk || !dependenciesOk || !profilesOk || !profileOverflowOk || !noTrustOk || !noCppOk || !cppTrustOk || !assetsOk || name is null || version is null || language is null || overflowMode is null || !recursionOk || !excludeOk || !safeOk || !loopOk)
                 return null;
 
             if (icon is not null && !File.Exists(Path.Combine(Path.GetDirectoryName(path)!, icon)))
                 diagnostics.Warning($"icône « {icon} » introuvable", path);
 
-            return new ProjectManifest(name, version, icon, language, overflowMode.Value, recursion, exclude, safe, boundedLoops, noTrust, noCpp, cppTrust, assets, releaseOverflow, profiles);
+            return new ProjectManifest(name, version, icon, language, overflowMode.Value, recursion, exclude, safe, boundedLoops, noTrust, noCpp, cppTrust, assets, releaseOverflow, profiles, dependencies, trust);
         }
     }
 

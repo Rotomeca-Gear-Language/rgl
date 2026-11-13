@@ -12,6 +12,17 @@ internal static class DiagnosticCodes
     /// <summary>Contrat @trusted invalide ou incohérent.</summary>
     public const string InvalidTrust = "E151";
 
+    /// <summary>Paquet ou version introuvable, ou téléchargement impossible.</summary>
+    public const string PackageNotFound = "E155";
+    /// <summary>Le contenu d'un paquet n'est pas celui que <c>rgl.lock</c> a enregistré (hash différent).</summary>
+    public const string PackageHashMismatch = "E156";
+    /// <summary>Dépendance mal écrite, manifeste de paquet invalide, archive refusée, <c>rgl.lock</c> illisible ou périmé.</summary>
+    public const string InvalidPackage = "E157";
+    /// <summary>Deux versions d'un même paquet sont demandées : une seule vit dans le programme.</summary>
+    public const string PackageVersionConflict = "E158";
+    /// <summary>Des paquets qui se demandent les uns les autres.</summary>
+    public const string PackageCycle = "E159";
+
     public const string UnsafePointerLeak = "W068";
     public const string UnsafeRequired = "E147";
     public const string NativePackRequired = "E148";

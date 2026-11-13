@@ -85,6 +85,7 @@ internal enum DocAction
 /// <param name="CountAllocations">Avec <c>--count-allocations</c> : le programme compté écrit sur la sortie d'erreur, en s'arrêtant, le nombre de ses blocs de mémoire et de ses copies profondes (profil <c>&lt;nom&gt;-compteurs</c>).</param>
 /// <param name="ExplainVectorization">Avec <c>compile --explain-vectorization</c> : s'arrête après avoir compilé avec les optimisations de release et dit quelles boucles Clang vectorise, et pourquoi pas les autres.</param>
 /// <param name="Profile">Le profil demandé par <c>--debug</c>, <c>--release</c>, <c>--release=size</c> ou <c>--profile nom</c> ; <see langword="null"/> pour le profil par défaut (<c>debug</c>).</param>
+/// <param name="Locked">Avec <c>compile</c> et <c>exec</c> (<c>--locked</c>) : <c>rgl.lock</c> doit déjà être complet et à jour, il n'est pas modifié.</param>
 /// <param name="Web">Avec <c>rgl init --web</c> : crée un serveur HTTP et une page Paper.</param>
 internal sealed record CommandLine(
     CommandKind Command,
@@ -111,7 +112,8 @@ internal sealed record CommandLine(
     bool CheckOnly = false,
     bool Force = false,
     bool AddToPath = false,
-    bool NoPath = false)
+    bool NoPath = false,
+    bool Locked = false)
 {
     /// <summary>Avec <c>rgl format</c> : les fichiers et dossiers à mettre en forme ; vide pour le dossier courant.</summary>
     public IReadOnlyList<string> Paths { get; init; } = Paths ?? [];
@@ -468,6 +470,7 @@ internal static class CommandLineParser
         var countAllocations = false;
         var explainOptimizations = false;
         var release = false;
+        var locked = false;
         string? profileName = null;
         IReadOnlyList<string> programArgs = [];
         var ok = true;
@@ -510,6 +513,9 @@ internal static class CommandLineParser
                     break;
                 case "--count-allocations":
                     countAllocations = true;
+                    break;
+                case "--locked":
+                    locked = true;
                     break;
                 case "--explain-vectorization":
                     explainVectorization = true;
@@ -565,6 +571,6 @@ internal static class CommandLineParser
             return null;
         }
 
-        return new CommandLine(command, file, directory, emitCpp, programArgs, release, emitAsm, ExplainVectorization: explainVectorization, Profile: profileName, CountAllocations: countAllocations, ExplainOptimizations: explainOptimizations);
+        return new CommandLine(command, file, directory, emitCpp, programArgs, release, emitAsm, ExplainVectorization: explainVectorization, Profile: profileName, CountAllocations: countAllocations, ExplainOptimizations: explainOptimizations, Locked: locked);
     }
 }
