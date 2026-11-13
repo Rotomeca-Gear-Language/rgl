@@ -145,6 +145,64 @@ internal static class ProjectInitializer
         return files.Select(f => f.Path).ToArray();
     }
 
+    /// <summary>Contenu de l'<c>index.forge</c> d'un nouveau paquet : il dit ce que le paquet rend visible.</summary>
+    private const string PackageIndexSource =
+        """
+        forge: index
+        description: "Ce que ce paquet rend visible"
+
+        // Importe les fichiers du paquet puis exporte les noms que les autres projets verront :
+        // import Outils;
+        // export {...Outils};
+
+        """;
+
+    /// <summary>
+    /// <c>rgl init --package</c> : crée le <c>rgl.json</c> d'un paquet (nom, version, description, licence) et son <c>index.forge</c>. N'écrase rien : si l'un
+    /// d'eux existe déjà, rien n'est créé. Le nom est celui du dossier, réduit à un identifiant (un dépôt <c>rgl-json</c> donne <c>rgl_json</c>).
+    /// </summary>
+    /// <returns>Les chemins créés, relatifs au dossier ; <see langword="null"/> en cas d'erreur.</returns>
+    public static IReadOnlyList<string>? InitPackage(string directory, DiagnosticBag diagnostics)
+    {
+        var name = new string([.. DefaultName(directory).Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_')]);
+        if (name.Length == 0 || char.IsAsciiDigit(name[0])) name = "paquet" + name;
+        var files = new (string Path, byte[] Content)[]
+        {
+            (ProjectManifest.FileName, PackageManifestContent(name)),
+            (Packages.PackageManifest.IndexFile, Utf8(PackageIndexSource)),
+        };
+
+        var existing = files.Select(f => f.Path).Where(p => File.Exists(Path.Combine(directory, p))).ToArray();
+        if (existing.Length > 0)
+        {
+            diagnostics.Error($"ce dossier contient déjà {string.Join(", ", existing)} : rien n'a été créé", directory);
+            return null;
+        }
+
+        foreach (var (path, content) in files)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(directory, path))!);
+            File.WriteAllBytes(Path.Combine(directory, path), content);
+        }
+        return files.Select(f => f.Path).ToArray();
+    }
+
+    private static byte[] PackageManifestContent(string name)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, IndentSize = 4, NewLine = "\n", Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("name", name);
+            writer.WriteString("version", "0.1.0");
+            writer.WriteString("description", "À décrire");
+            writer.WriteString("license", "MIT");
+            writer.WriteEndObject();
+        }
+        stream.WriteByte((byte)'\n');
+        return stream.ToArray();
+    }
+
     /// <summary>Nom par défaut du projet : celui de son dossier.</summary>
     private static string DefaultName(string directory) =>
         Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)));

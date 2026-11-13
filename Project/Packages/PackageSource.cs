@@ -6,6 +6,9 @@ namespace Rgl.Project.Packages;
 /// </summary>
 internal sealed record PackageFetch(Stream? Archive, string? Error, bool NotFound = false);
 
+/// <summary>Les versions publiées d'un paquet, de la plus récente à la plus ancienne, ou la raison de l'échec.</summary>
+internal sealed record PackageVersions(IReadOnlyList<string>? Versions, string? Error, bool NotFound = false);
+
 /// <summary>
 /// Le seul moyen qu'a le compilateur d'obtenir un paquet, injecté par <see cref="Cli.CliContext"/> pour que les tests n'aient pas besoin du réseau.
 /// </summary>
@@ -15,6 +18,9 @@ internal interface IPackageSource
     /// <param name="id">Le paquet.</param>
     /// <param name="version">Sa version exacte.</param>
     PackageFetch Fetch(PackageId id, string version);
+
+    /// <summary>Les versions du dépôt : ses tags <c>vX.Y.Z</c>, du plus récent au plus ancien (les autres tags sont ignorés).</summary>
+    PackageVersions Versions(PackageId id);
 }
 
 /// <summary>
@@ -47,6 +53,42 @@ internal sealed class HttpPackageSource : IPackageSource
             "codeberg.org" => $"https://codeberg.org/{id.Owner}/{id.Repository}/archive/{tag}.tar.gz",
             _ => throw new ArgumentException($"hôte non pris en charge : {id.Host}", nameof(id)),
         };
+    }
+
+    /// <summary>L'adresse de l'API qui liste les tags d'un dépôt sur sa forge (les cent premiers).</summary>
+    public static string TagsUrl(PackageId id) => id.Host switch
+    {
+        "github.com" => $"https://api.github.com/repos/{id.Owner}/{id.Repository}/tags?per_page=100",
+        "gitlab.com" => $"https://gitlab.com/api/v4/projects/{id.Owner}%2F{id.Repository}/repository/tags?per_page=100",
+        "codeberg.org" => $"https://codeberg.org/api/v1/repos/{id.Owner}/{id.Repository}/tags?limit=50",
+        _ => throw new ArgumentException($"hôte non pris en charge : {id.Host}", nameof(id)),
+    };
+
+    /// <inheritdoc/>
+    public PackageVersions Versions(PackageId id)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, TagsUrl(id));
+            using var response = _client.Send(request);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return new PackageVersions(null, $"« {id.Source} » n'existe pas sur {id.Host}", NotFound: true);
+            if (!response.IsSuccessStatusCode)
+                return new PackageVersions(null, $"{id.Host} a répondu {(int)response.StatusCode} ({response.ReasonPhrase})");
+
+            using var document = System.Text.Json.JsonDocument.Parse(response.Content.ReadAsStream());
+            if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return new PackageVersions(null, $"{id.Host} n'a pas rendu une liste de tags");
+            var versions = document.RootElement.EnumerateArray()
+                .Select(tag => tag.ValueKind == System.Text.Json.JsonValueKind.Object && tag.TryGetProperty("name", out var name) && name.ValueKind == System.Text.Json.JsonValueKind.String ? PackageVersion.FromTag(name.GetString()!) : null)
+                .OfType<string>().Distinct().ToList();
+            versions.Sort((a, b) => PackageVersion.Compare(b, a));
+            return new PackageVersions(versions, null);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException or System.Text.Json.JsonException)
+        {
+            return new PackageVersions(null, $"liste des versions impossible à lire : {e.Message}");
+        }
     }
 
     /// <inheritdoc/>

@@ -41,8 +41,36 @@ internal enum CommandKind
     /// <summary><c>rgl precast export [fichier|-d dossier] [-o fichier]</c> : écrit les precasts en JSON pour les outils.</summary>
     Precast,
 
+    /// <summary><c>rgl add</c>, <c>remove</c>, <c>restore</c>, <c>tree</c>, <c>outdated</c>, <c>update</c> et <c>publish</c> : les paquets du projet.</summary>
+    Package,
+
     /// <summary><c>rgl setup</c> : installe Zig (et OpenSSL) à côté de l'exécutable et propose de l'ajouter au PATH.</summary>
     Setup,
+}
+
+/// <summary>Ce que demande une commande de paquets.</summary>
+internal enum PackageAction
+{
+    /// <summary><c>rgl add adresse[@version]</c> : ajoute une dépendance, la récupère et écrit <c>rgl.lock</c>.</summary>
+    Add,
+
+    /// <summary><c>rgl remove adresse</c> : retire une dépendance.</summary>
+    Remove,
+
+    /// <summary><c>rgl restore</c> : récupère les paquets selon <c>rgl.lock</c>.</summary>
+    Restore,
+
+    /// <summary><c>rgl tree</c> : le graphe des dépendances.</summary>
+    Tree,
+
+    /// <summary><c>rgl outdated</c> : les paquets dont une version plus récente existe.</summary>
+    Outdated,
+
+    /// <summary><c>rgl update [adresse]</c> : monte les dépendances à leur dernière version.</summary>
+    Update,
+
+    /// <summary><c>rgl publish</c> : vérifie le paquet puis crée et pousse le tag de sa version.</summary>
+    Publish,
 }
 
 /// <summary>Ce que demande <c>rgl cache</c>.</summary>
@@ -87,6 +115,10 @@ internal enum DocAction
 /// <param name="Profile">Le profil demandé par <c>--debug</c>, <c>--release</c>, <c>--release=size</c> ou <c>--profile nom</c> ; <see langword="null"/> pour le profil par défaut (<c>debug</c>).</param>
 /// <param name="Locked">Avec <c>compile</c> et <c>exec</c> (<c>--locked</c>) : <c>rgl.lock</c> doit déjà être complet et à jour, il n'est pas modifié.</param>
 /// <param name="Web">Avec <c>rgl init --web</c> : crée un serveur HTTP et une page Paper.</param>
+/// <param name="PackageCommand">L'action d'une commande de paquets.</param>
+/// <param name="PackageArguments">Les arguments d'une commande de paquets : une adresse, éventuellement suivie de <c>@version</c>.</param>
+/// <param name="DryRun">Avec <c>rgl publish --dry-run</c> : fait toutes les vérifications, ne crée ni ne pousse rien.</param>
+/// <param name="AsPackage">Avec <c>rgl init --package</c> : crée un paquet (un <c>rgl.json</c> de paquet et un <c>index.forge</c>) au lieu d'un programme.</param>
 internal sealed record CommandLine(
     CommandKind Command,
     string? File = null,
@@ -113,8 +145,15 @@ internal sealed record CommandLine(
     bool Force = false,
     bool AddToPath = false,
     bool NoPath = false,
-    bool Locked = false)
+    bool Locked = false,
+    PackageAction PackageCommand = PackageAction.Restore,
+    IReadOnlyList<string>? PackageArguments = null,
+    bool DryRun = false,
+    bool AsPackage = false)
 {
+    /// <summary>Les arguments d'une commande de paquets ; vide s'il n'y en a pas.</summary>
+    public IReadOnlyList<string> PackageArguments { get; init; } = PackageArguments ?? [];
+
     /// <summary>Avec <c>rgl format</c> : les fichiers et dossiers à mettre en forme ; vide pour le dossier courant.</summary>
     public IReadOnlyList<string> Paths { get; init; } = Paths ?? [];
 
@@ -162,12 +201,77 @@ internal static class CommandLineParser
                 return ParsePrecast(args, diagnostics);
             case "setup":
                 return ParseSetup(args, diagnostics);
+            case "add":
+                return ParsePackage(PackageAction.Add, args, diagnostics);
+            case "remove":
+                return ParsePackage(PackageAction.Remove, args, diagnostics);
+            case "restore":
+                return ParsePackage(PackageAction.Restore, args, diagnostics);
+            case "tree":
+                return ParsePackage(PackageAction.Tree, args, diagnostics);
+            case "outdated":
+                return ParsePackage(PackageAction.Outdated, args, diagnostics);
+            case "update":
+                return ParsePackage(PackageAction.Update, args, diagnostics);
+            case "publish":
+                return ParsePackage(PackageAction.Publish, args, diagnostics);
             case "lsp":
                 return ParseNoArguments(CommandKind.LanguageServer, args, diagnostics);
             default:
-                diagnostics.Error($"commande inconnue « {args[0]} » (commandes : init, setup, compile, exec, check, cache, descriptor, doc, format, precast, lsp)");
+                diagnostics.Error($"commande inconnue « {args[0]} » (commandes : init, setup, compile, exec, add, remove, restore, tree, outdated, update, publish, check, cache, descriptor, doc, format, precast, lsp)");
                 return null;
         }
+    }
+
+    /// <summary>
+    /// Analyse <c>rgl add|remove|restore|tree|outdated|update|publish [adresse] [-d dossier] [--dry-run]</c> : <c>add</c> et <c>remove</c> veulent une adresse,
+    /// <c>update</c> en accepte une, les autres aucune ; <c>--dry-run</c> n'existe que pour <c>publish</c>.
+    /// </summary>
+    private static CommandLine? ParsePackage(PackageAction action, IReadOnlyList<string> args, DiagnosticBag diagnostics)
+    {
+        string? directory = null;
+        var dryRun = false;
+        var positional = new List<string>();
+        var name = args[0];
+        for (var i = 1; i < args.Count; i++)
+        {
+            switch (args[i])
+            {
+                case "-d":
+                    if (i + 1 >= args.Count)
+                    {
+                        diagnostics.Error($"« -d » attend un dossier : rgl {name} -d <dossier>");
+                        return null;
+                    }
+                    directory = args[++i];
+                    break;
+                case "--dry-run" when action == PackageAction.Publish:
+                    dryRun = true;
+                    break;
+                default:
+                    if (args[i].StartsWith('-'))
+                    {
+                        diagnostics.Error($"option inconnue « {args[i]} » pour « rgl {name} »" + (action == PackageAction.Publish ? " (options : -d, --dry-run)" : " (option : -d)"));
+                        return null;
+                    }
+                    positional.Add(args[i]);
+                    break;
+            }
+        }
+
+        var (min, max, usage) = action switch
+        {
+            PackageAction.Add => (1, 1, "rgl add <hôte/compte/dépôt>[@version]"),
+            PackageAction.Remove => (1, 1, "rgl remove <hôte/compte/dépôt>"),
+            PackageAction.Update => (0, 1, "rgl update [<hôte/compte/dépôt>]"),
+            _ => (0, 0, $"rgl {name}"),
+        };
+        if (positional.Count < min || positional.Count > max)
+        {
+            diagnostics.Error($"usage : {usage}");
+            return null;
+        }
+        return new CommandLine(CommandKind.Package, Directory: directory, PackageCommand: action, PackageArguments: positional, DryRun: dryRun);
     }
 
     /// <summary>Analyse <c>rgl setup [--force] [--add-to-path | --no-path]</c>.</summary>
@@ -435,7 +539,8 @@ internal static class CommandLineParser
     {
         if (args.Count == 1) return new CommandLine(CommandKind.Init);
         if (args.Count == 2 && args[1] == "--web") return new CommandLine(CommandKind.Init, Web: true);
-        diagnostics.Error($"option inconnue « {args[1]} » pour « rgl init » (option disponible : --web)");
+        if (args.Count == 2 && args[1] == "--package") return new CommandLine(CommandKind.Init, AsPackage: true);
+        diagnostics.Error($"option inconnue « {args[1]} » pour « rgl init » (options disponibles : --web, --package)");
         return null;
     }
 

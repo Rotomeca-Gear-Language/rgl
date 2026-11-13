@@ -20,9 +20,10 @@ namespace Rgl.Cli;
 /// <param name="Input">Entrée standard brute, lue par le serveur de langage ; <see langword="null"/> sans entrée.</param>
 /// <param name="Output">Sortie standard brute, où écrit le serveur de langage ; <see langword="null"/> sans sortie.</param>
 /// <param name="Packages">D'où viennent les archives des paquets ; <see langword="null"/> pour Internet (GitHub, GitLab, Codeberg). Les tests y mettent une source figée.</param>
+/// <param name="Git">Le <c>git</c> de <c>rgl publish</c> ; <see langword="null"/> pour celui du système. Les tests y mettent un faux.</param>
 /// <param name="DiskSize">La taille du disque du cache, en octets, qui remplace celle que le système donne ; sert aux tests de l'avertissement du cache.</param>
 internal sealed record CliContext(TextWriter Out, TextWriter Error, string WorkingDirectory, string CacheRoot, bool Color = false, ICompilerToolchain? Toolchain = null,
-    Stream? Input = null, Stream? Output = null, long? DiskSize = null, IPackageSource? Packages = null);
+    Stream? Input = null, Stream? Output = null, long? DiskSize = null, IPackageSource? Packages = null, IGitRunner? Git = null);
 
 /// <summary>Exécute une commande <c>rgl</c> et renvoie le code de sortie du processus.</summary>
 internal static class CliRunner
@@ -42,10 +43,17 @@ internal static class CliRunner
         Usage : rgl <commande> [options]
 
         Commandes :
-          init [--web]              Crée un projet ; --web ajoute un serveur HTTP et une page Paper
+          init [--web|--package]    Crée un projet ; --web ajoute un serveur HTTP et une page Paper, --package crée un paquet
           setup                     Installe Zig (et OpenSSL) à côté de rgl, puis propose d'ajouter rgl au PATH
           compile <fichier.rgl>     Compile le fichier .rgl indiqué
           exec<fichier.rgl>        Compile puis lance le fichier .rgl indiqué
+          add <adresse>[@version]   Ajoute un paquet aux dépendances (la dernière version sans @), le récupère et écrit rgl.lock
+          remove <adresse>          Retire un paquet des dépendances
+          restore                   Récupère les paquets selon rgl.lock
+          tree                      Le graphe des dépendances
+          outdated                  Les paquets dont une version plus récente existe
+          update [adresse]          Monte les dépendances à leur dernière version
+          publish [--dry-run]       Vérifie le paquet, puis crée et pousse le tag de sa version
           check [fichier.rgl]       Bilan de l'intégration C++ du projet : ce que les liaisons des
                                     bibliothèques C n'ont pas converti, et que le code utilise (E019)
           descriptor <en-tête> --class <Classe>
@@ -123,6 +131,7 @@ internal static class CliRunner
             CommandKind.Format => FormatCommand.Run(commandLine, context, diagnostics),
             CommandKind.Precast => PrecastCommand.Run(commandLine, context, diagnostics),
             CommandKind.Setup => SetupCommand.Run(commandLine, context, diagnostics),
+            CommandKind.Package => PackageCommands.Run(commandLine, context, diagnostics),
             CommandKind.LanguageServer => LanguageServer.Run(context.Input ?? Stream.Null, context.Output ?? Stream.Null),
             CommandKind.Compile or CommandKind.Exec => Build(commandLine, context, diagnostics),
             _ => throw new UnreachableException(),
@@ -151,11 +160,13 @@ internal static class CliRunner
     /// <summary><c>rgl init</c> : crée le projet dans le dossier courant et liste les fichiers créés.</summary>
     private static int Init(CommandLine commandLine, CliContext context, DiagnosticBag diagnostics)
     {
-        var created = ProjectInitializer.Init(context.WorkingDirectory, diagnostics, commandLine.Web);
+        var created = commandLine.AsPackage
+            ? ProjectInitializer.InitPackage(context.WorkingDirectory, diagnostics)
+            : ProjectInitializer.Init(context.WorkingDirectory, diagnostics, commandLine.Web);
         if (created is null)
             return Failure;
 
-        context.Out.WriteLine("Projet créé :");
+        context.Out.WriteLine(commandLine.AsPackage ? "Paquet créé :" : "Projet créé :");
         foreach (var path in created)
             context.Out.WriteLine($"  {path}");
         return Success;

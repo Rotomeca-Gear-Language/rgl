@@ -78,6 +78,19 @@ internal static partial class PackageVersion
     /// <summary>Le tag Git d'une version : <c>v1.2.0</c>.</summary>
     public static string Tag(string version) => "v" + version;
 
+    /// <summary>La version d'un tag (<c>v1.2.0</c> donne <c>1.2.0</c>) ; <see langword="null"/> si ce n'est pas le tag d'une version.</summary>
+    public static string? FromTag(string tag) => tag.Length > 1 && tag[0] == 'v' && IsValid(tag[1..]) ? tag[1..] : null;
+
+    /// <summary>Compare deux versions valides, nombre par nombre (<c>1.10.0</c> est après <c>1.9.0</c>).</summary>
+    public static int Compare(string left, string right)
+    {
+        var a = left.Split('.').Select(uint.Parse).ToArray();
+        var b = right.Split('.').Select(uint.Parse).ToArray();
+        for (var i = 0; i < 3; i++)
+            if (a[i] != b[i]) return a[i].CompareTo(b[i]);
+        return 0;
+    }
+
     [GeneratedRegex(@"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")]
     private static partial Regex Pattern();
 }

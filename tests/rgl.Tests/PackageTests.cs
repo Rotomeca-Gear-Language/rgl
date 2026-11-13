@@ -38,6 +38,15 @@ internal sealed class FakePackageSource : IPackageSource
     /// <summary>Retire une version : elle devient introuvable.</summary>
     public void Remove(string source, string version) => _archives.Remove($"{source}@{version}");
 
+    public PackageVersions Versions(PackageId id)
+    {
+        if (Offline) throw new InvalidOperationException("réseau interdit");
+        var prefix = id.Source + "@";
+        var versions = _archives.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).Select(k => k[prefix.Length..]).ToList();
+        versions.Sort((a, b) => PackageVersion.Compare(b, a));
+        return versions.Count == 0 ? new PackageVersions(null, "dépôt inconnu", NotFound: true) : new PackageVersions(versions, null);
+    }
+
     public PackageFetch Fetch(PackageId id, string version)
     {
         Requests.Add($"{id.Source}@{version}");
