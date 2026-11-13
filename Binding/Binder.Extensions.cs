@@ -29,10 +29,16 @@ namespace Rgl.Binding;
 internal sealed partial class Binder
 {
     /// <summary>Ce que les extensions d'un fichier ajoutent à un type.</summary>
-    private sealed class Extension(IrType target, string? space)
+    private sealed class Extension(IrType target, string? space, string? package = null)
     {
         /// <summary>Le namespace du fichier qui l'écrit ; <see langword="null"/> s'il n'en a pas.</summary>
         public string? Namespace { get; } = space;
+
+        /// <summary>L'adresse du paquet qui l'écrit ; <see langword="null"/> pour le projet et la std.</summary>
+        public string? Package { get; } = package;
+
+        /// <summary>Comment l'appel la désigne : <c>Mon/Ns</c>, ou <c>Mon/Ns@"github.com/alice/json"</c> pour celle d'un paquet.</summary>
+        public string? Label => Namespace is null || Package is null ? Namespace : $"{Namespace}@\"{Package}\"";
 
         /// <summary>Le type étendu.</summary>
         public IrType Target { get; } = target;
@@ -98,10 +104,10 @@ internal sealed partial class Binder
             if (_BindType(declaration.Target) is not { } target) continue;
             var shared = _DeclaredIn(target, declaration.Span);
             var list = shared ? _typeExtensions : _ns.Module.IsExtensionFile ? _globalExtensions : _ns.Module.Extensions;
-            var extension = list.FirstOrDefault(e => e.Target == target && e.Namespace == _ns.Module.NamespaceName);
+            var extension = list.FirstOrDefault(e => e.Target == target && e.Namespace == _ns.Module.NamespaceName && e.Package == _ns.Module.PackageSource);
             if (extension is null)
             {
-                extension = new Extension(target, _ns.Module.NamespaceName);
+                extension = new Extension(target, _ns.Module.NamespaceName, _ns.Module.PackageSource);
                 list.Add(extension);
             }
 
@@ -189,7 +195,7 @@ internal sealed partial class Binder
     #region Extensions génériques
 
     /// <summary>Un gear d'une extension générique : un gear générique dont les paramètres sont ceux de l'extension, et le type étendu.</summary>
-    private sealed record GenericExtensionGear(GenericGear Generic, ITypeNode Target, bool IsMethod, string? Namespace);
+    private sealed record GenericExtensionGear(GenericGear Generic, ITypeNode Target, bool IsMethod, string? Namespace, string? Package = null);
 
     /// <summary>Le nombre de gears d'extensions génériques : il numérote leur clé, donc leur nom C++.</summary>
     private uint _genericExtensionCount;
@@ -246,7 +252,7 @@ internal sealed partial class Binder
             if (!_CheckTypeParameters(parameters, false, gear.Parameters.Select(p => p.Name.Name))) continue;
 
             var key = $"ext{_genericExtensionCount++}_{name}";
-            (_ns.Module.IsExtensionFile ? _globalGenericExtensions : _ns.Module.GenericExtensions).Add(new GenericExtensionGear(new GenericGear(gear with { TypeParameters = parameters }, _ns, key), declaration.Target, true, _ns.Module.NamespaceName));
+            (_ns.Module.IsExtensionFile ? _globalGenericExtensions : _ns.Module.GenericExtensions).Add(new GenericExtensionGear(new GenericGear(gear with { TypeParameters = parameters }, _ns, key), declaration.Target, true, _ns.Module.NamespaceName, _ns.Module.PackageSource));
         }
     }
 
@@ -321,15 +327,29 @@ internal sealed partial class Binder
         ambiguous = false;
         if (_NamedTypeOf(access.Target) is not { } type) return null;
         var found = _ExtensionsOf(type)
-            .Where(e => (access.Namespace is null || e.Namespace == access.Namespace) && e.Constants.ContainsKey(access.Member.Name))
+            .Where(e => _MatchesNamespace(access.Namespace, e.Namespace, e.Package) && e.Constants.ContainsKey(access.Member.Name))
             .ToArray();
         if (found.Length > 1)
         {
             ambiguous = true;
-            _ReportAmbiguousExtension(access.Member.Span, access.Member.Name, type.ToString(), found.Select(e => e.Namespace), $"{access.Target.Span.Text}.<{_ExampleNamespace(found.Select(e => e.Namespace))}>{access.Member.Name}");
+            _ReportAmbiguousExtension(access.Member.Span, access.Member.Name, type.ToString(), found.Select(e => e.Label), $"{access.Target.Span.Text}.<{_ExampleNamespace(found.Select(e => e.Label))}>{access.Member.Name}");
             return null;
         }
         return found.Length == 1 && found[0].Constants[access.Member.Name].Symbol is { } variable ? new IrVariableReference(access.Span, variable) : null;
+    }
+
+    /// <summary>
+    /// Vrai si <paramref name="written"/> — ce qui est écrit entre <c>&lt;</c> et <c>&gt;</c> — désigne l'extension de namespace <paramref name="space"/> écrite par
+    /// <paramref name="package"/> : <c>Mon/Ns</c> désigne tout namespace de ce nom, <c>Mon/Ns@"github.com/alice/json"</c> celui du paquet seulement (adresse en minuscules,
+    /// comme partout).
+    /// </summary>
+    private static bool _MatchesNamespace(string? written, string? space, string? package)
+    {
+        if (written is null) return true;
+        var at = written.IndexOf('@');
+        if (at < 0) return space == written;
+        var address = written[(at + 1)..].Trim('"', '\'');
+        return space == written[..at] && package is not null && string.Equals(package, address, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string _ExampleNamespace(IEnumerable<string?> namespaces) => namespaces.FirstOrDefault(n => n is not null) ?? "Mon/Namespace";
@@ -352,8 +372,8 @@ internal sealed partial class Binder
     {
         handled = false;
         var space = member.Namespace;
-        var extensions = _VisibleExtensions().Where(e => space is null || e.Namespace == space).ToArray();
-        var generics = _VisibleGenericExtensions().Where(g => space is null || g.Namespace == space).ToArray();
+        var extensions = _VisibleExtensions().Where(e => _MatchesNamespace(space, e.Namespace, e.Package)).ToArray();
+        var generics = _VisibleGenericExtensions().Where(g => _MatchesNamespace(space, g.Namespace, g.Package)).ToArray();
         if (_QualifiedName(member) is not null) return null;
         if (space is not null)
         {
@@ -375,7 +395,7 @@ internal sealed partial class Binder
             if (own.Length > 1)
             {
                 handled = true;
-                _ReportAmbiguousExtension(member.Member.Span, name, named.ToString(), own.Select(e => e.Namespace), $"{member.Target.Span.Text}.<{_ExampleNamespace(own.Select(e => e.Namespace))}>{name}(…)");
+                _ReportAmbiguousExtension(member.Member.Span, name, named.ToString(), own.Select(e => e.Label), $"{member.Target.Span.Text}.<{_ExampleNamespace(own.Select(e => e.Label))}>{name}(…)");
                 return null;
             }
             if (own.Length == 1)
@@ -400,7 +420,7 @@ internal sealed partial class Binder
         var methods = hasField ? [] : extensions.Where(e => e.Target == target.Type && e.Gears.TryGetValue(name, out var gears) && gears.Any(g => g.IsMethod)).ToArray();
         if (methods.Length > 1)
         {
-            _ReportAmbiguousExtension(member.Member.Span, name, target.Type.ToString(), methods.Select(e => e.Namespace), $"{member.Target.Span.Text}.<{_ExampleNamespace(methods.Select(e => e.Namespace))}>{name}(…)");
+            _ReportAmbiguousExtension(member.Member.Span, name, target.Type.ToString(), methods.Select(e => e.Label), $"{member.Target.Span.Text}.<{_ExampleNamespace(methods.Select(e => e.Label))}>{name}(…)");
             return null;
         }
         if (methods.Length == 1) return _CallExtensionOverload(call, member, methods[0].Gears[name].Where(g => g.IsMethod).Select(g => g.Gear), target);
@@ -447,18 +467,19 @@ internal sealed partial class Binder
     }
 
     /// <summary>
-    /// Un namespace est unique dans tout le projet, boxes comprises (E123) : deux fichiers qui l'écrivent se confondraient dans l'appel
+    /// Un namespace est unique dans tout le projet, boxes comprises, et dans chaque paquet (E123) : deux fichiers qui l'écrivent se confondraient dans l'appel
     /// qui doit les distinguer.
     /// </summary>
     private void _CheckNamespaces(IReadOnlyList<SourceModule> modules)
     {
-        var seen = new Dictionary<string, SourceModule>(StringComparer.Ordinal);
+        // Un paquet a ses propres namespaces : deux paquets peuvent en avoir un de même nom, que l'appel départage par <Ns@"paquet">.
+        var seen = new Dictionary<(string? Package, string Name), SourceModule>();
         foreach (var module in modules)
         {
             if (module.Unit.Statements.OfType<NamespaceDeclaration>().FirstOrDefault() is not { } space || space.Name.Length == 0) continue;
-            if (seen.TryAdd(space.Name, module)) continue;
+            if (seen.TryAdd((module.Package, space.Name), module)) continue;
 
-            _Error(space.Span, DiagnosticCodes.InvalidNamespace, $"le namespace « {space.Name} » est déjà celui du fichier « {seen[space.Name].Name} »", "déjà pris",
+            _Error(space.Span, DiagnosticCodes.InvalidNamespace, $"le namespace « {space.Name} » est déjà celui du fichier « {seen[(module.Package, space.Name)].Name} »", "déjà pris",
                 "un namespace est unique dans le projet, boxes comprises : choisis-en un autre");
         }
     }

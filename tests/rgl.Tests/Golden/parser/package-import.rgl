@@ -1,0 +1,8 @@
+import package json;
+import package json as J only {parse, lire as read};
+import package "github.com/alice/json" as AliceJson;
+import package "github.com/alice/json" as A only {parse};
+import package;
+import package as P;
+
+train |> done;

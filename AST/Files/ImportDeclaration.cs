@@ -33,6 +33,12 @@ internal enum ImportKind
 
     /// <summary><c>import [..] file "page.html" as page;</c> : le fichier est cherché hors de la box courante.</summary>
     FileOutside,
+
+    /// <summary>
+    /// <c>import package json;</c> (le paquet dont le manifeste s'appelle <c>json</c>, parmi les dépendances du fichier) ou
+    /// <c>import package "github.com/alice/json" as AliceJson;</c> (le paquet d'une adresse, sous le nom écrit) : l'index du paquet, comme celui d'une box.
+    /// </summary>
+    Package,
 }
 
 /// <summary>

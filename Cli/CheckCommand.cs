@@ -3,6 +3,7 @@ using Rgl.Binding;
 using Rgl.Diagnostics;
 using Rgl.Native;
 using Rgl.Project;
+using Rgl.Project.Packages;
 using Rgl.Syntax;
 using Rgl.Text;
 
@@ -32,7 +33,9 @@ internal static class CheckCommand
 
         // Les notices de la lecture des en-têtes (« pas encore pris en charge ») sont dites par le bilan : seules les erreurs et les avertissements passent.
         var loading = new DiagnosticBag();
-        var modules = SourceGraph.Load(entry, project.RootDirectory, loading, project.Manifest?.Exclude, toolchain: context.Toolchain, nativeCache: Path.Combine(context.CacheRoot, "native"), nativePolicy: new NativePolicy(project.Manifest, project.RootDirectory));
+        var graph = PackageResolver.ForProject(project, context.CacheRoot, context.Packages, locked: false, loading);
+        if (graph is null) { foreach (var item in loading.Items) diagnostics.Add(item); return CliRunner.Failure; }
+        var modules = SourceGraph.Load(entry, project.RootDirectory, loading, project.Manifest?.Exclude, toolchain: context.Toolchain, nativeCache: Path.Combine(context.CacheRoot, "native"), nativePolicy: new NativePolicy(project.Manifest, project.RootDirectory, graph), packages: PackageContext.For(project, graph));
         foreach (var item in loading.Items.Where(d => d.Level != DiagnosticLevel.Info)) diagnostics.Add(item);
         if (modules is null) return CliRunner.Failure;
 

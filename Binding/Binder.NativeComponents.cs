@@ -107,7 +107,7 @@ internal sealed partial class Binder
     private IrGear? _BindNativeGear(GearDeclaration gear, GearSymbol symbol)
     {
         if (!_nativePolicy.AllowsCpp(gear.Span.Source.Path))
-            _Error(gear.Span, DiagnosticCodes.NativePolicy, "cette liaison est interdite par no-cpp", "C++ non autorisé");
+            _Error(gear.Span, DiagnosticCodes.NativePolicy, $"cette liaison est interdite par {_nativePolicy.Refusal(gear.Span.Source.Path)}", "C++ non autorisé");
         if (symbol.NativeSource is null && symbol.NativeBody is null)
         {
             _Error(gear.Name.Span, DiagnosticCodes.NativeComponent, $"« {symbol.Name} » est déclaré sans corps, mais {symbol.Name}.rgl.cpp est introuvable", "pas de C++",

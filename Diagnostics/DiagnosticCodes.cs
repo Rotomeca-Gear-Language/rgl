@@ -21,6 +21,10 @@ internal static class DiagnosticCodes
     /// <summary>Deux versions d'un même paquet sont demandées : une seule vit dans le programme.</summary>
     public const string PackageVersionConflict = "E158";
     /// <summary>Des paquets qui se demandent les uns les autres.</summary>
+    /// <summary>E160 : <c>import package</c> d'un nom inconnu, ambigu ou qui n'est pas une dépendance du fichier.</summary>
+    public const string PackageName = "E160";
+    /// <summary>E161 : un paquet lie une bibliothèque précompilée sans que le projet l'autorise (<c>package-trust.binaries</c>).</summary>
+    public const string PackageBinary = "E161";
     public const string PackageCycle = "E159";
 
     public const string UnsafePointerLeak = "W068";

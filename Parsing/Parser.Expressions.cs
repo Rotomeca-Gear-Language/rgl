@@ -398,7 +398,17 @@ internal sealed partial class Parser
             any = true;
         }
         var text = any ? first.Span.Union(_previous!.Span).Text : "";
-        if (!_IsNamespaceName(text))
+        // Mon/Ns@"github.com/alice/json" : le namespace du paquet de cette adresse (deux paquets peuvent en avoir un de même nom).
+        var at = text.IndexOf('@');
+        var written = at < 0 ? text : text[..at];
+        var address = at < 0 ? null : text[(at + 1)..];
+        if (address is not null && !(address.Length > 2 && address[0] == '"' && address[^1] == '"' && !address.Skip(1).SkipLast(1).Any(char.IsWhiteSpace)))
+        {
+            _Error(first.Span, DiagnosticCodes.InvalidNamespace, "l'adresse d'un paquet s'écrit entre guillemets après @", "adresse invalide",
+                "par exemple : valeur.<Mon/Ns@\"github.com/alice/json\">nom()");
+            written = "";
+        }
+        if (!_IsNamespaceName(written))
             _Error(first.Span, DiagnosticCodes.InvalidNamespace, "un namespace s'écrit avec des lettres, des chiffres, _ et -, séparés par /", "namespace invalide",
                 "par exemple : valeur.<Mon/Namespace>nom()");
         _ExpectOrReport(TokenKind.Greater, "pour fermer le namespace");

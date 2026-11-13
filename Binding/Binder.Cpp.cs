@@ -35,7 +35,7 @@ internal sealed partial class Binder
     {
         if (!_nativePolicy.AllowsCpp(cpp.Span.Source.Path))
         {
-            _Error(cpp.Span, DiagnosticCodes.NativePolicy, "cpp {} est interdit par no-cpp dans ce fichier", "C++ non autorisé");
+            _Error(cpp.Span, DiagnosticCodes.NativePolicy, $"cpp {{}} est interdit par {_nativePolicy.Refusal(cpp.Span.Source.Path)} dans ce fichier", "C++ non autorisé");
             return null;
         }
         foreach (var include in Syntax.CppBlockReader.Includes(cpp.Code))

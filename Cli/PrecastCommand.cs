@@ -2,6 +2,7 @@ using Rgl.Binding;
 using Rgl.Diagnostics;
 using Rgl.IR;
 using Rgl.Project;
+using Rgl.Project.Packages;
 using Rgl.Text;
 
 namespace Rgl.Cli;
@@ -20,8 +21,10 @@ internal static class PrecastCommand
         var source = SourceText.FromPath(project.EntryFile, diagnostics);
         if (source is null) return CliRunner.Failure;
         var manifest = project.Manifest;
-        var policy = new NativePolicy(manifest, project.RootDirectory);
-        var modules = SourceGraph.Load(source, project.RootDirectory, diagnostics, manifest?.Exclude, toolchain: context.Toolchain, nativeCache: Path.Combine(context.CacheRoot, "native"), nativePolicy: policy);
+        var graph = PackageResolver.ForProject(project, context.CacheRoot, context.Packages, locked: false, diagnostics);
+        if (graph is null) return CliRunner.Failure;
+        var policy = new NativePolicy(manifest, project.RootDirectory, graph);
+        var modules = SourceGraph.Load(source, project.RootDirectory, diagnostics, manifest?.Exclude, toolchain: context.Toolchain, nativeCache: Path.Combine(context.CacheRoot, "native"), nativePolicy: policy, packages: PackageContext.For(project, graph));
         if (modules is null) return CliRunner.Failure;
         var program = new Binder(diagnostics, manifest?.Overflow ?? OverflowMode.Checked,
             manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, policy).Bind(modules);

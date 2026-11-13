@@ -1,6 +1,7 @@
 using Rgl.Diagnostics;
 using Rgl.Docs;
 using Rgl.Project;
+using Rgl.Project.Packages;
 using Rgl.Text;
 
 namespace Rgl.Cli;
@@ -57,7 +58,9 @@ internal static class DocCommand
         var source = SourceText.FromPath(project.EntryFile, load);
         if (source is null) return CliRunner.Failure;
 
-        var modules = SourceGraph.Load(source, project.RootDirectory, load, project.Manifest?.Exclude);
+        var graph = PackageResolver.ForProject(project, context.CacheRoot, context.Packages, locked: false, load);
+        if (graph is null) return CliRunner.Failure;
+        var modules = SourceGraph.Load(source, project.RootDirectory, load, project.Manifest?.Exclude, nativePolicy: new NativePolicy(project.Manifest, project.RootDirectory, graph), packages: PackageContext.For(project, graph));
         if (modules is null) return CliRunner.Failure;
 
         var all = new List<DocEntry>();

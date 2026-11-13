@@ -67,12 +67,13 @@ internal static class BuildPipeline
         if (source is null) return null;
 
         // Le fichier d'entrée et les fichiers qu'il importe, lus et analysés : le binder ne reçoit que des arbres complets.
-        var modules = SourceGraph.Load(source, project.RootDirectory, diagnostics, project.Manifest?.Exclude, toolchain: toolchain, nativeCache: Path.Combine(cacheRoot, "native"), nativePolicy: new NativePolicy(project.Manifest, project.RootDirectory));
+        var policy = new NativePolicy(project.Manifest, project.RootDirectory, packageGraph);
+        var modules = SourceGraph.Load(source, project.RootDirectory, diagnostics, project.Manifest?.Exclude, toolchain: toolchain, nativeCache: Path.Combine(cacheRoot, "native"), nativePolicy: policy, packages: PackageContext.For(project, packageGraph));
         if (modules is null) return null;
 
         var manifest = project.Manifest;
         var program = new Binder(diagnostics, manifest?.OverflowFor(profile) ?? OverflowMode.Checked,
-            manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, new NativePolicy(manifest, project.RootDirectory)).Bind(modules);
+            manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, policy).Bind(modules);
         if (program is null) return null;
 
         var mainCpp = Path.Combine(cppDirectory, "main.cpp");

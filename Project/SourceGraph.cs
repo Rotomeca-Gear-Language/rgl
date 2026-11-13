@@ -13,6 +13,7 @@ using Rgl.IR.Symbols;
 using Rgl.Native;
 using Rgl.Parsing;
 using Rgl.Paper;
+using Rgl.Project.Packages;
 using Rgl.Syntax;
 using Rgl.Text;
 using System.Text;
@@ -50,9 +51,9 @@ internal static class SourceGraph
     /// <param name="openTexts">Le texte des fichiers ouverts dans un éditeur, par chemin complet : il remplace celui du disque.</param>
     /// <param name="toolchain">La chaîne de compilation, qui lit les en-têtes C des fichiers <c>forge: native</c> ; <see langword="null"/> si elle est introuvable.</param>
     /// <param name="nativeCache">Le dossier du cache des liaisons des en-têtes C ; <see langword="null"/> pour ne pas en utiliser.</param>
-    public static IReadOnlyList<SourceModule>? Load(SourceText entry, string rootDirectory, DiagnosticBag diagnostics, IReadOnlyList<string>? exclude = null, IReadOnlyDictionary<string, string>? openTexts = null, ICompilerToolchain? toolchain = null, string? nativeCache = null, NativePolicy? nativePolicy = null)
+    public static IReadOnlyList<SourceModule>? Load(SourceText entry, string rootDirectory, DiagnosticBag diagnostics, IReadOnlyList<string>? exclude = null, IReadOnlyDictionary<string, string>? openTexts = null, ICompilerToolchain? toolchain = null, string? nativeCache = null, NativePolicy? nativePolicy = null, PackageContext? packages = null)
     {
-        var loader = new Loader(rootDirectory, diagnostics, exclude ?? ProjectManifest.DefaultExclude, openTexts, toolchain, nativeCache, nativePolicy);
+        var loader = new Loader(rootDirectory, diagnostics, exclude ?? ProjectManifest.DefaultExclude, openTexts, toolchain, nativeCache, nativePolicy, packages);
         // Deux fichiers de même nom dans une même portée, importés ou non, empêchent de compiler : un nom désigne un seul fichier.
         if (!loader.CheckNames()) return null;
         if (loader.Parse(entry, isEntry: true, isIndex: false) is not { } unit) return null;
@@ -150,6 +151,15 @@ internal static class SourceGraph
         /// <summary>Les dossiers <c>.tools</c> de la portée, par nom sans extension.</summary>
         public Dictionary<string, List<string>> Tools { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Le paquet dont cette portée est le dossier (ou une box de ce dossier) ; <see langword="null"/> pour le projet et la std.</summary>
+        public ResolvedPackage? Package { get; init; }
+
+        /// <summary>La portée du dossier racine du paquet, pour <c>import [..]</c> depuis une box d'un paquet ; <see langword="null"/> hors d'un paquet.</summary>
+        public FileScope? PackageRoot { get; set; }
+
+        /// <summary>Les boxes d'un paquet, par nom sans extension : un paquet ne voit que les siennes.</summary>
+        public Dictionary<string, List<FileScope>> PackageBoxes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>Le nom unique, dans le programme, du fichier de ce nom dans cette portée.</summary>
         public string IdOf(string name) => Box is null ? name : Box + "." + name;
     }
@@ -190,8 +200,15 @@ internal static class SourceGraph
         private readonly string? _cacheDirectory;
         private readonly NativePolicy _nativePolicy;
 
-        public Loader(string root, DiagnosticBag diagnostics, IReadOnlyList<string> exclude, IReadOnlyDictionary<string, string>? openTexts = null, ICompilerToolchain? toolchain = null, string? cacheDirectory = null, NativePolicy? nativePolicy = null)
+        /// <summary>Les paquets du programme ; <see langword="null"/> si l'appelant n'en a pas résolu.</summary>
+        private readonly PackageContext? _packages;
+
+        /// <summary>La portée de chaque paquet, par adresse.</summary>
+        private readonly Dictionary<string, FileScope> _packageScopes = new(StringComparer.Ordinal);
+
+        public Loader(string root, DiagnosticBag diagnostics, IReadOnlyList<string> exclude, IReadOnlyDictionary<string, string>? openTexts = null, ICompilerToolchain? toolchain = null, string? cacheDirectory = null, NativePolicy? nativePolicy = null, PackageContext? packages = null)
         {
+            _packages = packages;
             _nativePolicy = nativePolicy ?? NativePolicy.Unrestricted;
             _cacheDirectory = cacheDirectory;
             _toolchain = toolchain;
@@ -208,6 +225,19 @@ internal static class SourceGraph
                 _std = new FileScope(std, "std") { IsStd = true };
                 _scopes.Add(_std);
                 _Fill(_std, std, _stdBoxes);
+            }
+
+            // Un paquet est une portée à part, opaque : deux paquets peuvent avoir des fichiers de même nom. Ses extensions valent pour tout le programme (LoadExtensionFiles).
+            if (packages is not null)
+            {
+                foreach (var package in packages.Graph.Packages.Where(p => Directory.Exists(p.Directory)))
+                {
+                    var scope = new FileScope(package.Directory, PackageContext.BoxName(package.Source)) { Package = package };
+                    scope.PackageRoot = scope;
+                    _scopes.Add(scope);
+                    _packageScopes[package.Source] = scope;
+                    _Fill(scope, package.Directory, scope.PackageBoxes);
+                }
             }
         }
 
@@ -270,7 +300,13 @@ internal static class SourceGraph
 
                 if (name.EndsWith(BoxSuffix, StringComparison.OrdinalIgnoreCase))
                 {
-                    var box = new FileScope(child, (scope.IsStd ? "std." : "") + name) { IsStd = scope.IsStd };
+                    var box = new FileScope(child, (scope.IsStd ? "std." : scope.Package is not null ? scope.Box + "." : "") + name)
+                    {
+                        IsStd = scope.IsStd,
+                        Package = scope.Package,
+                        PackageRoot = scope.PackageRoot,
+                        PackageBoxes = scope.PackageBoxes,
+                    };
                     _scopes.Add(box);
                     var boxName = name[..^BoxSuffix.Length];
                     if (!boxesByName.TryGetValue(boxName, out var boxes)) boxesByName[boxName] = boxes = [];
@@ -743,6 +779,13 @@ internal static class SourceGraph
             var platform = OperatingSystem.IsWindows() ? "windows" : "linux";
             if (header.Library?.FirstOrDefault(e => e.Platform.Name == platform) is { } entry)
             {
+                // Une archive compilée n'a pas de source à relire : le projet doit dire qu'il s'en remet à l'auteur du paquet.
+                if (_nativePolicy.PackageOf(Path.Combine(directory, "_")) is { } package && !_nativePolicy.AllowsBinaries(Path.Combine(directory, "_")))
+                {
+                    _diagnostics.Error(entry.Path, DiagnosticCodes.PackageBinary, $"le paquet « {package.Source} » lie une bibliothèque précompilée, que le projet n'autorise pas", "bibliothèque précompilée",
+                        ["écris le paquet dans package-trust.binaries du manifeste du projet pour garder ses binaires"]);
+                    return null;
+                }
                 library = Path.GetFullPath(_Unquote(entry.Path.Text), directory);
                 if (!File.Exists(library))
                 {
@@ -818,7 +861,7 @@ internal static class SourceGraph
             {
                 if (!_nativePolicy.AllowsCpp(path) && (unit.Header?.Kind?.Name is "native" or "descriptor" || unit.Statements.OfType<GearDeclaration>().Any(g => g.IsNative) || unit.Statements.OfType<TrainDeclaration>().Any(t => t.NativeReturnType is not null)))
                 {
-                    _diagnostics.Error(unit.Span, DiagnosticCodes.NativePolicy, "cette liaison native est interdite par no-cpp", "C++ non autorisé", ["autorise explicitement ce fichier .forge dans cpp-trust"]);
+                    _diagnostics.Error(unit.Span, DiagnosticCodes.NativePolicy, $"cette liaison native est interdite par {_nativePolicy.Refusal(path)}", "C++ non autorisé", [_nativePolicy.PackageOf(path) is null ? "autorise explicitement ce fichier .forge dans cpp-trust" : "package-trust.cpp du manifeste du projet autorise le C++ d'un paquet"]);
                     _visiting[id] = false;
                     return null;
                 }
@@ -838,7 +881,7 @@ internal static class SourceGraph
                 var nativeSources = _FindNativeSources(unit, path);
                 if (nativeSources is { Count: > 0 } && !_nativePolicy.AllowsCpp(path))
                 {
-                    _diagnostics.Error(unit.Span, DiagnosticCodes.NativePolicy, "cette implémentation C++ est interdite par no-cpp", "C++ non autorisé", []);
+                    _diagnostics.Error(unit.Span, DiagnosticCodes.NativePolicy, $"cette implémentation C++ est interdite par {_nativePolicy.Refusal(path)}", "C++ non autorisé", []);
                     nativeSources = null;
                 }
                 if (nativeSources is null)
@@ -860,7 +903,7 @@ internal static class SourceGraph
                 }
 
                 var imports = Visit(ref unit, scope, [.. chain, name]);
-                Modules.Add(new SourceModule(id, unit, false, imports, native, nativeSources.Count == 0 ? null : nativeSources, nativeBodies));
+                Modules.Add(new SourceModule(id, unit, false, imports, native, nativeSources.Count == 0 ? null : nativeSources, nativeBodies, scope.Package?.Source));
                 result = id;
             }
             _visiting[id] = false;
@@ -873,9 +916,12 @@ internal static class SourceGraph
             var written = import.Module.Name;
             switch (import.Kind)
             {
+                case ImportKind.Package:
+                    return _ResolvePackage(import, scope);
+
                 case ImportKind.Box:
                     // Les boxes de la std ne se nomment que depuis la std : l'utilisateur écrit use <Nom>.
-                    if (!_boxes.TryGetValue(written, out var boxes) && !(scope.IsStd && _stdBoxes.TryGetValue(written, out boxes)))
+                    if (!(scope.Package is not null ? scope.PackageBoxes : _boxes).TryGetValue(written, out var boxes) && !(scope.IsStd && _stdBoxes.TryGetValue(written, out boxes)))
                         return _NotFound(import, $"box « {written}{BoxSuffix} »", "boxes", _boxes.Keys, "les boxes se cherchent par leur nom dans tout le projet");
                     var index = _Exact(boxes[0].Files, IndexName);
                     if (index is null)
@@ -902,7 +948,7 @@ internal static class SourceGraph
                     return _ResolveStd(import, written);
 
                 default:
-                    var target = import.Kind == ImportKind.Outside && scope.IsStd ? _std! : import.Kind == ImportKind.Outside ? ProjectScope : scope;
+                    var target = import.Kind == ImportKind.Outside && scope.IsStd ? _std! : import.Kind == ImportKind.Outside && scope.PackageRoot is not null ? scope.PackageRoot : import.Kind == ImportKind.Outside ? ProjectScope : scope;
                     var forgeCandidates = target.Files.GetValueOrDefault(written, []);
                     var paperCandidates = target.PaperFiles.GetValueOrDefault(written, []);
                     var candidates = forgeCandidates.Concat(paperCandidates).ToList();
@@ -919,6 +965,54 @@ internal static class SourceGraph
                         ["les noms de fichiers sont sensibles à la casse"]);
                     return null;
             }
+        }
+
+        /// <summary>
+        /// <c>import package json;</c> et <c>import package "github.com/alice/json" as J;</c> : l'index du paquet. Un fichier ne voit que les paquets que son
+        /// manifeste demande ; le nom court est le <c>name</c> de leur manifeste. Un nom inconnu ou porté par plusieurs paquets est E160.
+        /// </summary>
+        private List<(string Path, FileScope Scope)>? _ResolvePackage(ImportDeclaration import, FileScope scope)
+        {
+            var written = import.Module.Name;
+            var fullForm = written.StartsWith('"') || written.StartsWith('\'');
+            if (_packages is null)
+                return _PackageError(import, "les paquets de ce programme n'ont pas été chargés", "paquets non chargés", ["lance « rgl compile » : il récupère les paquets du manifeste"]);
+
+            var dependencies = scope.Package?.Manifest.Dependencies.Keys ?? _packages.ProjectDependencies.Keys;
+            var visible = dependencies.Select(address => _packages.Graph[address]).OfType<ResolvedPackage>().ToList();
+
+            ResolvedPackage? chosen;
+            if (fullForm)
+            {
+                var text = _Unquote(written);
+                if (PackageId.Parse(text, out var problem) is not { } id)
+                    return _PackageError(import, $"adresse de paquet invalide : {problem}", "adresse invalide", ["une adresse s'écrit hôte/compte/dépôt, par exemple github.com/alice/json"]);
+                chosen = visible.FirstOrDefault(p => p.Source == id.Source);
+                if (chosen is null)
+                    return _PackageError(import, $"« {id.Source} » n'est pas une dépendance {(scope.Package is null ? "du projet" : $"du paquet « {scope.Package.Source} »")}", "pas une dépendance",
+                        [scope.Package is null ? "ajoute-la à « dependencies » dans rgl.json" : "un paquet ne voit que ses propres dépendances", visible.Count == 0 ? "il n'y en a aucune ici" : $"dépendances : {string.Join(", ", visible.Select(p => p.Source))}"]);
+            }
+            else
+            {
+                var matches = visible.Where(p => p.Manifest.Name == written).ToList();
+                if (matches.Count == 0)
+                    return _PackageError(import, $"aucun paquet « {written} » parmi les dépendances", "paquet inconnu",
+                        ["le nom court est le champ « name » du manifeste du paquet", visible.Count == 0 ? "il n'y a aucune dépendance ici : ajoute-la à « dependencies » dans rgl.json" : $"paquets : {string.Join(", ", visible.Select(p => p.Manifest.Name).Order(StringComparer.Ordinal))}"]);
+                if (matches.Count > 1)
+                    return _PackageError(import, $"plusieurs paquets s'appellent « {written} » : {string.Join(", ", matches.Select(p => p.Source))}", "ambigu",
+                        [$"écris l'adresse et un nom : import package \"{matches[0].Source}\" as {char.ToUpperInvariant(written[0])}{written[1..]}Alice;"]);
+                chosen = matches[0];
+            }
+
+            if (!_packageScopes.TryGetValue(chosen.Source, out var packageScope) || _Exact(packageScope.Files, IndexName) is not { } index)
+                return _PackageError(import, $"le paquet « {chosen.Source} » n'a pas de {IndexName}{RglProject.ForgeExtension} à sa racine", "pas d'index", ["l'index d'un paquet dit ce qu'il rend visible"]);
+            return [(index, packageScope)];
+        }
+
+        private List<(string, FileScope)>? _PackageError(ImportDeclaration import, string message, string label, string[] help)
+        {
+            _diagnostics.Error(import.Module.Span, DiagnosticCodes.PackageName, message, label, help);
+            return null;
         }
 
         /// <summary>

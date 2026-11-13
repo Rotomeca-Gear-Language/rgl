@@ -97,7 +97,7 @@ Une `IPackageSource` (récupérer l'archive d'une URL et d'une version) injecté
 ## Réalisation prévue (slices)
 
 1. **Récupération et lock** : `Project/Packages/` (`PackageManifest`, `PackageLock`, `PackageSource`, `PackageCache`, `PackageResolver`) ; `ProjectManifest.Dependencies`.
-2. **Liaison** : `import package` (parser, `AST/Files/ImportDeclaration`, `ImportKind.Package`), `SourceGraph` (une portée par paquet, `FileScope`), `SourceModule.Name` = `pkg:<url>.<fichier>` et nom C++ dérivé, `NativePolicy` (clé `package:`), extensions des paquets globales et namespace qualifié `<ns@"paquet">`.
+2. **Liaison** : `import package` (parser, `AST/Files/ImportDeclaration`, `ImportKind.Package`), `SourceGraph` (une portée par paquet, `FileScope`), `SourceModule.Name` = `pkg_<adresse>.<fichier>` (adresse dont tout ce qui n'est pas lettre ou chiffre devient `_`, nom C++ dérivé), `NativePolicy` (`package-trust.cpp`, `package-trust.binaries`), extensions des paquets globales et namespace qualifié `<ns@"paquet">`.
 3. **CLI** : `rgl add <url>@<version>`, `remove`, `restore` (selon le lock), `tree`, `outdated`, `update`, `publish`.
 4. **Éditeur** : le LSP lit les paquets en cache (`ProjectIndex`, complétion, survol, définition, actions rapides « rgl restore »).
 5. **Index de découverte** (dépôt `rgl-index`, GitHub Pages, `rgl search`) — plus tard.

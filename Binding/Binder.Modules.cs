@@ -28,13 +28,14 @@ namespace Rgl.Binding;
 /// </summary>
 /// <param name="Name">Le nom du fichier sans extension, tel qu'un import l'écrit ; ignoré pour le fichier d'entrée.</param>
 /// <param name="Unit">L'arbre du fichier, sans erreur de syntaxe.</param>
+/// <param name="Package">L'adresse du paquet dont le fichier fait partie ; <see langword="null"/> pour le projet et la std.</param>
 /// <param name="IsEntry">Vrai pour le fichier <c>.rgl</c> d'entrée, qui contient le train d'entrée.</param>
 /// <param name="Imports">
 /// Pour chaque import du fichier, les noms uniques des fichiers qu'il désigne (un seul, sauf <c>import tools Dossier;</c>) ; un import
 /// absent désigne le fichier de ce nom.
 /// </param>
 internal sealed record SourceModule(string Name, CompilationUnit Unit, bool IsEntry, IReadOnlyDictionary<ImportDeclaration, string[]>? Imports = null, Native.CLibrary? Native = null,
-    IReadOnlyDictionary<string, string>? NativeSources = null, IReadOnlyDictionary<int, IR.Symbols.NativeBody>? NativeBodies = null);
+    IReadOnlyDictionary<string, string>? NativeSources = null, IReadOnlyDictionary<int, IR.Symbols.NativeBody>? NativeBodies = null, string? Package = null);
 
 /// <summary>
 /// Les fichiers d'un programme. Chaque déclaration a un nom unique dans le programme : le sien dans le fichier
@@ -88,6 +89,9 @@ internal sealed partial class Binder
 
         /// <summary>Vrai pour un fichier <c>forge: extend</c> : ses extensions s'appliquent à tout le programme.</summary>
         public bool IsExtensionFile { get; init; }
+
+        /// <summary>L'adresse du paquet dont le fichier fait partie ; <see langword="null"/> pour le projet et la std.</summary>
+        public string? PackageSource { get; init; }
 
         /// <summary>Le namespace que le fichier déclare (<c>namespace Mon/Ns;</c>) ; <see langword="null"/> sans.</summary>
         public string? NamespaceName { get; set; }
@@ -353,6 +357,7 @@ internal sealed partial class Binder
         var info = new ModuleInfo(module.Name, module.IsEntry)
         {
             NamespaceName = unit.Statements.OfType<NamespaceDeclaration>().FirstOrDefault()?.Name,
+            PackageSource = module.Package,
             IsExtensionFile = unit.Header?.Kind.Name == "extend",
         };
         if (!module.IsEntry) _modules[module.Name] = info;

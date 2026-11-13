@@ -1,11 +1,32 @@
+using Rgl.Project.Packages;
+
 namespace Rgl.Project;
 
-/// <summary>Autorisations de code natif par fichier d’origine, sans autorisation transitive des imports.</summary>
-internal sealed class NativePolicy(ProjectManifest? manifest, string root)
+/// <summary>
+/// Autorisations de code natif par fichier d’origine, sans autorisation transitive des imports. Un fichier d'un paquet n'a le droit au C++
+/// que si le projet racine le dit dans <c>package-trust.cpp</c> ; le projet seul autorise, jamais un paquet ni ses dépendances.
+/// </summary>
+internal sealed class NativePolicy(ProjectManifest? manifest, string root, PackageGraph? packages = null)
 {
     public static NativePolicy Unrestricted { get; } = new(null, "");
-    public bool AllowsCpp(string path) => manifest?.NoCpp != true || Exempt(path);
-    public bool AllowsTrust(string path) => manifest?.NoTrust != true || Exempt(path);
+
+    /// <summary>Le paquet qui contient le fichier <paramref name="path"/> ; <see langword="null"/> s'il est au projet ou dans la std.</summary>
+    public ResolvedPackage? PackageOf(string path)
+    {
+        if (packages is null || packages.Packages.Count == 0 || !Path.IsPathFullyQualified(path)) return null;
+        var full = Path.GetFullPath(path);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return packages.Packages.FirstOrDefault(p => full.StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(p.Directory)) + Path.DirectorySeparatorChar, comparison));
+    }
+
+    public bool AllowsCpp(string path) => PackageOf(path) is { } package ? manifest?.Trust.Cpp.Contains(package.Source) == true : manifest?.NoCpp != true || Exempt(path);
+    public bool AllowsTrust(string path) => PackageOf(path) is { } package ? manifest?.NoTrust != true || manifest?.Trust.Cpp.Contains(package.Source) == true : manifest?.NoTrust != true || Exempt(path);
+
+    /// <summary>Vrai si le fichier peut lier une bibliothèque précompilée : celles d'un paquet ne sont gardées qu'avec <c>package-trust.binaries</c>.</summary>
+    public bool AllowsBinaries(string path) => PackageOf(path) is not { } package || manifest?.Trust.Binaries.Contains(package.Source) == true;
+
+    /// <summary>Ce qui interdit le C++ de ce fichier, pour les messages : <c>no-cpp</c>, ou le paquet et la clé du projet qui l'autoriserait.</summary>
+    public string Refusal(string path) => PackageOf(path) is { } package ? $"le paquet « {package.Source} » (écris-le dans package-trust.cpp du projet pour l'autoriser)" : "no-cpp";
 
     public static bool ValidTrustPath(string path)
     {

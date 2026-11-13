@@ -188,5 +188,7 @@ public class DiagnosticCoverageTests(ITestOutputHelper output)
         Add("E157", new PackageTests().Un_paquet_mal_forme_est_E157);
         Add("E158", new PackageTests().Deux_versions_d_un_meme_paquet_sont_un_conflit_E158_qui_dit_qui_demande_quoi);
         Add("E159", new PackageTests().Des_paquets_qui_se_demandent_les_uns_les_autres_sont_un_cycle_E159);
+        Add("E160", new PackageImportTests().Un_nom_ambigu_inconnu_ou_qui_n_est_pas_une_dependance_est_E160);
+        Add("E161", new PackageImportTests().Une_bibliotheque_precompilee_d_un_paquet_sans_package_trust_binaries_est_E161);
     }
 }

@@ -376,6 +376,13 @@ internal sealed partial class Parser
             // import json settings; : le fichier settings.json, lu à la compilation ; import xml layout; : layout.xml.
             kind = _Consume().Text == "json" ? ImportKind.Json : ImportKind.Xml;
         }
+        else if (_Expect(TokenKind.Identifier, "package") && (_Future().Kind == TokenKind.StringLiteral || _Future().Kind == TokenKind.Identifier && _Future().Text != "only"))
+        {
+            // import package json; ou import package "github.com/alice/json" as AliceJson; : un fichier qui s'appellerait « package » s'écrit sans rien devant.
+            _Consume();
+            if (_Expect(TokenKind.StringLiteral)) return _ParsePackageAddressImport(keyword);
+            kind = ImportKind.Package;
+        }
         else if (_Expect(TokenKind.Identifier, "file"))
             return _ParseFileImport(keyword, ImportKind.File);
         else if (_Expect(TokenKind.Identifier) && _Current.Text is "json" or "xml" && _Future().Kind is TokenKind.Identifier or TokenKind.OpenParen)
@@ -418,6 +425,38 @@ internal sealed partial class Parser
 
         if (!_ExpectOrReport(TokenKind.Semicolon, "à la fin de l'import")) _SkipToSemicolon();
         return new ImportDeclaration(keyword.Span.Union(_previous!.Span), module, only, kind, moduleAlias);
+    }
+
+    /// <summary>
+    /// <c>"github.com/alice/json" as Nom [only { … }];</c>, après <c>import package</c> : l'adresse d'un paquet, qui doit recevoir un nom (<c>as</c>) puisqu'elle n'en est pas un.
+    /// </summary>
+    private ImportDeclaration _ParsePackageAddressImport(Token keyword)
+    {
+        var address = _Consume();
+        Identifier? alias = null;
+        if (_ExpectAndConsume(TokenKind.AsKeyword)) alias = _ParseName("nom du paquet", "par exemple : import package \"github.com/alice/json\" as AliceJson;");
+        else _Error(_MissingAtCurrent(), DiagnosticCodes.ExpectedToken, "« as nom » attendu après l'adresse du paquet", "nom manquant ici",
+            "l'adresse n'est pas un nom : import package \"github.com/alice/json\" as AliceJson;");
+        List<ImportName>? only = null;
+        if (_Expect(TokenKind.Identifier, "only"))
+        {
+            _Consume();
+            only = [];
+            if (_ExpectOrReport(TokenKind.OpenBrace, "après « only »", "les noms choisis s'écrivent entre accolades : import package \"github.com/alice/json\" as J only {parse};"))
+            {
+                while (!_ExpectOneOf(TokenKind.CloseBrace, TokenKind.Semicolon, TokenKind.EndOfFile))
+                {
+                    var name = _ParseName("nom importé", "par exemple : only {parse as lire};");
+                    Identifier? renamed = null;
+                    if (_ExpectAndConsume(TokenKind.AsKeyword)) renamed = _ParseName("nouveau nom", "par exemple : only {parse as lire};");
+                    only.Add(new ImportName(renamed is null ? name.Span : name.Span.Union(renamed.Span), name, renamed));
+                    if (!_ExpectAndConsume(TokenKind.Comma)) break;
+                }
+                _ExpectOrReport(TokenKind.CloseBrace, "pour fermer les noms importés");
+            }
+        }
+        if (!_ExpectOrReport(TokenKind.Semicolon, "à la fin de l'import")) _SkipToSemicolon();
+        return new ImportDeclaration(keyword.Span.Union(_previous!.Span), new Identifier(address.Span), only, ImportKind.Package, alias);
     }
 
     /// <summary><c>file "nom.ext" as constante;</c>, après que <c>import</c> et l'éventuel <c>[..]</c> ont été lus.</summary>

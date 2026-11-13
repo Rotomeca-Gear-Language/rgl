@@ -1,0 +1,13 @@
+CompilationUnit 1:1
+  ImportDeclaration 1:1 module=json only=none kind=Package
+  ImportDeclaration 2:1 module=json only=2 kind=Package alias=J
+    ImportName 2:32 name=parse
+    ImportName 2:39 name=lire alias=read
+  ImportDeclaration 3:1 module="github.com/alice/json" only=none kind=Package alias=AliceJson
+  ImportDeclaration 4:1 module="github.com/alice/json" only=1 kind=Package alias=A
+    ImportName 4:51 name=parse
+  ImportDeclaration 5:1 module=package only=none
+  ImportDeclaration 6:1 module=package only=none alias=P
+  TrainDeclaration 8:1 unguarded=false parameters=none
+    Pipeline 8:7
+      DoneStep 8:10
