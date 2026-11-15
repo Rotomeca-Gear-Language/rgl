@@ -2,7 +2,7 @@
   "name": "rgl",
   "displayName": "RGL",
   "description": "RGL et composants Paper : coloration, diagnostics, autocomplétion, survol, signatures et navigation.",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "publisher": "rotomeca",
   "license": "UNLICENSED",
   "icon": "images/rgl.png",
@@ -150,6 +150,44 @@
         "title": "Nouveau dossier Tools…",
         "category": "RGL",
         "icon": "$(tools)"
+      },
+      {
+        "command": "rgl.addPackage",
+        "title": "Ajouter un paquet…",
+        "category": "RGL",
+        "icon": "$(add)"
+      },
+      {
+        "command": "rgl.removePackage",
+        "title": "Retirer un paquet…",
+        "category": "RGL"
+      },
+      {
+        "command": "rgl.restore",
+        "title": "Récupérer les paquets (rgl restore)",
+        "category": "RGL",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "rgl.packageTree",
+        "title": "Afficher le graphe des paquets",
+        "category": "RGL"
+      },
+      {
+        "command": "rgl.outdatedPackages",
+        "title": "Lister les paquets à mettre à jour",
+        "category": "RGL"
+      },
+      {
+        "command": "rgl.updatePackages",
+        "title": "Mettre à jour les paquets",
+        "category": "RGL"
+      },
+      {
+        "command": "rgl.publishPackage",
+        "title": "Publier ce paquet…",
+        "category": "RGL",
+        "icon": "$(package)"
       }
     ],
     "menus": {
@@ -312,9 +350,16 @@
             "enum": [
               "compile",
               "exec",
-              "check"
+              "check",
+              "add",
+              "remove",
+              "restore",
+              "tree",
+              "outdated",
+              "update",
+              "publish"
             ],
-            "description": "La commande du compilateur : compile, exec ou check."
+            "description": "La commande du compilateur : compile, exec, check, ou une commande de paquets (add, remove, restore, tree, outdated, update, publish)."
           },
           "file": {
             "type": "string",
@@ -327,6 +372,13 @@
           "release": {
             "type": "boolean",
             "description": "Compile avec les optimisations (--release)."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Les arguments d'une commande de paquets : une adresse (github.com/alice/json@1.2.0), --dry-run."
           }
         }
       }
@@ -480,7 +532,7 @@
     ]
   },
   "scripts": {
-    "test": "node test/dataset-model.test.js && node test/webview.test.js && node test/documentation.test.js && node test/native-language.test.js && node test/paper-language.test.js && node test/server-launch.test.js && node test/standard-library.test.js && node test/tasks.test.js && node test/debug.test.js && node test/debug-names.test.js && node test/testing.test.js && node test/paper-regions.test.js && node test/new-file.test.js"
+    "test": "node test/dataset-model.test.js && node test/webview.test.js && node test/documentation.test.js && node test/native-language.test.js && node test/paper-language.test.js && node test/server-launch.test.js && node test/standard-library.test.js && node test/tasks.test.js && node test/debug.test.js && node test/debug-names.test.js && node test/testing.test.js && node test/paper-regions.test.js && node test/new-file.test.js && node test/packages.test.js"
   },
   "dependencies": {
     "vscode-languageclient": "^10.1.2"

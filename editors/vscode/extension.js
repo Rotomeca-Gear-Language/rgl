@@ -16,6 +16,7 @@ const { registerTests } = require("./test-explorer");
 const { registerPaperDecorations } = require("./paper-decorations");
 const { registerMoldSuggestion } = require("./mold-suggestion");
 const { registerNewFile, registerNewFolders } = require("./new-file-command");
+const { registerPackages } = require("./package-commands");
 
 const recoverStandardLibrary = standardLibraryRecovery({
     prompt: () => vscode.window.showWarningMessage(
@@ -215,7 +216,7 @@ async function runCommand(command, release = false) {
 /** @param {vscode.ExtensionContext} context */
 async function activate(context) {
     storage = context.globalStorageUri.fsPath;
-    nativeWatcher = vscode.workspace.createFileSystemWatcher("**/{*.h,*.hpp,*.hxx,*.hh,rgl.json}");
+    nativeWatcher = vscode.workspace.createFileSystemWatcher("**/{*.h,*.hpp,*.hxx,*.hh,rgl.json,rgl.lock}");
     context.subscriptions.push(nativeWatcher);
     traceDiagnostics(context);
     context.subscriptions.push(
@@ -232,6 +233,14 @@ async function activate(context) {
         vscode.commands.registerCommand("rgl.run", () => runCommand("exec")),
         vscode.commands.registerCommand("rgl.runRelease", () => runCommand("exec", true)),
         vscode.commands.registerCommand("rgl.check", () => runCommand("check")),
+        // Un paquet récupéré ou retiré change le cache, que le serveur de langage lit : il relit tout quand la commande est finie.
+        vscode.tasks.onDidEndTaskProcess(async event => {
+            const definition = event.execution.task.definition;
+            if (definition.type === "rgl" && ["add", "remove", "restore", "update"].includes(definition.command) && event.exitCode === 0) {
+                await stop();
+                await start();
+            }
+        }),
         vscode.workspace.onDidChangeConfiguration(async event => {
             if (!event.affectsConfiguration("rgl.compilerPath")) return;
             await stop();
@@ -241,6 +250,7 @@ async function activate(context) {
     registerMoldSuggestion(context, () => client);
     registerNewFile(context);
     registerNewFolders(context);
+    registerPackages(context, (definition, folder) => vscode.tasks.executeTask(createTask(definition, folder)));
     registerDebugging(context, compilerPath);
     registerTests(context, compilerPath);
     await start();

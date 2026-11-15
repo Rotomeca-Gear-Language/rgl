@@ -51,26 +51,27 @@ internal sealed partial class LanguageServer
         var codes = (context?["diagnostics"]?.AsArray() ?? []).Select(d => (string?)d?["code"]).OfType<string>().ToHashSet();
         var only = context?["only"]?.AsArray().Select(o => (string?)o).OfType<string>().ToArray();
 
-        return new JsonArray([.. CodeActionProvider.At(document, start, end, codes, only).Select(a => (JsonNode)new JsonObject
+        return new JsonArray([.. CodeActionProvider.At(document, start, end, codes, only).Select(a =>
         {
-            ["title"] = a.Title,
-            ["kind"] = a.Kind,
-            ["isPreferred"] = a.IsPreferred,
-            ["edit"] = new JsonObject
-            {
-                ["changes"] = new JsonObject
+            var action = new JsonObject { ["title"] = a.Title, ["kind"] = a.Kind, ["isPreferred"] = a.IsPreferred };
+            if (a.Command is { } command) action["command"] = new JsonObject { ["title"] = a.Title, ["command"] = command };
+            else
+                action["edit"] = new JsonObject
                 {
-                    [uri] = new JsonArray([.. a.Edits.Select(e => (JsonNode)new JsonObject
+                    ["changes"] = new JsonObject
                     {
-                        ["range"] = new JsonObject
+                        [uri] = new JsonArray([.. a.Edits.Select(e => (JsonNode)new JsonObject
                         {
-                            ["start"] = new JsonObject { ["line"] = (int)e.StartLine, ["character"] = (int)e.StartCharacter },
-                            ["end"] = new JsonObject { ["line"] = (int)e.EndLine, ["character"] = (int)e.EndCharacter },
-                        },
-                        ["newText"] = e.Text,
-                    })]),
-                },
-            },
+                            ["range"] = new JsonObject
+                            {
+                                ["start"] = new JsonObject { ["line"] = (int)e.StartLine, ["character"] = (int)e.StartCharacter },
+                                ["end"] = new JsonObject { ["line"] = (int)e.EndLine, ["character"] = (int)e.EndCharacter },
+                            },
+                            ["newText"] = e.Text,
+                        })]),
+                    },
+                };
+            return (JsonNode)action;
         })]);
     }
 }

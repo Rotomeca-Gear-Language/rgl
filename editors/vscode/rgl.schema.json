@@ -84,6 +84,58 @@
         "pattern": "\\.forge$"
       },
       "description": "Fichiers .forge autorisés, par chemins relatifs à la racine, sans autorisation transitive des imports."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ce que fait le paquet (manifeste d'un paquet)."
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "description": "La licence du paquet, par exemple MIT."
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Les paquets demandés : l'adresse du dépôt et sa version exacte. `rgl add` les écrit.",
+      "propertyNames": {
+        "pattern": "^(github\\.com|gitlab\\.com|codeberg\\.org)/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+        "description": "Une version exacte : trois nombres, sans intervalle ni préfixe."
+      },
+      "examples": [
+        {
+          "github.com/alice/json": "1.2.0"
+        }
+      ]
+    },
+    "package-trust": {
+      "type": "object",
+      "description": "Ce que le projet autorise à ses paquets ; seul le projet racine autorise.",
+      "properties": {
+        "binaries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(github\\.com|gitlab\\.com|codeberg\\.org)/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+          },
+          "description": "Paquets qui gardent leurs bibliothèques précompilées (dll, so, dylib, a, lib, obj, o) à l'extraction."
+        },
+        "cpp": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(github\\.com|gitlab\\.com|codeberg\\.org)/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+          },
+          "description": "Paquets dont le C++ est admis (blocs cpp, .rgl.cpp, descriptors, forge: native)."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

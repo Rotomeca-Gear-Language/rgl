@@ -7,8 +7,24 @@ namespace Rgl.Lsp;
 /// <param name="Root">Le dossier du projet : celui du <c>rgl.json</c> le plus proche, sinon celui du document.</param>
 /// <param name="ScopeDirectory">Le dossier où les imports cherchent : le projet, ou le dossier de la box qui contient le document.</param>
 /// <param name="Modules">Les fichiers <c>.forge</c> de cet espace, le document lui-même exclu.</param>
-internal sealed record ProjectContext(string Root, string ScopeDirectory, IReadOnlyList<ModuleInfo> Modules, IReadOnlyList<ModuleInfo>? Std = null, IReadOnlyList<ModuleInfo>? StdExtensions = null, IReadOnlyList<ModuleInfo>? Entries = null)
+internal sealed record ProjectContext(string Root, string ScopeDirectory, IReadOnlyList<ModuleInfo> Modules, IReadOnlyList<ModuleInfo>? Std = null, IReadOnlyList<ModuleInfo>? StdExtensions = null, IReadOnlyList<ModuleInfo>? Entries = null, IReadOnlyList<EditorPackage>? Packages = null)
 {
+    /// <summary>
+    /// Le paquet qu'un <c>import package</c> désigne parmi les dépendances du projet : par le nom de son manifeste (<c>json</c>), ou par son adresse entre guillemets
+    /// (<c>"github.com/alice/json"</c>). Un nom porté par plusieurs paquets ne désigne rien : le compilateur le refuse (E160).
+    /// </summary>
+    public EditorPackage? FindPackage(string written)
+    {
+        if (Packages is null) return null;
+        if (written.StartsWith('"') || written.StartsWith('\''))
+        {
+            var address = written.Trim('"', '\'');
+            return Packages.FirstOrDefault(p => string.Equals(p.Package.Source, address, StringComparison.OrdinalIgnoreCase));
+        }
+        var matches = Packages.Where(p => p.Name == written).ToList();
+        return matches.Count == 1 ? matches[0] : null;
+    }
+
     /// <summary>Les fichiers où chercher les emplois d'un nom : les <c>.forge</c> de l'espace et le fichier d'entrée <c>.rgl</c> du projet.</summary>
     public IEnumerable<ModuleInfo> Sources => Modules.Where(m => !PaperProjection.IsPaper(m.Path)).Concat(Entries ?? []);
 
@@ -148,7 +164,19 @@ internal sealed class ProjectIndex
             }
         }
         var std = _ReadStdOnce(openText, out var stdExtensions);
-        return new ProjectContext(root, scope, modules, std, stdExtensions, entries);
+        return new ProjectContext(root, scope, modules, std, stdExtensions, entries, _ReadPackages(root));
+    }
+
+    /// <summary>Les paquets que le manifeste du projet demande (ses dépendances directes), lus dans le cache ; vide si le projet n'en a pas ou s'ils ne sont pas récupérés.</summary>
+    private static List<EditorPackage> _ReadPackages(string root)
+    {
+        var manifestPath = Path.Combine(root, ProjectManifest.FileName);
+        if (!File.Exists(manifestPath)) return [];
+        var manifest = ProjectManifest.Load(manifestPath, new DiagnosticBag());
+        if (manifest is null || manifest.Dependencies.Count == 0) return [];
+
+        var graph = EditorPackages.For(root, manifest).Graph;
+        return [.. manifest.Dependencies.Keys.Select(address => graph[address]).OfType<Rgl.Project.Packages.ResolvedPackage>().Select(PackageModules.Read).OfType<EditorPackage>()];
     }
 
     /// <summary>

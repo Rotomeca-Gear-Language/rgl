@@ -67,11 +67,15 @@ internal static class DocumentAnalysis
         // Un document dont l'adresse n'est pas celle d'un fichier local (non enregistré, distant) n'a pas de dossier de projet : on lui en donne un qui
         // n'existe pas, donc sans fichiers à importer, mais la std reste visible.
         var manifest = _Manifest(path);
-        var modules = SourceGraph.Load(source, _ProjectRoot(path), diagnostics, manifest?.Exclude, openTexts, NativeEditorModel.Toolchain, NativeEditorModel.CacheDirectory, new NativePolicy(manifest, _ProjectRoot(path)));
-        if (modules is null) return new DocumentReport(source, diagnostics.Items, []);
+        // Les paquets du projet, lus dans le cache sans réseau : ce qu'ils n'ont pas se signale comme « rgl restore » à lancer.
+        var packages = EditorPackages.For(_ProjectRoot(path), manifest);
+        foreach (var item in packages.Diagnostics) diagnostics.Add(item);
+        var policy = new NativePolicy(manifest, _ProjectRoot(path), packages.Graph);
+        var modules = SourceGraph.Load(source, _ProjectRoot(path), diagnostics, manifest?.Exclude, openTexts, NativeEditorModel.Toolchain, NativeEditorModel.CacheDirectory, policy, packages.Context);
+        if (modules is null || diagnostics.HasErrors) return new DocumentReport(source, diagnostics.Items, []);
 
         var program = new Binder(diagnostics, manifest?.Overflow ?? OverflowMode.Checked,
-            manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, new NativePolicy(manifest, _ProjectRoot(path))).Bind(modules);
+            manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, policy).Bind(modules);
         return program is null
             ? new DocumentReport(source, diagnostics.Items, [])
             : new DocumentReport(source, diagnostics.Items, _MutArguments(program, source), _Hints(program, source));
@@ -109,9 +113,11 @@ internal static class DocumentAnalysis
         var texts = new Dictionary<string, string>(openTexts ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase) { [Path.GetFullPath(path)] = content };
 
         var project = new DiagnosticBag();
-        var modules = SourceGraph.Load(new SourceText(entryPath, entryText), root, project, manifest?.Exclude, texts, NativeEditorModel.Toolchain, NativeEditorModel.CacheDirectory, new NativePolicy(manifest, root));
-        if (modules is not null)
-            new Binder(project, manifest?.Overflow ?? OverflowMode.Checked, manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, new NativePolicy(manifest, root)).Bind(modules);
+        var packages = EditorPackages.For(root, manifest);
+        var policy = new NativePolicy(manifest, root, packages.Graph);
+        var modules = SourceGraph.Load(new SourceText(entryPath, entryText), root, project, manifest?.Exclude, texts, NativeEditorModel.Toolchain, NativeEditorModel.CacheDirectory, policy, packages.Context);
+        if (modules is not null && !project.HasErrors)
+            new Binder(project, manifest?.Overflow ?? OverflowMode.Checked, manifest is null ? ProjectManifest.DefaultRecursionLimit : manifest.RecursionLimit, manifest?.Safe ?? false, manifest?.BoundedLoops ?? false, policy).Bind(modules);
 
         foreach (var diagnostic in project.Items)
         {

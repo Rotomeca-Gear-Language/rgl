@@ -10,7 +10,8 @@ namespace Rgl.Lsp;
 internal sealed record CodeEdit(uint StartLine, uint StartCharacter, uint EndLine, uint EndCharacter, string Text);
 
 /// <summary>Une action rapide : son titre, sa sorte du protocole (<c>quickfix</c>, <c>source.organizeImports</c>) et ses changements dans le document.</summary>
-internal sealed record CodeAction(string Title, string Kind, IReadOnlyList<CodeEdit> Edits, bool IsPreferred = false);
+/// <param name="Command">Pour une action qui ne change pas le texte : la commande de l'extension que l'éditeur lance (<c>rgl.restore</c>).</param>
+internal sealed record CodeAction(string Title, string Kind, IReadOnlyList<CodeEdit> Edits, bool IsPreferred = false, string? Command = null);
 
 /// <summary>
 /// Les actions rapides (l'ampoule de l'éditeur, Ctrl+;) : importer le nom que rien ne désigne et que le projet ou la std déclare, ajouter l'en-tête ou la
@@ -32,6 +33,9 @@ internal static class CodeActionProvider
         {
             actions.AddRange(_Imports(document, start, end));
             if (diagnosticCodes.Contains(DiagnosticCodes.MissingDescription) && _AddDescription(document) is { } description) actions.Add(description);
+            // Un paquet qui n'est pas dans le cache : « rgl restore » le récupère (l'éditeur ne télécharge jamais).
+            if (diagnosticCodes.Contains(DiagnosticCodes.PackageNotFound) || diagnosticCodes.Contains(DiagnosticCodes.PackageHashMismatch))
+                actions.Add(new CodeAction("Récupérer les paquets (rgl restore)", QuickFix, [], IsPreferred: true, Command: "rgl.restore"));
             if (diagnosticCodes.Contains(DiagnosticCodes.MissingHeader) && document.Self.Path.EndsWith(".forge", StringComparison.OrdinalIgnoreCase))
                 actions.Add(new CodeAction("Ajouter l'en-tête « forge: gears »", QuickFix, [new CodeEdit(0, 0, 0, 0, "forge: gears" + _Eol(document) + "description: ''" + _Eol(document) + _Eol(document))]));
 

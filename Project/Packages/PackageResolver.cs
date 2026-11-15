@@ -51,13 +51,16 @@ internal sealed class PackageResolver
     private readonly string _packagesRoot;
     private readonly PackageArchive.Limits _limits;
     private readonly IReadOnlySet<string> _trusted;
+    private readonly bool _writeLock;
 
     /// <param name="source">D'où viennent les archives.</param>
     /// <param name="cacheRoot">Racine du cache de RGL : les paquets sont dans <c>packages/</c>.</param>
     /// <param name="limits">Plafonds de l'extraction ; ceux par défaut sans valeur.</param>
     /// <param name="trusted">Les adresses des paquets que <c>package-trust.binaries</c> autorise : ils gardent leurs binaires de bibliothèques ; aucun sans valeur.</param>
-    public PackageResolver(IPackageSource source, string cacheRoot, PackageArchive.Limits? limits = null, IReadOnlySet<string>? trusted = null)
+    /// <param name="writeLock">Faux pour ne jamais écrire <c>rgl.lock</c> : l'éditeur lit les paquets, il ne modifie pas le projet.</param>
+    public PackageResolver(IPackageSource source, string cacheRoot, PackageArchive.Limits? limits = null, IReadOnlySet<string>? trusted = null, bool writeLock = true)
     {
+        _writeLock = writeLock;
         _source = source;
         _packagesRoot = Path.Combine(cacheRoot, "packages");
         _limits = limits ?? PackageArchive.Limits.Default;
@@ -105,7 +108,7 @@ internal sealed class PackageResolver
                 return null;
             }
         }
-        else if (current != fresh.ToText())
+        else if (_writeLock && current != fresh.ToText())
         {
             try
             {

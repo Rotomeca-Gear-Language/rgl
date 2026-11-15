@@ -7,11 +7,21 @@ const COMMANDS = {
     compile: "Compiler",
     exec: "Exécuter",
     check: "Vérifier",
+    add: "Ajouter un paquet",
+    remove: "Retirer un paquet",
+    restore: "Récupérer les paquets",
+    tree: "Graphe des paquets",
+    outdated: "Paquets à mettre à jour",
+    update: "Mettre à jour les paquets",
+    publish: "Publier le paquet",
 };
+
+/** Les commandes de paquets : elles travaillent sur le `rgl.json` du dossier, sans fichier d'entrée ni profil. */
+const PACKAGE_COMMANDS = ["add", "remove", "restore", "tree", "outdated", "update", "publish"];
 
 /**
  * La ligne de commande d'une tâche.
- * @param {{ command: "compile" | "exec" | "check", release?: boolean, file?: string, folder?: string }} definition
+ * @param {{ command: string, release?: boolean, file?: string, folder?: string, args?: string[] }} definition `args` : les arguments d'une commande de paquets (une adresse, `--dry-run`).
  * @param {string} compiler Le chemin du compilateur réglé (`rgl`, un chemin, ou un `.dll` lancé avec `dotnet`).
  * @returns {{ command: string, args: string[] }}
  */
@@ -20,6 +30,11 @@ function commandLine(definition, compiler) {
 
     const launch = compiler.toLowerCase().endsWith(".dll") ? { command: "dotnet", args: [compiler] } : { command: compiler, args: [] };
     const args = [...launch.args, definition.command];
+    if (PACKAGE_COMMANDS.includes(definition.command)) {
+        args.push(...(definition.args ?? []));
+        if (definition.folder) args.push("-d", definition.folder);
+        return { command: launch.command, args };
+    }
     if (definition.file) args.push(definition.file);
     else if (definition.folder) args.push("-d", definition.folder);
     if (definition.release && definition.command !== "check") args.push("--release");
@@ -42,4 +57,4 @@ function defaultDefinitions() {
     ];
 }
 
-module.exports = { COMMANDS, commandLine, title, defaultDefinitions };
+module.exports = { COMMANDS, PACKAGE_COMMANDS, commandLine, title, defaultDefinitions };

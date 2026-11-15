@@ -102,6 +102,12 @@ internal sealed partial class SemanticDocument
                 continue;
             }
 
+            if (import.Kind == ImportKind.Package)
+            {
+                if (Project.FindPackage(import.Module.Name) is { } package) _ImportFrom(import, package.Index);
+                continue;
+            }
+
             if (import.Kind is ImportKind.Box or ImportKind.Json) continue;
             if (import.Kind == ImportKind.Std)
             {

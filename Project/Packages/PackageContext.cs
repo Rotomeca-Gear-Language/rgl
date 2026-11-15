@@ -8,6 +8,12 @@ namespace Rgl.Project.Packages;
 /// <param name="ProjectDependencies">Les adresses (et versions) que demande le manifeste du projet.</param>
 internal sealed record PackageContext(PackageGraph Graph, IReadOnlyDictionary<string, string> ProjectDependencies)
 {
+    /// <summary>
+    /// Vrai quand les paquets n'ont pas pu être résolus (l'éditeur, hors ligne, avec un paquet absent du cache) : la raison est déjà dite, un
+    /// <c>import package</c> est alors signalé comme non récupéré (E155) au lieu de se plaindre d'un nom inconnu.
+    /// </summary>
+    public bool Unresolved { get; init; }
+
     /// <summary>Le contexte d'un projet dont les paquets viennent d'être résolus.</summary>
     public static PackageContext For(RglProject project, PackageGraph graph) =>
         new(graph, project.Manifest?.Dependencies ?? new Dictionary<string, string>());

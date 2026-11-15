@@ -206,6 +206,20 @@ internal static partial class CompletionProvider
         if (Regex.Match(prefix, @"^\s*(?:export\s+)?dataset\s+\w+(?:\s+from\s+(?:""[^""]*""|'[^']*'))?\s+(?:of|as)\s+\w*$") is { Success: true })
             return [.. document.Self.Symbols.Values.Concat(document.ImportedNames.Values).Where(s => s.Kind == RglSymbolKind.Mold).DistinctBy(s => s.Name).Select(s => _Item(document, s, "0_"))];
 
+        // import package json only {…} : les noms que le paquet exporte.
+        if (Regex.Match(prefix, @"^\s*import\s+package\s+(?<module>\w+|""[^""]*"")(?:\s+as\s+\w+)?\s+only\s*\{(?<done>[^}]*)$") is { Success: true } packageOnly)
+        {
+            if (document.Project.FindPackage(packageOnly.Groups["module"].Value) is not { } picked) return [];
+            var chosen = packageOnly.Groups["done"].Value.Split(',').Select(n => Regex.Replace(n.Trim(), @"\s+as\s+\w+$", "")).ToHashSet(StringComparer.Ordinal);
+            return [.. picked.Index.Exported.Values.Where(s => s.IsTopLevel && !chosen.Contains(s.Name)).Select(s => _Item(document, s, "0_"))];
+        }
+
+        // import package "github.com/… : l'adresse d'une dépendance ; import package js… : son nom court.
+        if (Regex.Match(prefix, @"^\s*import\s+package\s+""[^""]*$") is { Success: true })
+            return [.. (document.Project.Packages ?? []).Select(p => new CompletionItem(p.Package.Source, CompletionKind.Module, $"paquet {p.Name} {p.Package.Version}", _PackageDocumentation(p), "0_" + p.Package.Source, p.Package.Version))];
+        if (Regex.Match(prefix, @"^\s*import\s+package\s+\w*$") is { Success: true })
+            return [.. (document.Project.Packages ?? []).Select(p => new CompletionItem(p.Name, CompletionKind.Module, $"{p.Package.Source} {p.Package.Version}", _PackageDocumentation(p), "0_" + p.Name, p.Package.Source))];
+
         // use <Math> only {…} : les noms du fichier ou de la box de la std ; use <… : les noms de la std.
         if (Regex.Match(prefix, @"^\s*use\s*<(?<module>\w+)>(?:\s+as\s+\w+)?\s+only\s*\{(?<done>[^}]*)$") is { Success: true } stdOnly)
         {
@@ -235,7 +249,7 @@ internal static partial class CompletionProvider
             var items = document.Project.Modules.Where(m => kind != "box")
                 .Select(m => new CompletionItem(m.Name, CompletionKind.Module, m.Kind is null ? "fichier" : $"forge: {m.Kind}", _ModuleDocumentation(m), "0_" + m.Name, Path.GetFileName(m.Path)))
                 .ToList();
-            if (kind.Length == 0 && word.Length > 0 || kind.Length == 0) items.AddRange(new[] { "box", "tools" }.Select(k => new CompletionItem(k, CompletionKind.Keyword, "genre d'import", SortText: "5_" + k)));
+            if (kind.Length == 0 && word.Length > 0 || kind.Length == 0) items.AddRange(new[] { "box", "tools", "package" }.Select(k => new CompletionItem(k, CompletionKind.Keyword, "genre d'import", SortText: "5_" + k)));
             return items;
         }
 
@@ -256,6 +270,10 @@ internal static partial class CompletionProvider
         var wanted = word[..dot] + ".tools";
         return [.. folders.Where(f => f.Folder!.Equals(wanted, StringComparison.OrdinalIgnoreCase)).Select(f => new CompletionItem(f.Module.Name, CompletionKind.Module, f.Module.Kind is null ? "fichier" : $"forge: {f.Module.Kind}"))];
     }
+
+    private static string _PackageDocumentation(EditorPackage package) =>
+        $"Paquet `{package.Package.Source}` {package.Package.Version}" + (package.Package.Manifest.Description is null ? "" : $"\n\n{package.Package.Manifest.Description}")
+        + (package.Package.Manifest.License is null ? "" : $"\n\nLicence : {package.Package.Manifest.License}");
 
     private static string _ModuleDocumentation(ModuleInfo module) =>
         $"Fichier `{Path.GetFileName(module.Path)}`" + (module.Kind is null ? "" : $" — `forge: {module.Kind}`") + (module.Description is null ? "" : $"\n\n{module.Description}");

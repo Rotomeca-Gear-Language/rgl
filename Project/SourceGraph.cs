@@ -977,6 +977,12 @@ internal static class SourceGraph
             var fullForm = written.StartsWith('"') || written.StartsWith('\'');
             if (_packages is null)
                 return _PackageError(import, "les paquets de ce programme n'ont pas été chargés", "paquets non chargés", ["lance « rgl compile » : il récupère les paquets du manifeste"]);
+            if (_packages.Unresolved)
+            {
+                _diagnostics.Error(import.Module.Span, DiagnosticCodes.PackageNotFound, $"le paquet « {written.Trim('"', '\'')} » n'est pas disponible dans le cache", "paquet non récupéré",
+                    ["lance « rgl restore » pour récupérer les paquets du projet"]);
+                return null;
+            }
 
             var dependencies = scope.Package?.Manifest.Dependencies.Keys ?? _packages.ProjectDependencies.Keys;
             var visible = dependencies.Select(address => _packages.Graph[address]).OfType<ResolvedPackage>().ToList();

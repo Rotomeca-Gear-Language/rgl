@@ -158,6 +158,9 @@ internal sealed class ModuleInfo
         if (merged.Count > 0) Exported = merged;
     }
 
+    /// <summary>Remplace ce que le fichier rend visible : l'index d'un paquet montre ce qu'il exporte, pas ses propres déclarations.</summary>
+    public void SetExported(Dictionary<string, RglSymbol> exported) => Exported = exported;
+
     /// <summary>Les extensions écrites dans ce fichier (<c>extend [T] { … }</c>).</summary>
     public IEnumerable<AST.Extensions.ExtendDeclaration> Extends => Unit.Statements.OfType<AST.Extensions.ExtendDeclaration>();
 
