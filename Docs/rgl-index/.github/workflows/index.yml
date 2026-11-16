@@ -1,0 +1,41 @@
+name: index
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # À adapter : installe rgl (et Zig, pour compiler les scripts) comme tu le distribues.
+      - name: Installer rgl
+        run: |
+          echo "installe rgl ici"
+          rgl setup --no-path
+
+      - name: Vérifier les entrées et construire l'index
+        run: rgl index build . -o public/index.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  publish:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

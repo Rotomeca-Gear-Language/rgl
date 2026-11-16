@@ -190,5 +190,8 @@ public class DiagnosticCoverageTests(ITestOutputHelper output)
         Add("E159", new PackageTests().Des_paquets_qui_se_demandent_les_uns_les_autres_sont_un_cycle_E159);
         Add("E160", new PackageImportTests().Un_nom_ambigu_inconnu_ou_qui_n_est_pas_une_dependance_est_E160);
         Add("E161", new PackageImportTests().Une_bibliotheque_precompilee_d_un_paquet_sans_package_trust_binaries_est_E161);
+        Add("E162", new PackageIndexTests().L_index_lu_est_garde_et_sert_hors_ligne_et_sans_copie_c_est_E162);
+        Add("E163", new PackageIndexTests().Add_d_un_nom_court_inconnu_est_E163_avec_les_noms_proches);
+        Add("E164", new PackageIndexTests().Run_d_un_nom_qui_n_est_pas_un_script_de_l_index_est_E164);
     }
 }

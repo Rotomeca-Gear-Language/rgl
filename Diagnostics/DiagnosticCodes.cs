@@ -27,6 +27,15 @@ internal static class DiagnosticCodes
     public const string PackageBinary = "E161";
     public const string PackageCycle = "E159";
 
+    /// <summary>E162 : l'index de découverte est introuvable, illisible ou invalide, ou une entrée du dépôt d'index l'est.</summary>
+    public const string InvalidIndex = "E162";
+
+    /// <summary>E163 : un nom court (<c>rgl add json</c>) n'est pas dans l'index, ou plusieurs paquets le portent.</summary>
+    public const string IndexName = "E163";
+
+    /// <summary>E164 : un script (gist) refusé : hors index, fichiers non permis, dépendance hors index, <c>package-trust</c>.</summary>
+    public const string InvalidScript = "E164";
+
     public const string UnsafePointerLeak = "W068";
     public const string UnsafeRequired = "E147";
     public const string NativePackRequired = "E148";

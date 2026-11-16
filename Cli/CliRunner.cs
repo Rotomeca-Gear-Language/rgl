@@ -21,9 +21,11 @@ namespace Rgl.Cli;
 /// <param name="Output">Sortie standard brute, où écrit le serveur de langage ; <see langword="null"/> sans sortie.</param>
 /// <param name="Packages">D'où viennent les archives des paquets ; <see langword="null"/> pour Internet (GitHub, GitLab, Codeberg). Les tests y mettent une source figée.</param>
 /// <param name="Git">Le <c>git</c> de <c>rgl publish</c> ; <see langword="null"/> pour celui du système. Les tests y mettent un faux.</param>
+/// <param name="Index">D'où vient l'index de découverte ; <see langword="null"/> pour celui publié sur Internet.</param>
+/// <param name="Gists">D'où viennent les gists de <c>rgl run</c> ; <see langword="null"/> pour GitHub.</param>
 /// <param name="DiskSize">La taille du disque du cache, en octets, qui remplace celle que le système donne ; sert aux tests de l'avertissement du cache.</param>
 internal sealed record CliContext(TextWriter Out, TextWriter Error, string WorkingDirectory, string CacheRoot, bool Color = false, ICompilerToolchain? Toolchain = null,
-    Stream? Input = null, Stream? Output = null, long? DiskSize = null, IPackageSource? Packages = null, IGitRunner? Git = null);
+    Stream? Input = null, Stream? Output = null, long? DiskSize = null, IPackageSource? Packages = null, IGitRunner? Git = null, IIndexSource? Index = null, IGistSource? Gists = null);
 
 /// <summary>Exécute une commande <c>rgl</c> et renvoie le code de sortie du processus.</summary>
 internal static class CliRunner
@@ -54,6 +56,9 @@ internal static class CliRunner
           outdated                  Les paquets dont une version plus récente existe
           update [adresse]          Monte les dépendances à leur dernière version
           publish [--dry-run]       Vérifie le paquet, puis crée et pousse le tag de sa version
+          search [terme]            Cherche un paquet ou un script dans l'index de découverte
+          run <script> [-- args]    Compile puis exécute un script de l'index (un gist figé à une révision)
+          index build [dossier]     Construit index.json depuis packages/*.json et scripts/*.json (pour le dépôt d'index)
           check [fichier.rgl]       Bilan de l'intégration C++ du projet : ce que les liaisons des
                                     bibliothèques C n'ont pas converti, et que le code utilise (E019)
           descriptor <en-tête> --class <Classe>
@@ -132,6 +137,9 @@ internal static class CliRunner
             CommandKind.Precast => PrecastCommand.Run(commandLine, context, diagnostics),
             CommandKind.Setup => SetupCommand.Run(commandLine, context, diagnostics),
             CommandKind.Package => PackageCommands.Run(commandLine, context, diagnostics),
+            CommandKind.Search => IndexCommands.Search(commandLine, context, diagnostics),
+            CommandKind.Index => IndexCommands.Build(commandLine, context, diagnostics),
+            CommandKind.Run => IndexCommands.RunScript(commandLine, context, diagnostics),
             CommandKind.LanguageServer => LanguageServer.Run(context.Input ?? Stream.Null, context.Output ?? Stream.Null),
             CommandKind.Compile or CommandKind.Exec => Build(commandLine, context, diagnostics),
             _ => throw new UnreachableException(),
@@ -178,7 +186,7 @@ internal static class CliRunner
     /// du build (erreurs, avertissements, notices) s'affichent dès sa fin : avant le message final,
     /// et avant ce qu'écrit le programme lancé par <c>exec</c>.
     /// </summary>
-    private static int Build(CommandLine commandLine, CliContext context, DiagnosticBag diagnostics)
+    internal static int Build(CommandLine commandLine, CliContext context, DiagnosticBag diagnostics)
     {
         var build = new DiagnosticBag();
         var project = RglProject.Load(commandLine.File, commandLine.Directory, context.WorkingDirectory, build);

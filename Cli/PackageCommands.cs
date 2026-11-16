@@ -84,6 +84,13 @@ internal static partial class PackageCommands
         var at = argument.LastIndexOf('@');
         var address = at < 0 ? argument : argument[..at];
         var version = at < 0 ? null : argument[(at + 1)..];
+        // Un nom court (« json ») est cherché dans l'index de découverte : il donne l'adresse.
+        if (!address.Contains('/'))
+        {
+            if (IndexCommands.Resolve(address, context, diagnostics) is not { } resolved) return CliRunner.Failure;
+            context.Out.WriteLine($"« {address} » est {resolved} dans l'index.");
+            address = resolved;
+        }
         if (PackageId.Parse(address, out var problem) is not { } id)
         {
             diagnostics.Error($"adresse de paquet invalide : {problem}", session.ManifestPath, DiagnosticCodes.InvalidPackage);
@@ -391,13 +398,16 @@ internal static partial class PackageCommands
     /// son <c>index.forge</c> est alors celui d'une box, ses fichiers se trouvent par leur nom, et ses propres dépendances — récupérées comme à l'ordinaire — sont
     /// celles du projet temporaire.
     /// </summary>
-    private static bool _Check(Session session, PackageManifest manifest, CliContext context, DiagnosticBag diagnostics)
+    private static bool _Check(Session session, PackageManifest manifest, CliContext context, DiagnosticBag diagnostics) =>
+        CheckPackage(session.Root, manifest, session.Source, context, diagnostics);
+
+    internal static bool CheckPackage(string root, PackageManifest manifest, IPackageSource source, CliContext context, DiagnosticBag diagnostics, bool requireDocs = true)
     {
         var temporary = Path.Combine(context.CacheRoot, "publish", Guid.NewGuid().ToString("N")[..12]);
         try
         {
             var box = Path.Combine(temporary, "Verification.box");
-            _Copy(session.Root, box);
+            _Copy(root, box);
             File.WriteAllText(Path.Combine(temporary, ProjectManifest.FileName), JsonSerializer.Serialize(new Dictionary<string, object>
             {
                 ["name"] = "verification",
@@ -409,7 +419,7 @@ internal static partial class PackageCommands
             var entryText = "import box Verification;\ntrain |> done;\n";
             File.WriteAllText(entry, entryText);
 
-            var graph = new PackageResolver(session.Source, context.CacheRoot).Resolve(temporary, manifest.Dependencies, locked: false, diagnostics);
+            var graph = new PackageResolver(source, context.CacheRoot).Resolve(temporary, manifest.Dependencies, locked: false, diagnostics);
             if (graph is null) return false;
 
             var load = new DiagnosticBag();
@@ -419,6 +429,8 @@ internal static partial class PackageCommands
                 new Binder(load, OverflowMode.Checked, ProjectManifest.DefaultRecursionLimit, false, false, policy).Bind(modules);
             foreach (var item in load.Items) diagnostics.Add(item);
             if (load.HasErrors || modules is null) return false;
+
+            if (!requireDocs) return true;
 
             var documents = new DiagnosticBag();
             var all = new List<DocEntry>();
@@ -433,7 +445,7 @@ internal static partial class PackageCommands
             if (warnings.Count > 0)
             {
                 foreach (var warning in warnings) diagnostics.Add(warning);
-                diagnostics.Error($"la documentation du paquet a {warnings.Count} avertissement(s) : « rgl doc check » doit passer sans avertissement avant de publier", session.Root, DiagnosticCodes.InvalidPackage);
+                diagnostics.Error($"la documentation du paquet a {warnings.Count} avertissement(s) : « rgl doc check » doit passer sans avertissement avant de publier", root, DiagnosticCodes.InvalidPackage);
                 return false;
             }
             return true;

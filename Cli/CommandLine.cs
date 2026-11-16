@@ -44,6 +44,15 @@ internal enum CommandKind
     /// <summary><c>rgl add</c>, <c>remove</c>, <c>restore</c>, <c>tree</c>, <c>outdated</c>, <c>update</c> et <c>publish</c> : les paquets du projet.</summary>
     Package,
 
+    /// <summary><c>rgl search [terme]</c> : cherche dans l'index de découverte.</summary>
+    Search,
+
+    /// <summary><c>rgl index build [dossier] [-o fichier]</c> : construit l'index de découverte depuis un dépôt d'index.</summary>
+    Index,
+
+    /// <summary><c>rgl run script [-- arguments]</c> : compile puis exécute un script de l'index.</summary>
+    Run,
+
     /// <summary><c>rgl setup</c> : installe Zig (et OpenSSL) à côté de l'exécutable et propose de l'ajouter au PATH.</summary>
     Setup,
 }
@@ -201,6 +210,12 @@ internal static class CommandLineParser
                 return ParsePrecast(args, diagnostics);
             case "setup":
                 return ParseSetup(args, diagnostics);
+            case "search":
+                return ParseSearch(args, diagnostics);
+            case "index":
+                return ParseIndex(args, diagnostics);
+            case "run":
+                return ParseRun(args, diagnostics);
             case "add":
                 return ParsePackage(PackageAction.Add, args, diagnostics);
             case "remove":
@@ -218,9 +233,57 @@ internal static class CommandLineParser
             case "lsp":
                 return ParseNoArguments(CommandKind.LanguageServer, args, diagnostics);
             default:
-                diagnostics.Error($"commande inconnue « {args[0]} » (commandes : init, setup, compile, exec, add, remove, restore, tree, outdated, update, publish, check, cache, descriptor, doc, format, precast, lsp)");
+                diagnostics.Error($"commande inconnue « {args[0]} » (commandes : init, setup, compile, exec, run, add, remove, restore, tree, outdated, update, publish, search, index, check, cache, descriptor, doc, format, precast, lsp)");
                 return null;
         }
+    }
+
+    /// <summary>Analyse <c>rgl search [terme]</c>.</summary>
+    private static CommandLine? ParseSearch(IReadOnlyList<string> args, DiagnosticBag diagnostics)
+    {
+        if (args.Count > 2 || args.Count == 2 && args[1].StartsWith('-'))
+        {
+            diagnostics.Error("usage : rgl search [terme]");
+            return null;
+        }
+        return new CommandLine(CommandKind.Search, PackageArguments: args.Skip(1).ToList());
+    }
+
+    /// <summary>Analyse <c>rgl index build [dossier] [-o fichier]</c>.</summary>
+    private static CommandLine? ParseIndex(IReadOnlyList<string> args, DiagnosticBag diagnostics)
+    {
+        if (args.Count < 2 || args[1] != "build")
+        {
+            diagnostics.Error("usage : rgl index build [dossier] [-o fichier]");
+            return null;
+        }
+        string? folder = null;
+        string? output = null;
+        for (var i = 2; i < args.Count; i++)
+        {
+            if (args[i] == "-o" && i + 1 < args.Count) output = args[++i];
+            else if (!args[i].StartsWith('-') && folder is null) folder = args[i];
+            else
+            {
+                diagnostics.Error($"argument inattendu « {args[i]} » pour « rgl index build » (usage : rgl index build [dossier] [-o fichier])");
+                return null;
+            }
+        }
+        return new CommandLine(CommandKind.Index, Directory: folder, Output: output);
+    }
+
+    /// <summary>Analyse <c>rgl run script [-- arguments]</c>.</summary>
+    private static CommandLine? ParseRun(IReadOnlyList<string> args, DiagnosticBag diagnostics)
+    {
+        var separator = args.ToList().IndexOf("--");
+        var before = separator < 0 ? args.Skip(1).ToList() : args.Skip(1).Take(separator - 1).ToList();
+        var program = separator < 0 ? new List<string>() : args.Skip(separator + 1).ToList();
+        if (before.Count != 1 || before[0].StartsWith('-'))
+        {
+            diagnostics.Error("usage : rgl run <script> [-- arguments]");
+            return null;
+        }
+        return new CommandLine(CommandKind.Run, PackageArguments: before, ProgramArgs: program);
     }
 
     /// <summary>
