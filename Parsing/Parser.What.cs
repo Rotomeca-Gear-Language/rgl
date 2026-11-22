@@ -207,7 +207,7 @@ internal sealed partial class Parser
     #region En-tête et imports
 
     /// <summary>Les clés d'un en-tête de fichier.</summary>
-    private static readonly string[] HeaderKeys = ["forge", "description", "metadata", "header", "link", "library"];
+    private static readonly string[] HeaderKeys = ["forge", "description", "metadata", "header", "link", "library", .. Native.NativeSettings.Keys];
 
     /// <summary>
     /// <c>EnTête := { ( "forge" | "description" | "metadata" ) ":" Valeur }</c> : le genre du fichier (un mot),
@@ -224,6 +224,7 @@ internal sealed partial class Parser
         List<SourceSpan> headers = [];
         Identifier? link = null;
         List<LibraryEntry>? library = null;
+        List<HeaderSetting> settings = [];
 
         while (_AtHeaderKey())
         {
@@ -268,13 +269,46 @@ internal sealed partial class Parser
                     library = _ParseLibrary();
                     break;
 
+                case "include" or "define" or "sources" or "libraries" or "libdirs" or "system":
+                    settings.Add(_ParseSetting(key));
+                    break;
+
                 default:
                     metadata = _ParseMetadata();
                     break;
             }
         }
 
-        return new FileHeader(first.Span.Union(_previous!.Span), kind, description, metadata, headers, link, library);
+        return new FileHeader(first.Span.Union(_previous!.Span), kind, description, metadata, headers, link, library, settings);
+    }
+
+    /// <summary><c>clé: "texte"</c> ou <c>clé: ["texte", "texte"]</c> : un réglage natif ; la clé, déjà lue, peut s'écrire plusieurs fois.</summary>
+    private HeaderSetting _ParseSetting(Token key)
+    {
+        List<SourceSpan> values = [];
+        bool Text() => _ExpectOneOf(TokenKind.StringLiteral, TokenKind.RawStringLiteral);
+
+        if (Text()) values.Add(_Consume().Span);
+        else if (_Expect(TokenKind.OpenBracket))
+        {
+            _Consume();
+            while (!_Expect(TokenKind.CloseBracket) && !_Expect(TokenKind.EndOfFile))
+            {
+                if (!Text())
+                {
+                    _Error(_Current.Span, DiagnosticCodes.ExpectedToken, "texte attendu dans la liste", "texte attendu ici");
+                    while (!_Expect(TokenKind.CloseBracket) && !_Expect(TokenKind.EndOfFile)) _Consume();
+                    break;
+                }
+                values.Add(_Consume().Span);
+                if (_Expect(TokenKind.Comma)) _Consume();
+            }
+            _ExpectOrReport(TokenKind.CloseBracket, $"pour fermer la liste de {key.Text}");
+        }
+        else
+            _Error(_MissingAfterPrevious(), DiagnosticCodes.ExpectedToken, $"texte ou liste attendu après « {key.Text}: »", "valeur manquante ici",
+                $"par exemple : {key.Text}: \"vendor/lib\" ou {key.Text}: [\"a\", \"b\"]");
+        return new HeaderSetting(key.Span.Union(_previous!.Span), new Identifier(key.Span), values);
     }
 
     /// <summary>Vrai si le token courant est une clé d'en-tête suivie de « : ».</summary>

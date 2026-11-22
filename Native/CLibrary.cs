@@ -10,4 +10,4 @@ namespace Rgl.Native;
 /// <param name="Unconverted">Les fonctions, <c>struct</c> et <c>enum</c> de l'en-tête que les liaisons n'ont pas converties, avec la raison.</param>
 /// <param name="OtherDeclarations">Le nombre de déclarations de l'en-tête que les liaisons ne connaissent pas encore (variables…).</param>
 internal sealed record CLibrary(IReadOnlyList<string> Headers, IReadOnlyList<string> IncludeDirectories, string? Library, string Summary = "",
-    IReadOnlyList<CBindings.Unconverted>? Unconverted = null, int OtherDeclarations = 0);
+    IReadOnlyList<CBindings.Unconverted>? Unconverted = null, int OtherDeclarations = 0, NativeSettings? Settings = null);

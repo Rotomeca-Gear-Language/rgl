@@ -136,3 +136,52 @@ transitives. Un changement d’en-tête invalide l’objet. Un cache indisponibl
 la compilation fonctionner ; `rgl cache clear` le vide avec les autres caches.
 
 Le niveau `wrapper` reste mis de côté selon la décision de l’atelier.
+
+
+## Compilation et liaison
+
+Un programme C ou C++ existant se branche avec six clés, chacune un texte ou une liste de textes. Elles s'écrivent dans `rgl.json` (clé `native`, pour tout le projet) ou dans l'en-tête d'un fichier `forge: native` / `forge: descriptor` (pour cette bibliothèque).
+
+| Clé | Rôle |
+| --- | --- |
+| `include` | dossiers d'inclusion (`-I`) |
+| `define` | définitions du préprocesseur : `NOM` ou `NOM=valeur` (`-D`) |
+| `sources` | fichiers `.c`, `.cc`, `.cpp`, `.cxx` compilés avec le programme ; motifs `*`, `?`, `**` |
+| `libraries` | `.a`, `.lib`, `.dll`, `.so`, `.dylib` à lier ; une bibliothèque dynamique est copiée à côté de l'exécutable |
+| `libdirs` | dossiers où chercher les bibliothèques du système (`-L`) |
+| `system` | bibliothèques du système, sans `-l` (`m`, `pthread`, `ws2_32`) |
+
+```json
+{
+  "native": {
+    "include": "vendor/include",
+    "define": ["NDEBUG", "VERSION=3"],
+    "sources": "vendor/src/**/*.cpp",
+    "libraries": ["windows:vendor/lib/x.dll", "linux:vendor/lib/libx.so"],
+    "system": ["windows:ws2_32", "linux:pthread"]
+  }
+}
+```
+
+Un élément `windows:…`, `linux:…` ou `macos:…` ne vaut que sur cette plateforme. Dans un fichier forge :
+
+```
+forge: native
+description: "Ma bibliothèque"
+header: "vendor/lib.h"
+link: dynamic
+define: "LIB_FEATURE=1"
+sources: ["vendor/lib.c"]
+libraries: ["windows:vendor/lib.dll", "linux:vendor/libx.so"]
+```
+
+(`library: {windows: "…", linux: "…"}` reste la forme courte d'une seule archive par plateforme ; avec `link: dynamic` c'est une bibliothèque dynamique.)
+
+À savoir :
+
+- Les définitions et inclusions valent pour la lecture des en-têtes, les unités C++ et le programme : un `#ifdef` de l'en-tête voit vos `define`.
+- Les sources sont compilées par Zig (C pour un `.c`), **avec les exceptions**, comme les fichiers `.rgl.cpp` : une exception ne doit pas traverser le code RGL.
+- La liaison dynamique suppose une interface en C (`extern "C"`). Avec un descriptor (C++), `link: dynamic` avertit (W071) : l'ABI du C++ n'est pas garantie entre deux compilateurs.
+- Une DLL doit n'exporter que ses fonctions (`__declspec(dllexport)`).
+- Un paquet ne lit que ses propres fichiers (E165) ; ses bibliothèques précompilées demandent `package-trust.binaries` (E161) et ses sources `package-trust.cpp` (E150).
+- Une valeur invalide est E165.

@@ -193,15 +193,15 @@ public class NativeTests
     }
 
     [Fact]
-    public void La_liaison_dynamique_n_est_pas_disponible()
+    public void Un_mode_de_liaison_inconnu_est_refuse()
     {
-        using var project = Project(null, "import Mathx;\n!train |> $ 0;\n", Native(link: "dynamic"));
+        using var project = Project(null, "import Mathx;\n!train |> $ 0;\n", Native(link: "weak"));
 
         var diagnostics = new DiagnosticBag();
         var modules = SourceGraph.Load(new SourceText(Path.Combine(project.Path, "main.rgl"), File.ReadAllText(Path.Combine(project.Path, "main.rgl"))), project.Path, diagnostics);
 
         Assert.Null(modules);
-        Assert.Contains(diagnostics.Items, d => d.Code == DiagnosticCodes.DynamicLinkUnavailable);
+        Assert.Contains(diagnostics.Items, d => d.Code == DiagnosticCodes.MisplacedDeclaration && d.Message.Contains("weak"));
     }
 
     [Fact]

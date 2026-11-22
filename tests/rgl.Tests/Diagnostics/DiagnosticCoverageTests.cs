@@ -135,7 +135,6 @@ public class DiagnosticCoverageTests(ITestOutputHelper output)
         Add("E014", new BinderTests().Un_parametre_ne_recoit_pas_de_push);
         Add("E016", new ModuleTests().Un_forge_sans_en_tete_est_E016);
         Add("E019", new CheckAndCacheTests().Un_symbole_utilise_et_non_converti_est_E019_mais_ne_fait_pas_echouer_par_defaut);
-        Add("E020", new NativeTests().La_liaison_dynamique_n_est_pas_disponible);
         Add("E022", new LexerTests().Un_commentaire_de_bloc_non_ferme_va_jusqu_a_la_fin_et_est_signale);
         Add("E023", new LexerTests().Un_caractere_invalide_donne_un_token_Bad_et_le_lexer_continue);
         Add("E026", new LexerTests().Un_identificateur_de_plus_de_255_caracteres_est_signale);
@@ -193,5 +192,7 @@ public class DiagnosticCoverageTests(ITestOutputHelper output)
         Add("E162", new PackageIndexTests().L_index_lu_est_garde_et_sert_hors_ligne_et_sans_copie_c_est_E162);
         Add("E163", new PackageIndexTests().Add_d_un_nom_court_inconnu_est_E163_avec_les_noms_proches);
         Add("E164", new PackageIndexTests().Run_d_un_nom_qui_n_est_pas_un_script_de_l_index_est_E164);
+        Add("E165", new NativeSettingsTests().Un_reglage_invalide_est_E165);
+        Add("W071", new NativeSettingsTests().Une_liaison_dynamique_d_un_descriptor_avertit_W071);
     }
 }

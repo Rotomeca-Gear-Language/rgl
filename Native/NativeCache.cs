@@ -73,7 +73,7 @@ internal static partial class NativeCache
     public static string? Key(ICompilerToolchain toolchain, IReadOnlyList<string> headers, IReadOnlyList<string> includeDirectories, string fileName)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        hash.AppendData(Encoding.UTF8.GetBytes($"rgl-native|{toolchain.Name}|{toolchain.Target}|{typeof(NativeCache).Assembly.ManifestModule.ModuleVersionId}|{fileName}|{headers.Count}"));
+        hash.AppendData(Encoding.UTF8.GetBytes($"rgl-native|{toolchain.Name}|{toolchain.Target}|{typeof(NativeCache).Assembly.ManifestModule.ModuleVersionId}|{fileName}|{headers.Count}|{string.Join('\u001f', includeDirectories)}"));
 
         foreach (var header in headers)
         {

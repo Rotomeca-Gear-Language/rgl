@@ -2,6 +2,7 @@ using System.Text.Json;
 using Rgl.Build.Toolchain;
 using Rgl.Diagnostics;
 using Rgl.IR;
+using Rgl.Native;
 using Rgl.Project.Packages;
 
 namespace Rgl.Project;
@@ -44,6 +45,9 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
     /// <summary>Ce que le projet autorise à ses paquets (clé <c>package-trust</c>) ; rien sans cette clé.</summary>
     public PackageTrust Trust { get; init; } = Trust ?? PackageTrust.None;
 
+    /// <summary>Les réglages de compilation et de liaison de tout le projet (clé <c>native</c>) ; <see cref="NativeSettings.Empty"/> sans cette clé.</summary>
+    public NativeSettings Native { get; init; } = NativeSettings.Empty;
+
     /// <summary>Les paquets du projet : adresse → version exacte ; vide sans clé <c>dependencies</c>.</summary>
     public IReadOnlyDictionary<string, string> Dependencies { get; init; } = Dependencies is { Count: > 0 } ? Dependencies : NoDependencies;
 
@@ -59,7 +63,7 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
     public const string SupportedLanguageVersion = "0";
 
     /// <summary>Clés reconnues ; les autres déclenchent un avertissement.</summary>
-    private static readonly string[] KnownKeys = ["name", "version", "icon", "rgl", "overflow", "recursion", "exclude", "assets", "safe", "loop", "no-trust", "no-cpp", "cpp-trust", "profiles", "dependencies", "package-trust"];
+    private static readonly string[] KnownKeys = ["name", "version", "icon", "rgl", "overflow", "recursion", "exclude", "assets", "safe", "loop", "no-trust", "no-cpp", "cpp-trust", "profiles", "dependencies", "package-trust", "native"];
 
     /// <summary>Lit et valide un manifeste ; renvoie <c>null</c> si une erreur a été signalée.</summary>
     /// <param name="path">Chemin de <c>rgl.json</c>.</param>
@@ -155,14 +159,15 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
             var (profilesOk, profiles) = ReadProfiles(root, path, diagnostics);
             var (dependenciesOk, dependencies) = PackageManifest.ReadDependencies(root, path, diagnostics);
             var (trustOk, trust) = PackageTrust.Read(root, path, diagnostics);
+            var (nativeOk, native) = ReadNative(root, path, diagnostics);
 
-            if (!trustOk || !dependenciesOk || !profilesOk || !profileOverflowOk || !noTrustOk || !noCppOk || !cppTrustOk || !assetsOk || name is null || version is null || language is null || overflowMode is null || !recursionOk || !excludeOk || !safeOk || !loopOk)
+            if (!nativeOk || !trustOk || !dependenciesOk || !profilesOk || !profileOverflowOk || !noTrustOk || !noCppOk || !cppTrustOk || !assetsOk || name is null || version is null || language is null || overflowMode is null || !recursionOk || !excludeOk || !safeOk || !loopOk)
                 return null;
 
             if (icon is not null && !File.Exists(Path.Combine(Path.GetDirectoryName(path)!, icon)))
                 diagnostics.Warning($"icône « {icon} » introuvable", path);
 
-            return new ProjectManifest(name, version, icon, language, overflowMode.Value, recursion, exclude, safe, boundedLoops, noTrust, noCpp, cppTrust, assets, releaseOverflow, profiles, dependencies, trust);
+            return new ProjectManifest(name, version, icon, language, overflowMode.Value, recursion, exclude, safe, boundedLoops, noTrust, noCpp, cppTrust, assets, releaseOverflow, profiles, dependencies, trust) { Native = native };
         }
     }
 
@@ -299,6 +304,51 @@ internal sealed record ProjectManifest(string Name, string Version, string? Icon
         if (value.ValueKind is JsonValueKind.True or JsonValueKind.False) return (true, value.GetBoolean());
         diagnostics.Error($"la clé « {key} » vaut true ou false", path);
         return (false, false);
+    }
+
+    /// <summary>
+    /// La clé <c>native</c> : <c>{"include": […], "define": […], "sources": […], "libraries": […], "libdirs": […], "system": […]}</c> ; chaque valeur est un texte ou un tableau de textes, les chemins
+    /// partent du dossier du manifeste (et peuvent le quitter : le projet est chez lui). Un élément <c>windows:</c>, <c>linux:</c> ou <c>macos:</c> ne vaut que sur cette plateforme.
+    /// </summary>
+    private static (bool Ok, NativeSettings Settings) ReadNative(JsonElement root, string path, DiagnosticBag diagnostics)
+    {
+        if (!root.TryGetProperty("native", out var value)) return (true, NativeSettings.Empty);
+        const string Help = "include, define, sources, libraries, libdirs, system : chacune un texte ou un tableau de textes";
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            diagnostics.Error($"la clé « native » est un objet ({Help})", path, DiagnosticCodes.InvalidNativeSettings);
+            return (false, NativeSettings.Empty);
+        }
+
+        var raw = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (var property in value.EnumerateObject())
+        {
+            if (!NativeSettings.Keys.Contains(property.Name))
+            {
+                diagnostics.Error($"native : clé inconnue « {property.Name} » ({Help})", path, DiagnosticCodes.InvalidNativeSettings);
+                return (false, NativeSettings.Empty);
+            }
+            var entries = property.Value.ValueKind switch
+            {
+                JsonValueKind.String => [property.Value.GetString()!],
+                JsonValueKind.Array when property.Value.EnumerateArray().All(e => e.ValueKind == JsonValueKind.String) => property.Value.EnumerateArray().Select(e => e.GetString()!).ToList(),
+                _ => null,
+            };
+            if (entries is null)
+            {
+                diagnostics.Error($"native.{property.Name} est un texte ou un tableau de textes", path, DiagnosticCodes.InvalidNativeSettings);
+                return (false, NativeSettings.Empty);
+            }
+            raw[property.Name] = entries;
+        }
+
+        var ok = true;
+        var settings = NativeSettings.Resolve(raw, Path.GetDirectoryName(Path.GetFullPath(path))!, restrictTo: null, forceDynamic: false, (message, key) =>
+        {
+            ok = false;
+            diagnostics.Error($"native.{key} : {message}", path, DiagnosticCodes.InvalidNativeSettings);
+        });
+        return settings is null || !ok ? (false, NativeSettings.Empty) : (true, settings.IsEmpty ? NativeSettings.Empty : settings);
     }
 
     private static (bool Ok, string[] Paths) ReadCppTrust(JsonElement root, string path, DiagnosticBag diagnostics)

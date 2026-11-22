@@ -506,8 +506,11 @@ internal static class DiagnosticCodes
     /// <summary>Le C++ d'un fichier <c>.rgl.cpp</c> que Clang refuse : c'est une erreur du fichier de l'utilisateur, pas un bug du transpileur.</summary>
     public const string NativeCodeFailed = "E146";
 
-    /// <summary><c>link: dynamic</c> dans un fichier <c>forge: native</c> : seule la liaison statique est disponible.</summary>
-    public const string DynamicLinkUnavailable = "E020";
+    /// <summary>E165 : un réglage natif invalide (<c>include</c>, <c>define</c>, <c>sources</c>, <c>libraries</c>, <c>libdirs</c>, <c>system</c>) dans <c>rgl.json</c> ou un en-tête forge.</summary>
+    public const string InvalidNativeSettings = "E165";
+
+    /// <summary>W071 : <c>link: dynamic</c> dans un fichier <c>forge: descriptor</c> : l'interface binaire du C++ n'est pas garantie entre deux compilateurs.</summary>
+    public const string DynamicCppLink = "W071";
 
     /// <summary>Gear <c>pure</c> avec un paramètre <c>mut</c> : modifier l'appelant est un effet.</summary>
     public const string PureWithMutParameter = "E122";

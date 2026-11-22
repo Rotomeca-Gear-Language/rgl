@@ -169,7 +169,7 @@ internal sealed class ZigToolchain : ICompilerToolchain, IWebAssemblyToolchain
             "-isystem", Path.Combine(_runtime, "third_party", "ctre"),
             .. _NativeIncludes(natives),
             mainCpp, .. objects,
-            .. natives?.Select(n => n.Library).OfType<string>().Distinct() ?? [],
+            .. _NativeLinkInputs(natives),
             .. LinkFlags(profile),
             "-o", executable,
         ];
@@ -207,6 +207,18 @@ internal sealed class ZigToolchain : ICompilerToolchain, IWebAssemblyToolchain
         }
 
         var linked = _Step(log, arguments);
+        if (linked)
+        {
+            try
+            {
+                _CopyDynamicLibraries(natives, executable);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                log.Append($"impossible de copier une bibliothèque dynamique à côté de l'exécutable : {error.Message}\n");
+                linked = false;
+            }
+        }
         // Les DLL d'OpenSSL doivent se trouver à côté de l'exécutable pour qu'il démarre.
         if (linked && _openSsl is not null && _target.Contains("windows") && needed.Contains(RuntimeComponent.HttpTls))
             foreach (var dll in Directory.GetFiles(Path.Combine(_openSsl, "bin"), "*.dll"))
@@ -275,15 +287,15 @@ internal sealed class ZigToolchain : ICompilerToolchain, IWebAssemblyToolchain
     public ToolchainResult DumpHeaderAst(string header, IReadOnlyList<string> includeDirectories, Action<Stream> read, bool cpp = false) =>
         // « zig cc » et « zig c++ » lisent avec les en-têtes de Zig (la machine n'a pas à avoir un compilateur installé) ; « -x c » ou « -x c++ » impose le langage à un .h.
         // Ils préparent un objet dans leur cache même quand on ne demande que la syntaxe, et échouent parfois à le renommer : ce seul échec n'est pas celui de l'en-tête.
-        _DumpHeader([cpp ? "c++" : "cc", "-x", cpp ? "c++" : "c", .. cpp ? new[] { "-std=c++23" } : [], "-target", _target, "-Xclang", "-ast-dump=json", "-fsyntax-only", .. includeDirectories.Select(d => "-I" + d), header], read, syntaxOnly: true);
+        _DumpHeader([cpp ? "c++" : "cc", "-x", cpp ? "c++" : "c", .. cpp ? new[] { "-std=c++23" } : [], "-target", _target, "-Xclang", "-ast-dump=json", "-fsyntax-only", .. includeDirectories.Select(_IncludeFlag), header], read, syntaxOnly: true);
 
     /// <inheritdoc/>
     public ToolchainResult DumpHeaderMacros(string header, IReadOnlyList<string> includeDirectories, Action<Stream> read) =>
-        _DumpHeader(["cc", "-x", "c", "-target", _target, "-E", "-dD", .. includeDirectories.Select(d => "-I" + d), header], read);
+        _DumpHeader(["cc", "-x", "c", "-target", _target, "-E", "-dD", .. includeDirectories.Select(_IncludeFlag), header], read);
 
     /// <inheritdoc/>
     public ToolchainResult ListHeaderDependencies(string header, IReadOnlyList<string> includeDirectories, Action<Stream> read) =>
-        _DumpHeader(["cc", "-x", "c", "-target", _target, "-MM", .. includeDirectories.Select(d => "-I" + d), header], read);
+        _DumpHeader(["cc", "-x", "c", "-target", _target, "-MM", .. includeDirectories.Select(_IncludeFlag), header], read);
 
     /// <inheritdoc/>
     public ToolchainResult CompileNativeUnit(string source, string objectFile, BuildProfile profile, IReadOnlyList<string> includeDirectories)
@@ -292,13 +304,15 @@ internal sealed class ZigToolchain : ICompilerToolchain, IWebAssemblyToolchain
         Directory.CreateDirectory(Path.GetDirectoryName(objectFile)!);
 
         // Du C++ écrit à la main : avec les exceptions et le RTTI, que le programme et le runtime n'ont pas.
-        var flags = _CompileFlags(profile).Where(f => f != "-fno-rtti").Select(f => f == "-fno-exceptions" ? "-fexceptions" : f);
+        // Un fichier .c est du C : « zig cc », sans les options propres au C++.
+        var isC = source.EndsWith(".c", StringComparison.OrdinalIgnoreCase);
+        var flags = _CompileFlags(profile).Where(f => f != "-fno-rtti" && !(isC && f.StartsWith("-std=c++", StringComparison.Ordinal))).Select(f => f == "-fno-exceptions" ? "-fexceptions" : f);
         List<string> arguments =
         [
-            "c++", .. flags, "-target", _target,
+            isC ? "cc" : "c++", .. flags, "-target", _target,
             "-I" + Path.Combine(_runtime, "include"),
             "-isystem", Path.Combine(_runtime, "third_party", "ctre"),
-            .. includeDirectories.Select(d => "-I" + d),
+            .. includeDirectories.Select(_IncludeFlag),
             "-c", source, "-o", objectFile,
         ];
         // Le cache doit dépendre des inclusions transitives, et non de la date du .cpp engendré.
@@ -375,7 +389,36 @@ internal sealed class ZigToolchain : ICompilerToolchain, IWebAssemblyToolchain
 
     /// <summary>Les options <c>-I</c> des dossiers d'en-têtes des bibliothèques C du programme.</summary>
     private static IEnumerable<string> _NativeIncludes(IReadOnlyList<CLibrary>? natives) =>
-        natives?.SelectMany(n => n.IncludeDirectories).Distinct().Select(d => "-I" + d) ?? [];
+        natives?.SelectMany(n => n.IncludeDirectories).Distinct().Select(_IncludeFlag) ?? [];
+
+    /// <summary>
+    /// Une entrée des listes « dossiers d'inclusion » : une définition (<c>-DNOM=valeur</c>) passe telle quelle, un chemin devient <c>-I</c> suivi du dossier.
+    /// Les définitions voyagent dans la même liste pour que toute la chaîne (lecture des en-têtes, unités natives, programme) les reçoive sans changer d'interface.
+    /// </summary>
+    private static string _IncludeFlag(string entry) => entry.StartsWith("-D", StringComparison.Ordinal) ? entry : "-I" + entry;
+
+    /// <summary>Les entrées d'édition de liens de la plateforme : bibliothèques, dossiers et bibliothèques du système des réglages natifs, et le <c>rpath</c> d'une bibliothèque dynamique sous Linux.</summary>
+    private IEnumerable<string> _NativeLinkInputs(IReadOnlyList<CLibrary>? natives)
+    {
+        var settings = natives?.Select(n => n.Settings).OfType<NativeSettings>().ToArray() ?? [];
+        foreach (var library in natives?.Select(n => n.Library).OfType<string>().Distinct() ?? []) yield return library;
+        foreach (var directory in settings.SelectMany(s => s.LibraryDirectories).Distinct()) yield return "-L" + directory;
+        foreach (var library in settings.SelectMany(s => s.Libraries).DistinctBy(l => l.Path, StringComparer.OrdinalIgnoreCase)) yield return library.Path;
+        foreach (var name in settings.SelectMany(s => s.SystemLibraries).Distinct()) yield return "-l" + name;
+        if (_target.Contains("linux") && settings.Any(s => s.Libraries.Any(l => l.IsDynamic))) yield return "-Wl,-rpath,$ORIGIN";
+    }
+
+    /// <summary>Copie à côté de l'exécutable chaque bibliothèque dynamique du programme : sans elle (Windows) ou sans son <c>rpath</c> (Linux), il ne démarre pas ailleurs que chez elle.</summary>
+    private static void _CopyDynamicLibraries(IReadOnlyList<CLibrary>? natives, string executable)
+    {
+        var directory = Path.GetDirectoryName(executable)!;
+        foreach (var library in natives?.Select(n => n.Settings).OfType<NativeSettings>().SelectMany(s => s.Libraries).Where(l => l.IsDynamic).DistinctBy(l => l.Path, StringComparer.OrdinalIgnoreCase) ?? [])
+        {
+            var target = Path.Combine(directory, Path.GetFileName(library.Path));
+            if (!string.Equals(Path.GetFullPath(target), Path.GetFullPath(library.Path), StringComparison.OrdinalIgnoreCase))
+                File.Copy(library.Path, target, overwrite: true);
+        }
+    }
 
     #region Runtime
 

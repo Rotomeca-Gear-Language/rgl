@@ -641,7 +641,7 @@ internal static class SourceGraph
             var header = unit.Header!;
             var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
 
-            if (_ResolveHeaderFiles(header, directory) is not var (headers, library)) return null;
+            if (_ResolveHeaderFiles(header, directory) is not var (headers, library, settings)) return null;
 
             if (_toolchain is null)
             {
@@ -650,13 +650,14 @@ internal static class SourceGraph
                 return null;
             }
 
-            var includes = headers.Select(h => Path.GetDirectoryName(h.Path)!).Distinct().ToList();
+            // Les dossiers des en-têtes, puis les dossiers et définitions écrits dans l'en-tête (la liste porte aussi les « -D… » : voir ZigToolchain).
+            var includes = headers.Select(h => Path.GetDirectoryName(h.Path)!).Concat(settings.PreprocessorOptions).Distinct().ToList();
 
             // Les mêmes en-têtes (et ce qu'ils incluent), avec le même Clang, le même compilateur et la même cible, donnent les mêmes liaisons : le texte est rangé dans le cache.
             var key = _cacheDirectory is null ? null : NativeCache.Key(_toolchain, [.. headers.Select(h => h.Path)], includes, Path.GetFileName(path));
             if (key is not null && NativeCache.Lookup(_cacheDirectory!, key) is { } cached)
             {
-                var fromCache = new CLibrary([.. headers.Select(h => h.Path)], includes, library, cached.Summary, cached.Unconverted, cached.OtherDeclarations);
+                var fromCache = new CLibrary([.. headers.Select(h => h.Path)], includes, library, cached.Summary, cached.Unconverted, cached.OtherDeclarations, settings);
                 _NoteLeftOut(path, fromCache);
                 return _ParseBindings(path, cached.Source, fromCache);
             }
@@ -698,7 +699,7 @@ internal static class SourceGraph
 
             var bindings = CBindings.Generate(new CHeader(functions, skipped, aliases, records, enums, macros), Path.GetFileName(path), _toolchain.Target);
             var summary = $"{Path.GetFileName(path)} : {bindings.Converted} fonction(s), {bindings.Types} type(s) et {bindings.Constants} constante(s) convertis, {bindings.Unconverted.Count} déclaration(s) et {bindings.OtherDeclarations} autre(s) pas encore prises en charge";
-            var generated = new CLibrary([.. headers.Select(h => h.Path)], includes, library, summary, bindings.Unconverted, bindings.OtherDeclarations);
+            var generated = new CLibrary([.. headers.Select(h => h.Path)], includes, library, summary, bindings.Unconverted, bindings.OtherDeclarations, settings);
             _NoteLeftOut(path, generated);
             if (key is not null) NativeCache.Store(_cacheDirectory!, key, summary, bindings.OtherDeclarations, bindings.Unconverted, bindings.Source);
             return _ParseBindings(path, bindings.Source, generated);
@@ -760,8 +761,35 @@ internal static class SourceGraph
         /// Les en-têtes et la bibliothèque statique de la plateforme que décrit l'en-tête d'un fichier <c>forge: native</c> ou <c>forge: descriptor</c>, en chemins complets, relatifs au
         /// dossier du fichier. Un fichier absent est une erreur (E107) ; <see langword="null"/> après une erreur signalée.
         /// </summary>
-        private ((SourceSpan Span, string Path)[] Headers, string? Library)? _ResolveHeaderFiles(FileHeader header, string directory)
+        private ((SourceSpan Span, string Path)[] Headers, string? Library, NativeSettings Settings)? _ResolveHeaderFiles(FileHeader header, string directory)
         {
+            var dynamicLink = header.Link?.Name == "dynamic";
+            var owner = _nativePolicy.PackageOf(Path.Combine(directory, "_"));
+
+            // Les réglages natifs écrits dans l'en-tête : un paquet ne sort pas de son dossier, et ses bibliothèques précompilées demandent l'accord du projet.
+            Dictionary<string, List<string>> settingValues = [];
+            var settingsOk = true;
+            foreach (var setting in header.Settings ?? [])
+            {
+                if (!settingValues.TryGetValue(setting.Key.Name, out var list)) settingValues[setting.Key.Name] = list = [];
+                list.AddRange(setting.Values.Select(v => _Unquote(v.Text)));
+            }
+            var settings = settingValues.Count == 0 ? NativeSettings.Empty
+                : NativeSettings.Resolve(settingValues.ToDictionary(p => p.Key, p => (IReadOnlyList<string>)p.Value), directory, owner?.Directory, dynamicLink,
+                    (message, key) =>
+                    {
+                        settingsOk = false;
+                        var span = header.Settings!.Last(s => s.Key.Name == key).Span;
+                        _diagnostics.Error(span, DiagnosticCodes.InvalidNativeSettings, message, key, ["les réglages natifs : include, define, sources, libraries, libdirs, system"]);
+                    });
+            if (!settingsOk || settings is null) return null;
+            if (settings.Libraries.Count > 0 && owner is not null && !_nativePolicy.AllowsBinaries(Path.Combine(directory, "_")))
+            {
+                _diagnostics.Error(header.Settings!.First(s => s.Key.Name == "libraries").Span, DiagnosticCodes.PackageBinary, $"le paquet « {owner.Source} » lie une bibliothèque précompilée, que le projet n'autorise pas", "bibliothèque précompilée",
+                    ["écris le paquet dans package-trust.binaries du manifeste du projet pour garder ses binaires"]);
+                return null;
+            }
+
             List<(SourceSpan Span, string Path)> headers = [];
             foreach (var written in header.Headers ?? [])
             {
@@ -793,8 +821,15 @@ internal static class SourceGraph
                         ["le chemin d'une bibliothèque est relatif au dossier du fichier forge"]);
                     return null;
                 }
+
+                // Avec link: dynamic, c'est une bibliothèque dynamique : on la lie comme les autres et on la copie à côté de l'exécutable.
+                if (dynamicLink || NativeSettings.IsDynamicLibrary(library))
+                {
+                    settings = settings.Merge(new NativeSettings([], [], [], [new NativeLibrary(library, true)], [], []));
+                    library = null;
+                }
             }
-            return ([.. headers], library);
+            return ([.. headers], library, settings);
         }
 
         /// <summary>
@@ -805,7 +840,7 @@ internal static class SourceGraph
         {
             var header = unit.Header!;
             var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
-            if (_ResolveHeaderFiles(header, directory) is not var (headers, library)) return null;
+            if (_ResolveHeaderFiles(header, directory) is not var (headers, library, settings)) return null;
 
             var paths = headers.Select(h => h.Path).ToArray();
             var descriptors = unit.Statements.OfType<DescriptorDeclaration>().ToArray();
@@ -816,8 +851,8 @@ internal static class SourceGraph
             var parsed = _Errors() > before ? null : new Parser(tokens, _diagnostics).Parse();
             if (parsed is null || _Errors() > before) return null;
 
-            var includes = paths.Select(p => Path.GetDirectoryName(p)!).Distinct().ToList();
-            return (parsed, new CLibrary([], includes, library, $"{Path.GetFileName(path)} : {descriptors.Length} descriptor(s)"), generated.Bodies);
+            var includes = paths.Select(p => Path.GetDirectoryName(p)!).Concat(settings.PreprocessorOptions).Distinct().ToList();
+            return (parsed, new CLibrary([], includes, library, $"{Path.GetFileName(path)} : {descriptors.Length} descriptor(s)", Settings: settings), generated.Bodies);
         }
 
         /// <summary>Le texte d'un chemin écrit entre guillemets, sans eux.</summary>

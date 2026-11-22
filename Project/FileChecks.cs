@@ -119,8 +119,8 @@ internal static class FileChecks
         foreach (var extra in unit.Statements.OfType<NamespaceDeclaration>().Skip(1))
             diagnostics.Error(extra.Span, DiagnosticCodes.InvalidNamespace, "un fichier n'a qu'un namespace", "second namespace", ["retire-le : un seul namespace par fichier"]);
 
-        if (kind.Name is not ("native" or "descriptor") && (unit.Header.Headers is { Count: > 0 } || unit.Header.Link is not null || unit.Header.Library is not null))
-            diagnostics.Error(unit.Header.Span, DiagnosticCodes.MisplacedDeclaration, "header:, link: et library: s'écrivent dans un fichier forge: native ou descriptor", "pas dans ce genre de fichier",
+        if (kind.Name is not ("native" or "descriptor") && (unit.Header.Headers is { Count: > 0 } || unit.Header.Link is not null || unit.Header.Library is not null || unit.Header.Settings is { Count: > 0 }))
+            diagnostics.Error(unit.Header.Span, DiagnosticCodes.MisplacedDeclaration, "header:, link:, library: et les réglages natifs (include, define, sources, libraries, libdirs, system) s'écrivent dans un fichier forge: native ou descriptor", "pas dans ce genre de fichier",
                 ["ces clés décrivent une bibliothèque C : elles n'ont de sens que dans un fichier forge: native"]);
 
         _CheckNativeComponents(unit, kind.Name, diagnostics);
@@ -234,10 +234,13 @@ internal static class FileChecks
             diagnostics.Error(header.Span, DiagnosticCodes.MisplacedDeclaration, $"un fichier forge: {(descriptors ? "descriptor" : "native")} dit comment il se lie : « link: static »", "link manquant",
                 ["seule la liaison statique existe pour l'instant : link: static"]);
         else if (link.Name == "dynamic")
-            diagnostics.Error(link.Span, DiagnosticCodes.DynamicLinkUnavailable, "link: dynamic n'est pas disponible avant la V2", "liaison dynamique",
-                ["la V2 ajoutera la liaison dynamique", "utilise link: static avec une bibliothèque statique (.a, .lib)"]);
+        {
+            if (descriptors)
+                diagnostics.Warning(link.Span, DiagnosticCodes.DynamicCppLink, "link: dynamic avec un descriptor : l'interface binaire du C++ n'est pas garantie", "liaison dynamique de C++",
+                    ["une bibliothèque dynamique écrite en C++ doit être compilée avec le même compilateur et la même bibliothèque standard que le programme", "une interface en C (extern \"C\") n'a pas ce risque"]);
+        }
         else if (link.Name != "static")
-            diagnostics.Error(link.Span, DiagnosticCodes.MisplacedDeclaration, $"mode de liaison inconnu : « {link.Name} »", "mode inconnu", ["modes : static"]);
+            diagnostics.Error(link.Span, DiagnosticCodes.MisplacedDeclaration, $"mode de liaison inconnu : « {link.Name} »", "mode inconnu", ["modes : static, dynamic"]);
 
         foreach (var entry in header.Library ?? [])
             if (entry.Platform.Name is not ("windows" or "linux"))

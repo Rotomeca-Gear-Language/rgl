@@ -105,7 +105,7 @@ internal static class BuildPipeline
 
         if (output == BuildOutput.Vectorization)
         {
-            result = toolchain.ExplainVectorization(mainCpp, profile, cpp.Natives);
+            result = toolchain.ExplainVectorization(mainCpp, profile, _WithProjectSettings(cpp.Natives, manifest));
             File.WriteAllText(log, result.Log);
             if (result.Success)
             {
@@ -117,7 +117,7 @@ internal static class BuildPipeline
         {
             // L'assembleur reste dans le cache, rangé par profil : ses optimisations sont celles du profil.
             var assembly = Path.Combine(projectDirectory, "asm", profileName, "main.s");
-            result = toolchain.EmitAssembly(mainCpp, assembly, profile, cpp.Natives);
+            result = toolchain.EmitAssembly(mainCpp, assembly, profile, _WithProjectSettings(cpp.Natives, manifest));
             File.WriteAllText(log, result.Log);
             if (result.Success) return new BuildResult(cppDirectory, null, assembly);
         }
@@ -129,12 +129,35 @@ internal static class BuildPipeline
             var icon = ProgramIcon.Prepare(project, Path.Combine(projectDirectory, "icon"), diagnostics);
 
             // Le C++ des composants écrits en C++ se compile d'abord, avec les exceptions : s'il ne compile pas, c'est l'erreur du fichier de l'utilisateur.
-            List<CLibrary> natives = [.. cpp.Natives ?? []];
+            List<CLibrary> natives = [.. _WithProjectSettings(cpp.Natives, manifest)];
+
+            // Les inclusions et définitions de tous les réglages natifs valent pour chaque unité C++ et chaque source : une bibliothèque se compile comme le programme qui l'utilise.
+            var shared = natives.SelectMany(n => n.IncludeDirectories).Distinct().ToArray();
+
+            // Les fichiers C et C++ des réglages (clé « sources ») : un objet chacun, rangé avec le C++ engendré, lié au programme.
+            var sourceObjects = new List<NativeLibrary>();
+            foreach (var sourceFile in natives.Select(n => n.Settings).OfType<NativeSettings>().SelectMany(s => s.Sources).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var sourceName = Path.GetFileNameWithoutExtension(sourceFile) + "-" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sourceFile)))[..8];
+                var sourceObject = Path.Combine(cppDirectory, "sources", sourceName + ".o");
+                var compiledSource = toolchain.CompileNativeUnit(sourceFile, sourceObject, profile, [Path.GetDirectoryName(sourceFile)!, .. shared]);
+                File.WriteAllText(log, compiledSource.Log);
+                if (!compiledSource.Success)
+                {
+                    var lines = compiledSource.Log.Split(new[] { (char)10 }, StringSplitOptions.RemoveEmptyEntries).Where(l => !l.StartsWith("$ ", StringComparison.Ordinal)).Take(8).Select(l => l.TrimEnd()).ToArray();
+                    diagnostics.Add(new Diagnostic(DiagnosticLevel.Error, $"{Path.GetFileName(sourceFile)} ne compile pas", sourceFile, Code: DiagnosticCodes.NativeCodeFailed, Help: lines));
+                    return null;
+                }
+                sourceObjects.Add(new NativeLibrary(sourceObject, false));
+            }
+            if (sourceObjects.Count > 0)
+                natives.Add(new CLibrary([], [], null, Settings: new NativeSettings([], [], [], sourceObjects, [], [])));
+
             foreach (var unit in cpp.NativeUnits ?? [])
             {
                 var generated = Path.Combine(cppDirectory, unit.Name + ".rgl.gen.cpp");
                 var objectFile = Path.Combine(cppDirectory, unit.Name + ".rgl.o");
-                var compiled = toolchain.CompileNativeUnit(generated, objectFile, profile, [Path.GetDirectoryName(unit.SourcePath)!, .. unit.IncludeDirectories ?? []]);
+                var compiled = toolchain.CompileNativeUnit(generated, objectFile, profile, [Path.GetDirectoryName(unit.SourcePath)!, .. unit.IncludeDirectories ?? [], .. shared]);
                 File.WriteAllText(log, compiled.Log);
                 if (!compiled.Success)
                 {
@@ -167,5 +190,15 @@ internal static class BuildPipeline
             Help: ["c'est un bug du transpileur, pas une erreur dans ton programme",
                    $"le détail est dans {log}, et le C++ dans {mainCpp}"]));
         return null;
+    }
+
+    /// <summary>
+    /// Les bibliothèques natives du programme, avec en tête les réglages du manifeste (clé <c>native</c>) : une bibliothèque sans en-tête, qui ne porte que ses inclusions,
+    /// définitions, sources et bibliothèques à lier.
+    /// </summary>
+    private static IReadOnlyList<CLibrary> _WithProjectSettings(IReadOnlyList<CLibrary>? natives, ProjectManifest? manifest)
+    {
+        if (manifest is null || manifest.Native.IsEmpty) return natives ?? [];
+        return [new CLibrary([], [.. manifest.Native.PreprocessorOptions], null, Settings: manifest.Native), .. natives ?? []];
     }
 }
